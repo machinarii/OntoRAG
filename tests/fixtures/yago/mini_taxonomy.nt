@@ -1,0 +1,23 @@
+<http://schema.org/Thing> <http://www.w3.org/2000/01/rdf-schema#label> "Thing"@en .
+<http://schema.org/Thing> <http://www.w3.org/2000/01/rdf-schema#comment> "The most generic type."@en .
+<http://schema.org/Person> <http://www.w3.org/2000/01/rdf-schema#subClassOf> <http://schema.org/Thing> .
+<http://schema.org/Person> <http://www.w3.org/2000/01/rdf-schema#label> "Person"@en .
+<http://schema.org/Person> <http://www.w3.org/2000/01/rdf-schema#comment> "A human being."@en .
+<http://schema.org/Organization> <http://www.w3.org/2000/01/rdf-schema#subClassOf> <http://schema.org/Thing> .
+<http://schema.org/Organization> <http://www.w3.org/2000/01/rdf-schema#label> "Organization"@en .
+<http://schema.org/Organization> <http://www.w3.org/2000/01/rdf-schema#comment> "An organization."@en .
+<http://schema.org/MedicalEntity> <http://www.w3.org/2000/01/rdf-schema#subClassOf> <http://schema.org/Thing> .
+<http://schema.org/MedicalEntity> <http://www.w3.org/2000/01/rdf-schema#label> "MedicalEntity"@en .
+<http://schema.org/MedicalEntity> <http://www.w3.org/2000/01/rdf-schema#comment> "A medical entity."@en .
+<http://schema.org/Drug> <http://www.w3.org/2000/01/rdf-schema#subClassOf> <http://schema.org/MedicalEntity> .
+<http://schema.org/Drug> <http://www.w3.org/2000/01/rdf-schema#label> "Drug"@en .
+<http://schema.org/Drug> <http://www.w3.org/2000/01/rdf-schema#comment> "A chemical or biologic substance."@en .
+<http://schema.org/Medication> <http://www.w3.org/2000/01/rdf-schema#subClassOf> <http://schema.org/Drug> .
+<http://schema.org/Medication> <http://www.w3.org/2000/01/rdf-schema#label> "Medication"@en .
+<http://schema.org/Medication> <http://www.w3.org/2000/01/rdf-schema#comment> "A medication."@en .
+<http://schema.org/Vaccine> <http://www.w3.org/2000/01/rdf-schema#subClassOf> <http://schema.org/Drug> .
+<http://schema.org/Vaccine> <http://www.w3.org/2000/01/rdf-schema#label> "Vaccine"@en .
+<http://schema.org/Hospital> <http://www.w3.org/2000/01/rdf-schema#subClassOf> <http://schema.org/Organization> .
+<http://schema.org/Hospital> <http://www.w3.org/2000/01/rdf-schema#subClassOf> <http://schema.org/MedicalEntity> .
+<http://schema.org/Hospital> <http://www.w3.org/2000/01/rdf-schema#label> "Hospital"@en .
+<http://schema.org/Hospital> <http://www.w3.org/2000/01/rdf-schema#comment> "A hospital."@en .

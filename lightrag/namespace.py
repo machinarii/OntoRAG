@@ -16,8 +16,10 @@ class NameSpace:
     VECTOR_STORE_ENTITIES = "entities"
     VECTOR_STORE_RELATIONSHIPS = "relationships"
     VECTOR_STORE_CHUNKS = "chunks"
+    VECTOR_STORE_YAGO_CLASSES = "yago_classes"
 
     GRAPH_STORE_CHUNK_ENTITY_RELATION = "chunk_entity_relation"
+    GRAPH_STORE_YAGO_TAXONOMY = "yago_taxonomy"
 
     DOC_STATUS = "doc_status"
 
