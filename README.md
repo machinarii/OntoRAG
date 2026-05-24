@@ -13,12 +13,6 @@ OntoRAG is a fork of [HKUDS/LightRAG](https://github.com/HKUDS/LightRAG) that la
 
 ---
 
-<div align="center">
-
-<div style="margin: 20px 0;">
-  <img src="./assets/logo.png" width="120" height="120" alt="LightRAG Logo" style="border-radius: 20px; box-shadow: 0 8px 32px rgba(0, 217, 255, 0.3);">
-</div>
-
 ## Installation
 
 **💡 Using uv for Package Management**: This project uses [uv](https://docs.astral.sh/uv/) for fast and reliable Python package management. Install uv first: `curl -LsSf https://astral.sh/uv/install.sh | sh` (Unix/macOS) or `powershell -c "irm https://astral.sh/uv/install.ps1 | iex"` (Windows)
