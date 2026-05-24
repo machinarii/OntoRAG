@@ -10,8 +10,9 @@ Top-level directories:
 
 - **lightrag/**: Core Python package — see *Module Layout* below.
 - **lightrag_webui/**: React 19 + TypeScript client (Bun + Vite + Tailwind). UI components in `src/`.
-- **scripts/**: `test.sh` (preferred test runner), `setup/` interactive environment wizard (use `make env-*` rather than calling `setup.sh` directly — see *Configuration > Setup Wizard Outputs*), and release tooling.
+- **scripts/**: `test.sh` (preferred test runner), `setup/` interactive environment wizard (use `make env-*` rather than calling `setup.sh` directly — see *Configuration > Setup Wizard Outputs*), release tooling, and `yago/` — bootstrap CLI (`build_yago_taxonomy.py`), corpus coverage gate (`check_coverage.py`), and a `fetch_yago.sh` redirect (the files are already committed; pass `--fetch` to re-download).
 - **tests/** and root-level `test_*.py`: Pytest coverage. Working datasets stay in `inputs/`, `rag_storage/`, and `temp/`; deployment collateral lives in `docs/`, `k8s-deploy/`, and compose files.
+- **yago/**: Committed YAGO 4.0 T-Box files (`yago-wd-class.nt`, `yago-wd-schema.nt`, `yago-wd-shapes.nt`). SHA256-pinned in `lightrag/taxonomy/manifest.py`; verified by the bootstrap CLI on every default run. A-Box (entity facts) is deliberately excluded.
 
 ### Module Layout (`lightrag/`)
 
@@ -28,6 +29,7 @@ Top-level directories:
 - **parser_routing.py**: Parser engine and filename-hint resolution for `legacy`, `native`, `mineru`, and `docling` flows, plus chunker configuration resolution.
 - **native_parser/** and **chunker/**: Native document parsing and chunking layers. `.docx` parsing lives under `native_parser/docx/`; chunking strategies include token-size, recursive character, semantic vector, and paragraph semantic chunkers.
 - **api/**: FastAPI service (`lightrag_server.py`) with REST endpoints and Ollama-compatible API; routers under `routers/`, static Swagger assets, packaged WebUI output, and Gunicorn launcher.
+- **taxonomy/** *(OntoRAG fork addition)*: Standalone YAGO 4.0 taxonomy stack consumed by Plan B. `parser.py` (N-Triples → `YagoClass`), `graph_loader.py` (load + ancestor walk), `vocabulary.py` (descendant-count working-vocabulary selection), `class_index.py` (vector index over class label+comment), `classifier.py` (`DocumentClassifier.classify` — single LLM call, ≥50%-of-top threshold, 10-class cap, `lightrag:Uncategorized` sentinel on failure), `manifest.py` (pinned SHA256s + `verify_yago_files()`), `constants.py` (RDF IRIs + tunables). Design lives in `docs/GraphAndRagArchitecture.md` §5; implementation plan in `docs/superpowers/plans/2026-05-22-yago-taxonomy-infrastructure.md`. Reuses existing `BaseGraphStorage` / `BaseVectorStorage` — no backend changes.
 
 ## Core Architecture
 
