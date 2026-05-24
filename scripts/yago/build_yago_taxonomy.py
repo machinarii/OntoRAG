@@ -9,12 +9,23 @@ a full LightRAG instance — it doesn't need any of the LLM/embedding/role
 machinery beyond `embedding_func`. The taxonomy lives in its own
 namespaces and is consumed at query/ingest time by Plan B's wiring.
 
+Defaults to parsing the YAGO 4.0 T-Box files pinned at
+/Users/jin/OntoRAG/yago/ (see lightrag.taxonomy.manifest). When invoked
+through `main()` the SHA256 manifest is verified first; tests calling
+`build_taxonomy()` directly bypass the check and supply their own files.
+
 Usage:
+    # default: parse the pinned YAGO 4.0 files
     python scripts/yago/build_yago_taxonomy.py \\
-        --files data/yago/2024-02-29/*.nt \\
         --working-dir ./rag_storage \\
         --workspace default \\
         --embedding-binding openai
+
+    # override file set (skips checksum verification)
+    python scripts/yago/build_yago_taxonomy.py \\
+        --files path/to/custom.nt \\
+        --working-dir ./rag_storage \\
+        --skip-verify
 """
 
 from __future__ import annotations
@@ -40,6 +51,11 @@ from lightrag.taxonomy import (
     load_taxonomy_to_graph,
     parse_ntriples_file,
     select_working_vocabulary,
+)
+from lightrag.taxonomy.manifest import (
+    YAGO_DATA_DIR,
+    default_taxonomy_paths,
+    verify_yago_files,
 )
 from lightrag.utils import EmbeddingFunc
 
@@ -156,8 +172,10 @@ def _resolve_embedding(binding: str, model: str | None) -> EmbeddingFunc:
 
 def _parse_args(argv: list[str]) -> argparse.Namespace:
     p = argparse.ArgumentParser(description=__doc__)
-    p.add_argument("--files", nargs="+", required=True, type=Path,
-                   help="YAGO N-Triples files (schema + taxonomy)")
+    p.add_argument("--files", nargs="+", type=Path, default=None,
+                   help="YAGO N-Triples files to parse. Defaults to the "
+                        "pinned YAGO 4.0 T-Box at /Users/jin/OntoRAG/yago/. "
+                        "Overriding this disables SHA256 verification.")
     p.add_argument("--working-dir", required=True, type=Path,
                    help="LightRAG working_dir to populate")
     p.add_argument("--workspace", default="default",
@@ -172,6 +190,9 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
                    help="Embedding model name (binding-specific)")
     p.add_argument("--exclude", action="append", default=[],
                    help="IRI to exclude from the vocabulary (repeatable)")
+    p.add_argument("--skip-verify", action="store_true",
+                   help="Skip the YAGO file SHA256 manifest check. Set "
+                        "automatically when --files is overridden.")
     p.add_argument("--verbose", action="store_true")
     return p.parse_args(argv)
 
@@ -183,9 +204,15 @@ def main(argv: list[str] | None = None) -> int:
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
     )
 
+    use_pinned = args.files is None
+    files = args.files if not use_pinned else default_taxonomy_paths()
+    if use_pinned and not args.skip_verify:
+        logger.info("Verifying pinned YAGO files in %s…", YAGO_DATA_DIR)
+        verify_yago_files()
+
     embed = _resolve_embedding(args.embedding_binding, args.embedding_model)
     summary = asyncio.run(build_taxonomy(
-        files=args.files,
+        files=files,
         working_dir=args.working_dir,
         workspace=args.workspace,
         embedding_func=embed,
