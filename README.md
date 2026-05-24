@@ -206,7 +206,7 @@ LightRAG Server includes a multimodal document pipeline for PDFs, Office documen
 
 ## 🤝 LightRAG Contributors
 
-<div align="center">
+<div>
   <a href="https://github.com/HKUDS/LightRAG?tab=readme-ov-file#-contribution">Please checkout all of the contributors for LightRAG who made it happen</a>
 </div>
 
