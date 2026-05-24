@@ -1,6 +1,6 @@
 # OntoRAG
 
-OntoRAG is a fork of [HKUDS/LightRAG](https://github.com/HKUDS/LightRAG) that layers a YAGO-grounded document taxonomy on top of LightRAG's graph-based retrieval. The upstream README follows below — everything in this fork header is OntoRAG-specific.
+OntōRAG grounds LightRAG's knowledge graph in a formal ontology (YAGO) instead of letting arbitrary entity and relation types emerge ad hoc from the source text. It is a fork of [HKUDS/LightRAG](https://github.com/HKUDS/LightRAG); the upstream README follows below — everything in this fork header is OntoRAG-specific.
 
 **Fork-specific additions**
 - **YAGO 4.0 document taxonomy** (`lightrag/taxonomy/`) — RDF loader, class graph, working vocabulary, vector index, and a `DocumentClassifier` that assigns weighted YAGO classes per document. Design: [`docs/GraphAndRagArchitecture.md` §5](docs/GraphAndRagArchitecture.md#5-yago-taxonomy-integration). Implementation plan: [`docs/superpowers/plans/2026-05-22-yago-taxonomy-infrastructure.md`](docs/superpowers/plans/2026-05-22-yago-taxonomy-infrastructure.md).
@@ -204,7 +204,7 @@ LightRAG provides additional capabilities including token usage tracking, knowle
 
 LightRAG Server includes a multimodal document pipeline for PDFs, Office documents, images, tables, and formulas. Parsing is handled through external MinerU or Docling services, while multimodal indexing runs in the LightRAG pipeline. For setup details, see **[docs/AdvancedFeatures.md](./docs/AdvancedFeatures.md)**.
 
-## 🤝 LightRAG Contributors
+## LightRAG Contributors
 
 <div>
   <a href="https://github.com/HKUDS/LightRAG?tab=readme-ov-file#-contribution">Please checkout all of the contributors for LightRAG who made it happen</a>
@@ -212,7 +212,7 @@ LightRAG Server includes a multimodal document pipeline for PDFs, Office documen
 
 ---
 
-## Sources & Attribution (OntoRAG fork)
+## Sources & Attribution
 
 **Upstream:**
 - [HKUDS/LightRAG](https://github.com/HKUDS/LightRAG) — the base RAG framework this fork extends. arXiv: [2410.05779](https://arxiv.org/abs/2410.05779).
