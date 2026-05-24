@@ -204,12 +204,10 @@ LightRAG provides additional capabilities including token usage tracking, knowle
 
 LightRAG Server includes a multimodal document pipeline for PDFs, Office documents, images, tables, and formulas. Parsing is handled through external MinerU or Docling services, while multimodal indexing runs in the LightRAG pipeline. For setup details, see **[docs/AdvancedFeatures.md](./docs/AdvancedFeatures.md)**.
 
-## 🤝 Contribution
+## 🤝 LightRAG Contributors
 
 <div align="center">
-  <a href="https://github.com/HKUDS/LightRAG/graphs/contributors">
-    <img src="https://contrib.rocks/image?repo=HKUDS/LightRAG" style="border-radius: 15px; box-shadow: 0 0 20px rgba(0, 217, 255, 0.3);" />
-  </a>
+  <a href="https://github.com/HKUDS/LightRAG?tab=readme-ov-file#-contribution">Please checkout all of the contributors for LightRAG who made it happen</a>
 </div>
 
 ---
