@@ -1,40 +1,47 @@
 #!/usr/bin/env bash
-# Download YAGO 4.5 schema + taxonomy N-Triples for the LightRAG taxonomy layer.
+# YAGO 4.0 T-Box files for the LightRAG taxonomy layer.
 #
-# YAGO 4.5 publishes its data at https://yago-knowledge.org/downloads/yago-4-5
-# We only need the T-Box (schema + taxonomy), not the entity facts (A-Box).
-#
-# Usage: bash scripts/yago/fetch_yago.sh [version]
-# Default version is the pinned release below. Files land in
-# data/yago/<version>/ and the script is idempotent (re-running skips files
-# that already exist with non-zero size).
+# As of the YAGO-4.0 switch this script no longer downloads anything by default.
+# The canonical files live committed at /Users/jin/OntoRAG/yago/ and their
+# sha256s are pinned in lightrag/taxonomy/manifest.py. This script is kept as a
+# pointer so anyone landing on it knows where the files originally came from
+# and how to re-fetch them if the local copies are lost or corrupted.
 
 set -euo pipefail
 
-VERSION="${1:-2024-02-29}"
-BASE_URL="https://yago-knowledge.org/data/yago4.5/${VERSION}"
-TARGET_DIR="data/yago/${VERSION}"
+YAGO_DIR="${YAGO_DIR:-/Users/jin/OntoRAG/yago}"
+BASE_URL="https://yago-knowledge.org/data/yago4/full/2020-02-24"
+FILES=(yago-wd-class.nt yago-wd-schema.nt yago-wd-shapes.nt)
 
-mkdir -p "${TARGET_DIR}"
+cat <<EOF
+YAGO 4.0 T-Box files are expected at:
+  ${YAGO_DIR}/yago-wd-class.nt    (≈60 MB — class definitions, subClassOf, labels)
+  ${YAGO_DIR}/yago-wd-schema.nt   (≈340 KB — schema-level properties)
+  ${YAGO_DIR}/yago-wd-shapes.nt   (≈210 KB — SHACL shapes)
 
-FILES=(
-  "yago-schema.nt"
-  "yago-taxonomy.nt"
-)
+Pinned SHA256s live in lightrag/taxonomy/manifest.py. Verify with:
+  python -c 'from lightrag.taxonomy.manifest import verify_yago_files; verify_yago_files()'
 
-for fname in "${FILES[@]}"; do
-  target="${TARGET_DIR}/${fname}"
-  if [[ -s "${target}" ]]; then
-    echo "Already present: ${target} ($(wc -c < "${target}") bytes)"
-    continue
-  fi
-  echo "Downloading ${BASE_URL}/${fname} -> ${target}"
-  curl --fail --location --output "${target}" "${BASE_URL}/${fname}"
-  echo "Downloaded $(wc -c < "${target}") bytes"
-done
+If files are missing or drifted, re-download from:
+  ${BASE_URL}/yago-wd-class.nt.gz
+  ${BASE_URL}/yago-wd-schema.nt.gz
+  ${BASE_URL}/yago-wd-shapes.nt.gz
 
-echo
-echo "YAGO ${VERSION} files in ${TARGET_DIR}:"
-ls -lh "${TARGET_DIR}"
-echo
-echo "Next: python scripts/yago/build_yago_taxonomy.py --files ${TARGET_DIR}/*.nt --working-dir ./rag_storage"
+Then gunzip into ${YAGO_DIR}/.
+EOF
+
+# Optional: pass --fetch to actually run the curl commands (idempotent — skips
+# files already present at non-zero size).
+if [[ "${1:-}" == "--fetch" ]]; then
+  mkdir -p "${YAGO_DIR}"
+  for fname in "${FILES[@]}"; do
+    target="${YAGO_DIR}/${fname}"
+    if [[ -s "${target}" ]]; then
+      echo "Already present: ${target}"
+      continue
+    fi
+    echo "Downloading ${BASE_URL}/${fname}.gz → ${target}"
+    curl --fail --location --output "${target}.gz" "${BASE_URL}/${fname}.gz"
+    gunzip "${target}.gz"
+  done
+fi

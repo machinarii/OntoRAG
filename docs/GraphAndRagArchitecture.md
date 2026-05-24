@@ -218,14 +218,16 @@ Doc-status storage is **not** touched on the query path; it is read/written by t
 
 ### 5.1 Goals
 
-Add hierarchical informational context to retrieval by classifying every ingested document into one or more [YAGO 4.5](https://yago-knowledge.org/downloads/yago-4-5) taxonomy classes. Chunks inherit their parent document's classes, giving the LLM topical framing alongside raw text. Enables browse/filter-by-class without a new query mode.
+Add hierarchical informational context to retrieval by classifying every ingested document into one or more [YAGO 4.0](https://yago-knowledge.org/downloads/yago-4) taxonomy classes. Chunks inherit their parent document's classes, giving the LLM topical framing alongside raw text. Enables browse/filter-by-class without a new query mode.
+
+> **2026-05-22 — version pinned to YAGO 4.0, not 4.5.** YAGO 4.5 ships its T-Box without `rdfs:label`/`rdfs:comment` on classes (consumers are expected to derive labels from the IRI local-name or query Wikidata). YAGO 4.0's `yago-wd-class.nt` bundles 10K classes, the `subClassOf` hierarchy, English labels, and English comments in a single 60 MB N-Triples file — which matches this section's data assumption directly. Files live committed at `/Users/jin/OntoRAG/yago/`; SHA256s pinned in `lightrag/taxonomy/manifest.py`.
 
 **Design stance — "Option A":** classes live at the *document* layer only. Extracted entities keep their free-form `entity_type` from LLM extraction; they are not linked to YAGO IRIs. This keeps the v1 surface small and ingestion cost flat; per-entity YAGO classification (Option B) is a deferred upgrade if eval shows entity-level hierarchy is needed.
 
 ### 5.2 Data Sources
 
-- **YAGO 4.5 schema + taxonomy only** — the T-Box (~10K classes + `rdfs:subClassOf` edges + `rdfs:label` + `rdfs:comment`). Entity facts (A-Box) are not loaded.
-- **Pinned version** of the dump (specific release date), cached locally. Version pinning prevents drift in extraction/classification behavior when YAGO updates.
+- **YAGO 4.0 T-Box only** — `yago-wd-class.nt` (10K classes + `rdfs:subClassOf` edges + `rdfs:label` + `rdfs:comment`) plus `yago-wd-schema.nt` (schema-level properties). Entity facts (A-Box: `yago-wd-facts.nt`, `yago-wd-labels.nt`, `yago-wd-full-types.nt`, etc.) are not loaded.
+- **Pinned version** — release dated 2020-02-24, files committed under `/Users/jin/OntoRAG/yago/`, SHA256s pinned in `lightrag/taxonomy/manifest.py`. The build CLI calls `verify_yago_files()` before parsing.
 - **Working vocabulary cap**: top ~200 classes selected for breadth and stability are exposed to the classifier; the full ~10K hierarchy is loaded into the graph for ancestor walks but not all of it is offered as a classification target. Fine-grained classes (e.g. `SerialKiller`) are excluded from the classifier's choice set because the LLM picks them inconsistently.
 
 ### 5.3 Storage Model
@@ -318,7 +320,7 @@ These are valid future upgrades; they are *not* part of the initial build:
 
 Plan A (infrastructure) shipped on branch `feat/yago-taxonomy-infrastructure` per `docs/superpowers/plans/2026-05-22-yago-taxonomy-infrastructure.md`. Items marked `[x] (Plan A)` are complete; the remainder gate Plan B.
 
-- [x] (Plan A) Pin a specific YAGO 4.5 release; document the file list (schema + taxonomy only). — `scripts/yago/fetch_yago.sh`, default version `2024-02-29`.
+- [x] (Plan A) Pin a specific YAGO release; document the file list (T-Box only). — YAGO 4.0 (2020-02-24); files `yago-wd-class.nt` + `yago-wd-schema.nt` + `yago-wd-shapes.nt` committed at `/Users/jin/OntoRAG/yago/`; SHA256s in `lightrag/taxonomy/manifest.py`; verified by `scripts/yago/build_yago_taxonomy.py` on every default run. `scripts/yago/fetch_yago.sh` is now a redirect explaining where the files came from (pass `--fetch` to re-download).
 - [x] (Plan A) Select the ~200-class working vocabulary (top-N by `subClassOf` descendant count, manually pruned for utility). — `lightrag/taxonomy/vocabulary.py::select_working_vocabulary`; manual exclusions via `--exclude` on the bootstrap CLI.
 - [ ] Validate corpus coverage on a 100-doc sample; check `Uncategorized` rate. — run `python scripts/yago/check_coverage.py --sample-dir … --working-dir …` once Plan A bootstrap is complete on the target working directory. Gate: Uncategorized < 40-50%; otherwise add domain overlays before Plan B.
 - [ ] Build an eval harness with a held-out query set + reference answers, run against current `main` *before* Plan B's taxonomy enrichment lands. Otherwise there's no apples-to-apples comparison once context formatting changes.

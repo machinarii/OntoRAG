@@ -2,11 +2,25 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Build the standalone YAGO 4.5 taxonomy stack — RDF loader, in-storage class graph, working vocabulary, class vector index, and a document classifier — that can take a piece of text and return weighted YAGO class assignments. No LightRAG ingestion or query-path changes in this plan; those land in Plan B once we've validated corpus coverage with this code.
+> **2026-05-22 update — YAGO version switched from 4.5 to 4.0.**
+> The initial plan targeted YAGO 4.5 (`yago-schema.ttl` + `yago-taxonomy.ttl`).
+> Investigation revealed those files ship without `rdfs:label` / `rdfs:comment` on
+> classes — YAGO 4.5 expects consumers to derive labels from the IRI local name
+> or query Wikidata. Switching to YAGO 4.0's `yago-wd-class.nt` (one file,
+> ~60 MB uncompressed) gives us 10K classes with English labels + comments in
+> plain N-Triples — no Turtle parser, no labels gap. Files are committed at
+> `/Users/jin/OntoRAG/yago/`, pinned by SHA256 in `lightrag/taxonomy/manifest.py`.
+> Task 7 (download script) has been replaced with Task 7 (SHA256 manifest);
+> `scripts/yago/fetch_yago.sh` survives as a redirect pointing to the canonical
+> URLs in case the local copies are lost.
+
+**Goal:** Build the standalone YAGO 4.0 taxonomy stack — RDF loader, in-storage class graph, working vocabulary, class vector index, and a document classifier — that can take a piece of text and return weighted YAGO class assignments. No LightRAG ingestion or query-path changes in this plan; those land in Plan B once we've validated corpus coverage with this code.
 
 **Architecture:** A new `lightrag/taxonomy/` module. Parses YAGO N-Triples → populates a dedicated graph namespace with class nodes + `subClassOf` edges → selects ~200 working-vocabulary classes by descendant count → embeds those into a dedicated vector namespace → exposes `DocumentClassifier.classify(text)` which retrieves top-N candidates from the index, runs a single LLM call with a JSON-schema prompt, and applies the ≥50%-of-top threshold + 10-class cap. Reuses existing `BaseGraphStorage` / `BaseVectorStorage` interfaces; no changes to those interfaces or to backends. Test fixtures use tiny in-memory fakes for the embedding and LLM functions.
 
 **Tech Stack:** Python 3.10+, pytest, existing `NetworkXStorage` + `NanoVectorDBStorage` backends, `numpy` (already a dep). No new third-party deps — we parse N-Triples with a small regex parser to avoid adding `rdflib`.
+
+**Data:** YAGO 4.0 (release dated 2020-02-24) — `yago-wd-class.nt`, `yago-wd-schema.nt`, `yago-wd-shapes.nt` committed at `/Users/jin/OntoRAG/yago/`. SHA256s pinned in `lightrag/taxonomy/manifest.py`.
 
 **Reference docs:** `docs/GraphAndRagArchitecture.md` §5 (planned architecture), in particular §5.3 (storage model), §5.4 (classification step), §5.7 (limitations to watch).
 
@@ -1697,75 +1711,65 @@ git commit -m "feat(taxonomy): expose public module surface"
 
 ---
 
-## Task 7: YAGO Download Script
+## Task 7: SHA256 Manifest for the YAGO 4.0 T-Box (replaces the original download script)
 
 **Files:**
-- Create: `scripts/yago/fetch_yago.sh`
+- Create: `lightrag/taxonomy/manifest.py`
+- Modify (redirect-only): `scripts/yago/fetch_yago.sh`
 
-Single-purpose shell script that downloads the YAGO 4.5 schema + taxonomy N-Triples to `data/yago/{version}/`. Pins a version. Verifies the download with the upstream-published checksum if available, otherwise just reports the byte count for manual inspection. **Does not auto-run** — engineer invokes it once when bootstrapping.
+The original Task 7 was a download script targeting YAGO 4.5. The 4.5 → 4.0 switch made it obsolete: YAGO 4.0 files are tiny (~60 MB total uncompressed) and now committed under `/Users/jin/OntoRAG/yago/`. We replace the download task with a checksum-pinning task so "YAGO 4.0" in this repo is tied to specific bytes — anyone who replaces the files with a different snapshot trips a verification error from the build CLI.
 
-- [ ] **Step 1: Create the script**
+`scripts/yago/fetch_yago.sh` is kept as a documentation pointer (no auto-download by default). Pass `--fetch` to actually run curl.
 
-Create `/Users/jin/OntoRAG/scripts/yago/fetch_yago.sh`:
+- [ ] **Step 1: Capture SHA256s of the three YAGO 4.0 T-Box files**
 
 ```bash
-#!/usr/bin/env bash
-# Download YAGO 4.5 schema + taxonomy N-Triples for the LightRAG taxonomy layer.
-#
-# YAGO 4.5 publishes its data at https://yago-knowledge.org/downloads/yago-4-5
-# We only need the T-Box (schema + taxonomy), not the entity facts (A-Box).
-#
-# Usage: bash scripts/yago/fetch_yago.sh [version]
-# Default version is the pinned release below. Files land in
-# data/yago/<version>/ and the script is idempotent (re-running skips files
-# that already exist with non-zero size).
-
-set -euo pipefail
-
-VERSION="${1:-2024-02-29}"
-BASE_URL="https://yago-knowledge.org/data/yago4.5/${VERSION}"
-TARGET_DIR="data/yago/${VERSION}"
-
-mkdir -p "${TARGET_DIR}"
-
-# The two files we need. Names match upstream as of the pinned version.
-FILES=(
-  "yago-schema.nt"
-  "yago-taxonomy.nt"
-)
-
-for fname in "${FILES[@]}"; do
-  target="${TARGET_DIR}/${fname}"
-  if [[ -s "${target}" ]]; then
-    echo "Already present: ${target} ($(wc -c < "${target}") bytes)"
-    continue
-  fi
-  echo "Downloading ${BASE_URL}/${fname} → ${target}"
-  curl --fail --location --output "${target}" "${BASE_URL}/${fname}"
-  echo "Downloaded $(wc -c < "${target}") bytes"
-done
-
-echo
-echo "YAGO ${VERSION} files in ${TARGET_DIR}:"
-ls -lh "${TARGET_DIR}"
-echo
-echo "Next: python scripts/yago/build_yago_taxonomy.py --files ${TARGET_DIR}/*.nt --working-dir ./rag_storage"
+shasum -a 256 /Users/jin/OntoRAG/yago/yago-wd-{class,schema,shapes}.nt
 ```
 
-- [ ] **Step 2: Make it executable**
+Expected (matches the pinned manifest):
+```
+0b11dff027ad77d82b83bf4a241389760c2801ce6f3c92b77684d752abfa0670  yago-wd-class.nt
+1a5484f1402aebe9e1d07e3df8fd02421d0f7bc7dccf3012ba49f4f95610c90c  yago-wd-schema.nt
+05a542e176a96b32ee265bb5bf4e51d403779c399db7a0044c4571814475b729  yago-wd-shapes.nt
+```
 
-Run: `chmod +x /Users/jin/OntoRAG/scripts/yago/fetch_yago.sh`
+- [ ] **Step 2: Write the manifest module**
 
-- [ ] **Step 3: Lint-check shell syntax**
+Create `/Users/jin/OntoRAG/lightrag/taxonomy/manifest.py` exposing:
+- `YAGO_VERSION = "yago-4.0-2020-02-24"`
+- `YAGO_DATA_DIR` — `<repo>/yago/`
+- `PINNED_FILES: dict[str, str]` — filename → sha256
+- `TAXONOMY_FILES: tuple[str, ...]` — files the parser actually consumes (`yago-wd-class.nt`, `yago-wd-schema.nt`; shapes is pinned for provenance but not parsed)
+- `default_taxonomy_paths()` — returns absolute `Path` list for the CLI
+- `verify_yago_files(data_dir=YAGO_DATA_DIR)` — raises `YagoFileChecksumError` listing every missing/drifted file at once
+- `sha256_of(path)` helper
 
-Run: `bash -n /Users/jin/OntoRAG/scripts/yago/fetch_yago.sh`
-Expected: no output (syntax OK).
+Verification reads in 1 MB chunks so the 60 MB `yago-wd-class.nt` doesn't load to memory wholesale.
 
-- [ ] **Step 4: Commit**
+- [ ] **Step 3: Rewrite `scripts/yago/fetch_yago.sh` as a redirect**
+
+Replace the body with a `cat <<EOF` that explains:
+1. Where the files are expected (`/Users/jin/OntoRAG/yago/`)
+2. Where they came from (`https://yago-knowledge.org/data/yago4/full/2020-02-24/yago-wd-{class,schema,shapes}.nt.gz`)
+3. How to verify (`python -c 'from lightrag.taxonomy.manifest import verify_yago_files; verify_yago_files()'`)
+
+Support an optional `--fetch` flag that does the curl + gunzip if explicitly invoked.
+
+- [ ] **Step 4: Smoke-test**
 
 ```bash
-git add scripts/yago/fetch_yago.sh
-git commit -m "feat(taxonomy): script to fetch YAGO 4.5 schema + taxonomy"
+.venv/bin/python -c "from lightrag.taxonomy.manifest import verify_yago_files; verify_yago_files(); print('ok')"
+bash scripts/yago/fetch_yago.sh   # prints redirect, exits cleanly
+bash -n scripts/yago/fetch_yago.sh
+.venv/bin/ruff check lightrag/taxonomy/manifest.py
+```
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add lightrag/taxonomy/manifest.py scripts/yago/fetch_yago.sh
+git commit -m "feat(taxonomy): pin YAGO 4.0 T-Box by SHA256; fetch_yago.sh becomes a redirect"
 ```
 
 ---
@@ -1777,6 +1781,14 @@ git commit -m "feat(taxonomy): script to fetch YAGO 4.5 schema + taxonomy"
 - Create: `tests/test_yago_build_cli.py`
 
 CLI that parses given N-Triples files → loads classes into the YAGO graph namespace → selects working vocabulary → builds the class vector index. Targets a LightRAG `working_dir` (creates the storage instances directly without booting the full `LightRAG` class). Idempotent re-runs.
+
+> **2026-05-22 update (paired with Task 7):** `--files` is now optional and
+> defaults to `lightrag.taxonomy.manifest.default_taxonomy_paths()` — the two
+> committed YAGO 4.0 files (`yago-wd-class.nt`, `yago-wd-schema.nt`). When the
+> default is used, `main()` calls `verify_yago_files()` before parsing; pass
+> `--skip-verify` (or override `--files` with custom paths) to bypass. Tests
+> call `build_taxonomy()` directly with fixture files, so they never trip the
+> manifest check — keeps the existing `tests/test_yago_build_cli.py` green.
 
 - [ ] **Step 1: Write failing tests for the CLI**
 
@@ -2301,8 +2313,8 @@ git commit -m "docs(taxonomy): mark Plan A items shipped in spike checklist"
 
 | §5 requirement | Plan A task |
 |---|---|
-| YAGO 4.5 T-Box only (§5.2) | Task 7 (download script targets schema + taxonomy N-Triples) |
-| Pinned version (§5.2) | Task 7 |
+| YAGO T-Box only (§5.2) | Task 7 (manifest pins YAGO 4.0 `yago-wd-class.nt` + `yago-wd-schema.nt`; A-Box files excluded) |
+| Pinned version (§5.2) | Task 7 — SHA256 in `lightrag/taxonomy/manifest.py`, verified by build CLI |
 | ~200 working vocabulary (§5.2) | Task 3 |
 | Separate graph namespace (§5.3) | Task 0 (namespace const), Task 2 (loader writes there) |
 | Class node schema (§5.3) | Task 2 |
@@ -2332,8 +2344,10 @@ git commit -m "docs(taxonomy): mark Plan A items shipped in spike checklist"
 Plan A is complete and saved to `docs/superpowers/plans/2026-05-22-yago-taxonomy-infrastructure.md`.
 
 After Plan A lands:
-1. Run `bash scripts/yago/fetch_yago.sh` to download the pinned YAGO files.
-2. Run `python scripts/yago/build_yago_taxonomy.py …` to populate the taxonomy in your working dir.
+1. Confirm the pinned YAGO 4.0 files are present:
+   `python -c "from lightrag.taxonomy.manifest import verify_yago_files; verify_yago_files(); print('ok')"`.
+   If they were lost, run `bash scripts/yago/fetch_yago.sh --fetch` to re-download.
+2. Run `python scripts/yago/build_yago_taxonomy.py --working-dir ./rag_storage …` to populate the taxonomy in your working dir (the CLI defaults to the pinned files and verifies before parsing).
 3. Run `python scripts/yago/check_coverage.py …` against a 100-doc corpus sample. **Coverage gate:** Uncategorized rate < 40% before writing Plan B; otherwise revisit vocabulary selection or add a domain overlay.
 4. Build the eval harness (Plan A doesn't ship one — it's an open §5.8 item).
 5. Write Plan B (LightRAG pipeline integration + query-path enrichment) once the gate passes.
