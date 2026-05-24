@@ -231,16 +231,6 @@ LightRAG Server includes a multimodal document pipeline for PDFs, Office documen
   </div>
 </div>
 
-<div align="center">
-  <div style="width: 100%; max-width: 600px; margin: 20px auto; padding: 20px; background: linear-gradient(135deg, rgba(0, 217, 255, 0.1) 0%, rgba(0, 217, 255, 0.05) 100%); border-radius: 15px; border: 1px solid rgba(0, 217, 255, 0.2);">
-    <div style="display: flex; justify-content: center; align-items: center; gap: 15px;">
-      <span style="font-size: 24px;">⭐</span>
-      <span style="color: #00d9ff; font-size: 18px;">Thank you for visiting LightRAG!</span>
-      <span style="font-size: 24px;">⭐</span>
-    </div>
-  </div>
-</div>
-
 ---
 
 ## Sources & Attribution (OntoRAG fork)
