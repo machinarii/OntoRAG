@@ -1,3 +1,18 @@
+# OntoRAG
+
+OntoRAG is a fork of [HKUDS/LightRAG](https://github.com/HKUDS/LightRAG) that layers a YAGO-grounded document taxonomy on top of LightRAG's graph-based retrieval. The upstream README follows below — everything in this fork header is OntoRAG-specific.
+
+**Fork-specific additions**
+- **YAGO 4.0 document taxonomy** (`lightrag/taxonomy/`) — RDF loader, class graph, working vocabulary, vector index, and a `DocumentClassifier` that assigns weighted YAGO classes per document. Design: [`docs/GraphAndRagArchitecture.md` §5](docs/GraphAndRagArchitecture.md#5-yago-taxonomy-integration). Implementation plan: [`docs/superpowers/plans/2026-05-22-yago-taxonomy-infrastructure.md`](docs/superpowers/plans/2026-05-22-yago-taxonomy-infrastructure.md).
+- **Pinned YAGO 4.0 T-Box** at `yago/` (sha256s in `lightrag/taxonomy/manifest.py`).
+- **Bootstrap + coverage CLIs** at `scripts/yago/`.
+
+**License:** [MIT](LICENSE) — Copyright © 2025 LightRAG Team and © 2026 Jinsoo An (OntoRAG fork additions). Mirrors upstream LightRAG's MIT terms with the fork contributor credited alongside.
+
+**Project conventions** are in [`AGENTS.md`](AGENTS.md).
+
+---
+
 <div align="center">
 
 <div style="margin: 20px 0;">
@@ -435,3 +450,15 @@ primaryClass={cs.IR}
     </div>
   </div>
 </div>
+
+---
+
+## Sources & Attribution (OntoRAG fork)
+
+**Upstream:**
+- [HKUDS/LightRAG](https://github.com/HKUDS/LightRAG) — the base RAG framework this fork extends. arXiv: [2410.05779](https://arxiv.org/abs/2410.05779).
+
+**Data sources used by the OntoRAG-fork additions:**
+- **YAGO 4.0** (release 2020-02-24) — the T-Box files (`yago-wd-class.nt`, `yago-wd-schema.nt`, `yago-wd-shapes.nt`) committed at `yago/` originate from [yago-knowledge.org/data/yago4/full/2020-02-24/](https://yago-knowledge.org/data/yago4/full/2020-02-24/). YAGO is licensed under [CC BY-SA 3.0](https://creativecommons.org/licenses/by-sa/3.0/). Project page: [yago-knowledge.org](https://yago-knowledge.org/).
+
+**License:** Single [MIT](LICENSE) covering both the upstream LightRAG code (© 2025 LightRAG Team) and the OntoRAG fork additions (© 2026 Jinsoo An, contributor). Same MIT terms as upstream.
