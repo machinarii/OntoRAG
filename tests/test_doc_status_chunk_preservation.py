@@ -6,13 +6,13 @@ from uuid import uuid4
 import numpy as np
 import pytest
 
-import lightrag.lightrag as lightrag_module
-import lightrag.pipeline as pipeline_module
-from lightrag.base import DocStatus
-from lightrag.constants import GRAPH_FIELD_SEP
-from lightrag.kg.shared_storage import get_namespace_data, get_namespace_lock
-from lightrag.lightrag import LightRAG
-from lightrag.utils import (
+import ontorag.ontorag as ontorag_module
+import ontorag.pipeline as pipeline_module
+from ontorag.base import DocStatus
+from ontorag.constants import GRAPH_FIELD_SEP
+from ontorag.kg.shared_storage import get_namespace_data, get_namespace_lock
+from ontorag.ontorag import OntoRAG
+from ontorag.utils import (
     EmbeddingFunc,
     Tokenizer,
     compute_mdhash_id,
@@ -75,9 +75,9 @@ async def _build_rag(
     chunking_func,
     *,
     max_parallel_insert: int = 1,
-) -> LightRAG:
+) -> OntoRAG:
     workspace = f"{test_name}_{uuid4().hex[:8]}"
-    rag = LightRAG(
+    rag = OntoRAG(
         working_dir=str(tmp_path / test_name),
         workspace=workspace,
         llm_model_func=_dummy_llm,
@@ -95,7 +95,7 @@ async def _build_rag(
 
 
 async def _seed_chunk_cache_entries(
-    rag: LightRAG, chunk_ids: list[str], prefix: str
+    rag: OntoRAG, chunk_ids: list[str], prefix: str
 ) -> list[str]:
     updates = {}
     cache_records = {}
@@ -116,7 +116,7 @@ async def _seed_chunk_cache_entries(
 
 
 async def _seed_delete_retry_state(
-    rag: LightRAG,
+    rag: OntoRAG,
     *,
     doc_id: str,
     status_chunk_ids: list[str],
@@ -482,7 +482,7 @@ async def test_delete_rebuild_failure_prunes_chunk_tracking_before_abort(
             raise RuntimeError("rebuild fail sentinel")
 
         monkeypatch.setattr(
-            lightrag_module, "rebuild_knowledge_from_chunks", fail_rebuild
+            ontorag_module, "rebuild_knowledge_from_chunks", fail_rebuild
         )
 
         result = await rag.adelete_by_doc_id(doc_id)
@@ -544,13 +544,13 @@ async def test_delete_retry_succeeds_after_rebuild_failure(tmp_path, monkeypatch
             raise RuntimeError("rebuild fail sentinel")
 
         monkeypatch.setattr(
-            lightrag_module, "rebuild_knowledge_from_chunks", fail_rebuild
+            ontorag_module, "rebuild_knowledge_from_chunks", fail_rebuild
         )
         first_result = await rag.adelete_by_doc_id(doc_id)
         assert first_result.status == "fail"
 
         monkeypatch.setattr(
-            lightrag_module,
+            ontorag_module,
             "rebuild_knowledge_from_chunks",
             _succeed_rebuild_from_remaining_chunks,
         )
@@ -610,7 +610,7 @@ async def test_delete_retry_cleans_llm_cache_after_rebuild_failure(
             raise RuntimeError("rebuild fail sentinel")
 
         monkeypatch.setattr(
-            lightrag_module, "rebuild_knowledge_from_chunks", fail_rebuild
+            ontorag_module, "rebuild_knowledge_from_chunks", fail_rebuild
         )
         first_result = await rag.adelete_by_doc_id(doc_id, delete_llm_cache=True)
         assert first_result.status == "fail"
@@ -621,7 +621,7 @@ async def test_delete_retry_cleans_llm_cache_after_rebuild_failure(
         assert await rag.text_chunks.get_by_id(drop_chunk_id) is None
 
         monkeypatch.setattr(
-            lightrag_module,
+            ontorag_module,
             "rebuild_knowledge_from_chunks",
             _succeed_rebuild_from_remaining_chunks,
         )
@@ -665,7 +665,7 @@ async def test_delete_retry_cleans_llm_cache_when_enabled_on_retry(
             raise RuntimeError("rebuild fail sentinel")
 
         monkeypatch.setattr(
-            lightrag_module, "rebuild_knowledge_from_chunks", fail_rebuild
+            ontorag_module, "rebuild_knowledge_from_chunks", fail_rebuild
         )
         first_result = await rag.adelete_by_doc_id(doc_id, delete_llm_cache=False)
 
@@ -676,7 +676,7 @@ async def test_delete_retry_cleans_llm_cache_when_enabled_on_retry(
         assert await rag.text_chunks.get_by_id(drop_chunk_id) is None
 
         monkeypatch.setattr(
-            lightrag_module,
+            ontorag_module,
             "rebuild_knowledge_from_chunks",
             _succeed_rebuild_from_remaining_chunks,
         )
@@ -723,7 +723,7 @@ async def test_delete_retry_collects_cache_ids_without_cache_storage(
         cache_storage = rag.llm_response_cache
         rag.llm_response_cache = None
         monkeypatch.setattr(
-            lightrag_module, "rebuild_knowledge_from_chunks", fail_rebuild
+            ontorag_module, "rebuild_knowledge_from_chunks", fail_rebuild
         )
         first_result = await rag.adelete_by_doc_id(doc_id, delete_llm_cache=False)
 
@@ -735,7 +735,7 @@ async def test_delete_retry_collects_cache_ids_without_cache_storage(
 
         rag.llm_response_cache = cache_storage
         monkeypatch.setattr(
-            lightrag_module,
+            ontorag_module,
             "rebuild_knowledge_from_chunks",
             _succeed_rebuild_from_remaining_chunks,
         )
@@ -1383,7 +1383,7 @@ async def test_retry_state_write_failure_in_exception_handler_still_returns_fail
             raise RuntimeError("doc_status upsert fail sentinel")
 
         monkeypatch.setattr(
-            lightrag_module, "rebuild_knowledge_from_chunks", fail_rebuild
+            ontorag_module, "rebuild_knowledge_from_chunks", fail_rebuild
         )
         monkeypatch.setattr(rag.doc_status, "upsert", fail_upsert)
 
@@ -1451,7 +1451,7 @@ async def test_persist_pre_rebuild_failure_records_stage_and_allows_retry(
 
         monkeypatch.undo()
         monkeypatch.setattr(
-            lightrag_module,
+            ontorag_module,
             "rebuild_knowledge_from_chunks",
             _succeed_rebuild_from_remaining_chunks,
         )

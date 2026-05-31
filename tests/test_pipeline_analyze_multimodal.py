@@ -32,14 +32,14 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from lightrag import LightRAG, ROLES, RoleLLMConfig
-from lightrag.exceptions import MultimodalAnalysisError
-from lightrag.utils import EmbeddingFunc, Tokenizer
+from ontorag import OntoRAG, ROLES, RoleLLMConfig
+from ontorag.exceptions import MultimodalAnalysisError
+from ontorag.utils import EmbeddingFunc, Tokenizer
 
 
 @pytest.fixture
-def _propagate_lightrag_logger(monkeypatch):
-    monkeypatch.setattr(logging.getLogger("lightrag"), "propagate", True)
+def _propagate_ontorag_logger(monkeypatch):
+    monkeypatch.setattr(logging.getLogger("ontorag"), "propagate", True)
 
 
 pytestmark = pytest.mark.offline
@@ -110,7 +110,7 @@ def _build_rag(
     vlm_process_enable: bool = True,
     vlm_func=None,
     extract_func=None,
-) -> LightRAG:
+) -> OntoRAG:
     role_configs = {}
     for spec in ROLES:
         if spec.name == "vlm" and vlm_func is not None:
@@ -120,7 +120,7 @@ def _build_rag(
         else:
             role_configs[spec.name] = RoleLLMConfig()
     base_func = vlm_func or extract_func
-    return LightRAG(
+    return OntoRAG(
         working_dir=str(tmp_path),
         workspace=f"vlm-pipeline-{tmp_path.name}",
         llm_model_func=base_func,
@@ -169,7 +169,7 @@ def _write_sidecar_fixtures(tmp_path: Path) -> tuple[str, dict, Path]:
 
 @pytest.mark.asyncio
 async def test_vlm_process_enable_false_hard_fails_for_images(
-    tmp_path, caplog, _propagate_lightrag_logger
+    tmp_path, caplog, _propagate_ontorag_logger
 ):
     """With i opted-in but VLM disabled, analyze_multimodal must hard-fail
     the document rather than silently skipping."""
@@ -244,7 +244,7 @@ async def test_vlm_call_carries_image_inputs(tmp_path):
     """Sanity check the call kwargs: image_inputs (not legacy `messages`)
     must be present.  The ``_priority`` argument is consumed by the role
     wrapper before reaching the raw model func, so it is not observable on
-    the mock — see ``priority_limit_async_func_call`` in lightrag.utils."""
+    the mock — see ``priority_limit_async_func_call`` in ontorag.utils."""
     call_log: list[dict] = []
     rag = _build_rag(
         tmp_path, vlm_process_enable=True, vlm_func=_make_vlm_mock(call_log)
@@ -263,7 +263,7 @@ async def test_vlm_call_carries_image_inputs(tmp_path):
         assert kwargs.get("stream") is False
         assert kwargs.get("image_inputs") is not None
         assert "messages" not in kwargs
-        # _priority is consumed by the wrapper (see lightrag.utils
+        # _priority is consumed by the wrapper (see ontorag.utils
         # priority_limit_async_func_call); not observable on the raw mock.
         assert "_priority" not in kwargs
     finally:
@@ -615,8 +615,8 @@ async def test_analyze_worker_marks_doc_failed_on_multimodal_error(tmp_path):
     letting the document stay stuck in ANALYZING."""
     import asyncio
     from dataclasses import asdict
-    from lightrag.base import DocProcessingStatus, DocStatus
-    from lightrag.pipeline import _BatchRunContext
+    from ontorag.base import DocProcessingStatus, DocStatus
+    from ontorag.pipeline import _BatchRunContext
 
     async def vlm_func(prompt, **kwargs):
         return ""
@@ -639,7 +639,7 @@ async def test_analyze_worker_marks_doc_failed_on_multimodal_error(tmp_path):
         await rag.doc_status.upsert({doc_id: asdict(status_doc)})
 
         async def _raise_mm_error(**_kwargs):
-            from lightrag.exceptions import MultimodalAnalysisError
+            from ontorag.exceptions import MultimodalAnalysisError
 
             raise MultimodalAnalysisError("forced failure for test")
 
@@ -691,7 +691,7 @@ async def test_analysis_cache_respects_disabled_flag(tmp_path):
     to sidecar item.llm_cache_list — otherwise document deletion would try
     to clean up cache entries that were never written."""
     call_log: list[dict] = []
-    rag = LightRAG(
+    rag = OntoRAG(
         working_dir=str(tmp_path),
         workspace=f"vlm-pipeline-cache-{tmp_path.name}",
         llm_model_func=_make_vlm_mock(call_log),
@@ -749,7 +749,7 @@ async def test_oversized_table_content_truncated_to_extract_budget(tmp_path):
     wrap the trimmed body in a ``<table>`` tag, and (c) include the
     truncation marker so the LLM is told the body is incomplete.
     """
-    from lightrag.constants import DEFAULT_MAX_EXTRACT_INPUT_TOKENS
+    from ontorag.constants import DEFAULT_MAX_EXTRACT_INPUT_TOKENS
 
     extract_log: list[dict] = []
     rag = _build_rag(
@@ -825,7 +825,7 @@ async def test_oversized_table_content_truncated_to_extract_budget(tmp_path):
 
 @pytest.mark.asyncio
 async def test_max_extract_input_tokens_env_var_lowers_cap_and_logs_warning(
-    tmp_path, caplog, _propagate_lightrag_logger, monkeypatch
+    tmp_path, caplog, _propagate_ontorag_logger, monkeypatch
 ):
     """``MAX_EXTRACT_INPUT_TOKENS`` env var overrides the compile-time
     default, and any truncation emits a WARNING-level log line so
@@ -875,7 +875,7 @@ async def test_max_extract_input_tokens_env_var_lowers_cap_and_logs_warning(
             encoding="utf-8",
         )
 
-        with caplog.at_level(logging.WARNING, logger="lightrag.pipeline"):
+        with caplog.at_level(logging.WARNING, logger="ontorag.pipeline"):
             await rag.analyze_multimodal(
                 doc_id="doc-mid",
                 file_path="fixture.pdf",

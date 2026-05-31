@@ -4,14 +4,14 @@ import pytest
 
 sys.argv = sys.argv[:1]
 
-from lightrag.api.routers.document_routes import (  # noqa: E402
+from ontorag.api.routers.document_routes import (  # noqa: E402
     DocStatusResponse,
     normalize_file_path,
     pipeline_index_texts,
 )
-from lightrag.base import DocStatus  # noqa: E402
-from lightrag.constants import PROCESS_OPTION_CHUNK_FIXED  # noqa: E402
-from lightrag.pipeline import _PipelineMixin  # noqa: E402
+from ontorag.base import DocStatus  # noqa: E402
+from ontorag.constants import PROCESS_OPTION_CHUNK_FIXED  # noqa: E402
+from ontorag.pipeline import _PipelineMixin  # noqa: E402
 
 
 class DummyRAG:
@@ -132,9 +132,9 @@ async def test_error_document_enqueue_canonicalizes_file_path_before_upsert():
 
 @pytest.mark.asyncio
 async def test_custom_chunks_use_canonical_unknown_source_before_upsert():
-    from lightrag import LightRAG
+    from ontorag import OntoRAG
 
-    rag = LightRAG.__new__(LightRAG)
+    rag = OntoRAG.__new__(OntoRAG)
     rag.full_docs = CaptureKV()
     rag.text_chunks = CaptureKV()
     rag.chunks_vdb = CaptureKV()

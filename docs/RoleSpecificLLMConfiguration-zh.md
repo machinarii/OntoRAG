@@ -1,6 +1,6 @@
 # 基于角色的 LLM/VLM 配置指南
 
-LightRAG 支持为不同处理阶段配置不同的 LLM 或 VLM。这个机制适合把低成本模型用于抽取，把更强模型用于最终回答，或为多模态分析单独指定视觉语言模型。
+OntoRAG 支持为不同处理阶段配置不同的 LLM 或 VLM。这个机制适合把低成本模型用于抽取，把更强模型用于最终回答，或为多模态分析单独指定视觉语言模型。
 
 ## 角色说明
 
@@ -13,7 +13,7 @@ LightRAG 支持为不同处理阶段配置不同的 LLM 或 VLM。这个机制�
 | `QUERY` | 最终问答、普通查询、bypass 查询，以及 Ollama-compatible API 的查询路径。 |
 | `VLM` | 多模态分析阶段，用于图片、表格、公式等内容的 VLM 分析。 |
 
-如果某个角色没有专门配置，LightRAG 会使用基础 `LLM_*` 配置。
+如果某个角色没有专门配置，OntoRAG 会使用基础 `LLM_*` 配置。
 
 ## 基础 LLM 配置
 
@@ -132,7 +132,7 @@ QUERY_LLM_MODEL=gpt-5
 
 - 必须设置 `{ROLE}_LLM_MODEL`。
 - 非 Bedrock provider 必须设置 `{ROLE}_LLM_BINDING_API_KEY`。
-- 如果没有设置 `{ROLE}_LLM_BINDING_HOST`，LightRAG 会尝试使用该 provider 的默认 host。
+- 如果没有设置 `{ROLE}_LLM_BINDING_HOST`，OntoRAG 会尝试使用该 provider 的默认 host。
 - provider 参数不继承基础 provider options，而是从空配置开始，只叠加角色专属 provider options。
 
 示例：基础使用 Ollama，本地抽取；最终回答改用 OpenAI：
@@ -296,7 +296,7 @@ KEYWORD_MAX_ASYNC_LLM=4
 KEYWORD_LLM_TIMEOUT=180
 ```
 
-这个模式不是跨 provider，因为三个角色的 binding 都是 `openai`。LightRAG 会分别把每个角色的 `*_LLM_BINDING_HOST` 和 `*_LLM_BINDING_API_KEY` 传给 OpenAI-compatible client。
+这个模式不是跨 provider，因为三个角色的 binding 都是 `openai`。OntoRAG 会分别把每个角色的 `*_LLM_BINDING_HOST` 和 `*_LLM_BINDING_API_KEY` 传给 OpenAI-compatible client。
 
 注意：同 provider 的 provider options 会继承基础 `OPENAI_LLM_*`。如果本地 vLLM 不支持 OpenAI 官方参数，例如 `reasoning_effort`，不要设置全局 `OPENAI_LLM_REASONING_EFFORT`；改用 `EXTRACT_OPENAI_LLM_REASONING_EFFORT`、`QUERY_OPENAI_LLM_REASONING_EFFORT` 这类角色级变量。
 
@@ -371,6 +371,6 @@ QUERY_BEDROCK_LLM_TEMPERATURE=0.2
 - 同 provider 下，`OPENAI_LLM_REASONING_EFFORT`、`OPENAI_LLM_MAX_TOKENS`、`OLLAMA_LLM_NUM_CTX`、`GEMINI_LLM_THINKING_CONFIG` 等 provider 参数会自动继承。
 - 当前没有干净的角色级“取消继承某个 provider 参数”的语义。如果某个同 provider 角色模型不支持基础参数，需要为该角色显式覆盖为可用值，或将它配置成跨 provider，并且只设置该角色支持的 provider 参数。
 - `azure_openai` 的 `AZURE_OPENAI_DEPLOYMENT` 和 `AZURE_OPENAI_API_VERSION` 是全局环境变量。若设置了 `AZURE_OPENAI_DEPLOYMENT`，它可能优先于角色模型名。
-- Gemini Vertex AI 模式由进程级 Google 环境变量控制，不能在同一个 LightRAG 进程里让某些角色使用 Vertex AI、另一些角色使用 AI Studio API key。
+- Gemini Vertex AI 模式由进程级 Google 环境变量控制，不能在同一个 OntoRAG 进程里让某些角色使用 Vertex AI、另一些角色使用 AI Studio API key。
 - `LLM_BINDING_HOST` 在 Docker/Compose 中通常需要使用容器可访问地址，例如 `host.docker.internal`，角色级 host 也遵循相同原则。
-- 修改 `.env` 后请重启 LightRAG Server。部分 IDE 终端会预加载 `.env`，建议打开新的终端会话确认环境变量生效。
+- 修改 `.env` 后请重启 OntoRAG Server。部分 IDE 终端会预加载 `.env`，建议打开新的终端会话确认环境变量生效。

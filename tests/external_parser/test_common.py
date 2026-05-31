@@ -1,4 +1,4 @@
-"""Tests for shared helpers in ``lightrag/external_parser/``.
+"""Tests for shared helpers in ``ontorag/external_parser/``.
 
 These cover the pure functions reused across engine integrations:
 
@@ -19,7 +19,7 @@ from pathlib import Path
 
 import pytest
 
-from lightrag.external_parser import (
+from ontorag.external_parser import (
     Manifest,
     ManifestFile,
     clear_dir_contents,

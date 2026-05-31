@@ -1,4 +1,4 @@
-"""Tests for ``lightrag/external_parser/docling/cache.py``.
+"""Tests for ``ontorag/external_parser/docling/cache.py``.
 
 Covers the cache-miss conditions enumerated in the module docstring:
 
@@ -16,14 +16,14 @@ from pathlib import Path
 
 import pytest
 
-from lightrag.external_parser import Manifest, ManifestFile, write_manifest
-from lightrag.external_parser._common import compute_size_and_hash
-from lightrag.external_parser.docling.cache import (
+from ontorag.external_parser import Manifest, ManifestFile, write_manifest
+from ontorag.external_parser._common import compute_size_and_hash
+from ontorag.external_parser.docling.cache import (
     compute_options_signature,
     is_bundle_valid,
     snapshot_tunable_env,
 )
-from lightrag.external_parser.docling.client import FIXED_CONSTANTS
+from ontorag.external_parser.docling.client import FIXED_CONSTANTS
 
 
 @pytest.fixture(autouse=True)

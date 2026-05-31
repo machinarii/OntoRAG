@@ -3,7 +3,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from lightrag.llm.openai import openai_complete_if_cache
+from ontorag.llm.openai import openai_complete_if_cache
 
 
 def _make_completion(content: str, finish_reason: str = "stop"):
@@ -84,7 +84,7 @@ async def test_length_finish_reason_returns_raw_content():
     fake_client = _make_fake_client(completion)
 
     with patch(
-        "lightrag.llm.openai.create_openai_async_client",
+        "ontorag.llm.openai.create_openai_async_client",
         return_value=fake_client,
     ):
         result = await openai_complete_if_cache(
@@ -108,7 +108,7 @@ async def test_json_object_response_format_forwarded_to_create():
     fake_client = _make_fake_client(completion)
 
     with patch(
-        "lightrag.llm.openai.create_openai_async_client",
+        "ontorag.llm.openai.create_openai_async_client",
         return_value=fake_client,
     ):
         result = await openai_complete_if_cache(
@@ -132,7 +132,7 @@ async def test_legacy_entity_extraction_emits_deprecation_warning():
     fake_client = _make_fake_client(completion)
 
     with patch(
-        "lightrag.llm.openai.create_openai_async_client",
+        "ontorag.llm.openai.create_openai_async_client",
         return_value=fake_client,
     ):
         with pytest.warns(DeprecationWarning):
@@ -155,7 +155,7 @@ async def test_legacy_keyword_extraction_emits_deprecation_warning():
     fake_client = _make_fake_client(completion)
 
     with patch(
-        "lightrag.llm.openai.create_openai_async_client",
+        "ontorag.llm.openai.create_openai_async_client",
         return_value=fake_client,
     ):
         with pytest.warns(DeprecationWarning):
@@ -181,7 +181,7 @@ async def test_typed_response_format_is_rejected():
         pass
 
     with patch(
-        "lightrag.llm.openai.create_openai_async_client",
+        "ontorag.llm.openai.create_openai_async_client",
         return_value=fake_client,
     ):
         with pytest.raises(TypeError, match="typed/Pydantic"):
@@ -207,7 +207,7 @@ async def test_streaming_structured_output_disables_cot():
     fake_client = _make_fake_client(fake_stream)
 
     with patch(
-        "lightrag.llm.openai.create_openai_async_client",
+        "ontorag.llm.openai.create_openai_async_client",
         return_value=fake_client,
     ):
         stream = await openai_complete_if_cache(

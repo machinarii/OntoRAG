@@ -1,23 +1,23 @@
 # File Processing Pipeline Specification
 
-Starting from version v1.5.0 (currently on the dev branch), LightRAG's file processing pipeline has received a major upgrade:
+Starting from version v1.5.0 (currently on the dev branch), OntoRAG's file processing pipeline has received a major upgrade:
 
 * Supports multiple file content extraction engines: legacy, native, mineru, docling
 * Supports multiple text chunking methods: Fix, Recursive, Vector, Paragraph
 * Supports disabling entity-relation extraction for individual files
 
-LightRAG Server introduces an intermediate file-processing format: `LightRAG Document`. This format supports multimodal data such as tables and images, and also includes the document's section/paragraph metadata, which is convenient for content traceability later.
+OntoRAG Server introduces an intermediate file-processing format: `OntoRAG Document`. This format supports multimodal data such as tables and images, and also includes the document's section/paragraph metadata, which is convenient for content traceability later.
 
-This document is organized from the perspective of **LightRAG Server** deployment and use: the quick-start configuration that can be applied directly is given first, followed by configuration syntax for content extraction and chunking, storage / directory layout, deduplication, concurrency, and resume rules. Developers who call the `LightRAG` class directly via Python should jump to [Chapter 8: Python SDK Invocation](#8-python-sdk-invocation).
+This document is organized from the perspective of **OntoRAG Server** deployment and use: the quick-start configuration that can be applied directly is given first, followed by configuration syntax for content extraction and chunking, storage / directory layout, deduplication, concurrency, and resume rules. Developers who call the `OntoRAG` class directly via Python should jump to [Chapter 8: Python SDK Invocation](#8-python-sdk-invocation).
 
 ## 1. Quick Start
 
 ### Keep the legacy file-processing behavior
 
-All files are processed using the legacy document parsing and chunking strategy. Either leave `LIGHTRAG_PARSER` unconfigured, or set it to the following value:
+All files are processed using the legacy document parsing and chunking strategy. Either leave `ONTORAG_PARSER` unconfigured, or set it to the following value:
 
 ```bash
-LIGHTRAG_PARSER=*:legacy-F
+ONTORAG_PARSER=*:legacy-F
 ```
 
 ### Recommended starting file-processing behavior
@@ -25,7 +25,7 @@ LIGHTRAG_PARSER=*:legacy-F
 No reliance on external document parsing services or on `VLM` vision models. Use the new built-in `Native` engine to parse `docx` documents with table (t) and equation (e) modality analysis enabled, paired with the `P` chunking strategy; other documents use the legacy content extractor paired with the more effective `R` chunking strategy.
 
 ```bash
-LIGHTRAG_PARSER=*:native-teP,*:legacy-R
+ONTORAG_PARSER=*:native-teP,*:legacy-R
 ```
 
 ### Enable multimodal processing capability
@@ -33,18 +33,18 @@ LIGHTRAG_PARSER=*:native-teP,*:legacy-R
 Enabling multimodal processing requires the `MinerU` file parsing service and a `VLM` vision recognition model. Use `Native` to parse `docx` files; use `MinerU` to parse `pdf`, `office`, and various image files. All of the above files have image (i), table (t), and equation (e) modality analysis enabled and are paired with the `P` chunking strategy. Other documents fall back to the legacy content extractor paired with the `R` chunking strategy.
 
 ```bash
-LIGHTRAG_PARSER=*:native-iteP,*:mineru-iteP,*:legacy-R
+ONTORAG_PARSER=*:native-iteP,*:mineru-iteP,*:legacy-R
 VLM_PROCESS_ENABLE=true
 VLM_LLM_MODEL=kimi-k2.6
 MINERU_API_MODE=local
 MINERU_LOCAL_ENDPOINT=http://localhost:8000
 ```
 
-> `P` is LightRAG's native chunking strategy; see [Paragraph Semantic Chunking](ParagraphSemanticChunking.md) for details. For VLM configuration, see [Role-based LLM/VLM Configuration Guide](RoleSpecificLLMConfiguration.md).
+> `P` is OntoRAG's native chunking strategy; see [Paragraph Semantic Chunking](ParagraphSemanticChunking.md) for details. For VLM configuration, see [Role-based LLM/VLM Configuration Guide](RoleSpecificLLMConfiguration.md).
 
 ## 2. Content Extraction and Processing Option Configuration
 
-LightRAG's file processing configuration is composed of two parts: the content extraction engine determines how the original file is parsed, and the processing options determine whether multimodal analysis is performed after parsing, which chunking method to use, and whether to build a knowledge graph. Typically, the environment variable `LIGHTRAG_PARSER` is first used to set default rules by file extension, and then a `[hint]` in the filename overrides individual files. Engine and options can be written in the same configuration fragment, for example `docx:native-iet` or `report.[native-R!].docx`.
+OntoRAG's file processing configuration is composed of two parts: the content extraction engine determines how the original file is parsed, and the processing options determine whether multimodal analysis is performed after parsing, which chunking method to use, and whether to build a knowledge graph. Typically, the environment variable `ONTORAG_PARSER` is first used to set default rules by file extension, and then a `[hint]` in the filename overrides individual files. Engine and options can be written in the same configuration fragment, for example `docx:native-iet` or `report.[native-R!].docx`.
 
 For backward compatibility, when the configuration is not modified, the upgraded file content extraction behavior remains the original `legacy` behavior. To enable the new content processing engines, configure as described in this section.
 
@@ -53,13 +53,13 @@ For backward compatibility, when the configuration is not modified, the upgraded
 The complete configuration model is as follows:
 
 ```text
-LIGHTRAG_PARSER=ext:engine-options,ext:engine,*:legacy-R
+ONTORAG_PARSER=ext:engine-options,ext:engine,*:legacy-R
 filename.[ENGINE].ext
 filename.[ENGINE-OPTIONS].ext
 filename.[-OPTIONS].ext
 ```
 
-- `LIGHTRAG_PARSER` is the default rule table, matched by file extension, e.g., `pdf:mineru`, `docx:native-iet`.
+- `ONTORAG_PARSER` is the default rule table, matched by file extension, e.g., `pdf:mineru`, `docx:native-iet`.
 - The `[hint]` in a filename is a single-file override rule, e.g., `paper.[mineru].pdf`, `memo.[native-R!].docx`.
 - `ENGINE` is the content extraction engine: `legacy`, `native`, `mineru`, or `docling`.
 - `OPTIONS` is a string combination of processing options, e.g., `iet`, `R!`, `P`. The options are ultimately written into `process_options` and read by subsequent pipeline stages.
@@ -69,7 +69,7 @@ filename.[-OPTIONS].ext
 Common combination examples:
 
 ```bash
-LIGHTRAG_PARSER=pdf:mineru-R,docx:native-ietP,*:legacy-R
+ONTORAG_PARSER=pdf:mineru-R,docx:native-ietP,*:legacy-R
 MINERU_API_MODE=local
 MINERU_LOCAL_ENDPOINT=http://localhost:8000
 DOCLING_ENDPOINT=http://localhost:5001
@@ -82,9 +82,9 @@ my-proposal.[-!].docx           # Use the default engine, only disable knowledge
 my-proposal.[mineru].docx       # Use the MinerU engine, all processing options default
 ```
 
-### 2.2 Default Rules: `LIGHTRAG_PARSER`
+### 2.2 Default Rules: `ONTORAG_PARSER`
 
-`LIGHTRAG_PARSER` is used to configure the default content extraction engine for different file extensions; default processing options for the rule can also be appended after the engine:
+`ONTORAG_PARSER` is used to configure the default content extraction engine for different file extensions; default processing options for the rule can also be appended after the engine:
 
 ```text
 ext:engine,ext:engine,*:legacy
@@ -95,7 +95,7 @@ ext:engine-options
 - The left side matches the file extension, not the full filename; write `pdf:mineru`, not `*.pdf:mineru`.
 - Rules can be separated by either a comma `,` or a semicolon `;`.
 - Rules are checked left to right; priority rules go in front, with the wildcard rule typically at the end.
-- The `-options` suffix after the engine serves as the default `process_options` for files matched by this rule. For example, `LIGHTRAG_PARSER=docx:native-iet` means all `.docx` files default to the `native` engine with image, table, and equation analysis enabled.
+- The `-options` suffix after the engine serves as the default `process_options` for files matched by this rule. For example, `ONTORAG_PARSER=docx:native-iet` means all `.docx` files default to the `native` engine with image, table, and equation analysis enabled.
 
 ### 2.3 Single-File Override: filename hints
 
@@ -111,9 +111,9 @@ notes.[-R].md
 The content inside the square brackets supports three forms:
 
 ```text
-[ENGINE]              # Specify only the engine; processing options use the default or what LIGHTRAG_PARSER provides
+[ENGINE]              # Specify only the engine; processing options use the default or what ONTORAG_PARSER provides
 [ENGINE-OPTIONS]      # Specify both engine and processing options
-[-OPTIONS]            # Specify only processing options; the engine still follows LIGHTRAG_PARSER / default rules
+[-OPTIONS]            # Specify only processing options; the engine still follows ONTORAG_PARSER / default rules
 ```
 
 When parsing the hint, content without a hyphen must match an engine name exactly (`mineru` / `native` / `docling` / `legacy`); when there is content before a hyphen, the part before the hyphen is the engine and the part after is the options; when starting with a hyphen, it specifies only options. The legacy `[OPTIONS]` syntax is no longer valid; for example, `[iet]` must now be written as `[-iet]`.
@@ -127,15 +127,15 @@ When parsing the hint, content without a hyphen must match an engine name exactl
 | `mineru` | External MinerU content extraction engine | `pdf` `doc` `docx` `ppt` `pptx` `xls` `xlsx` `png` `jpg` `jpeg` `jp2` `webp` `gif` `bmp` |
 | `docling` | External Docling content extraction engine | `pdf` `docx` `pptx` `xlsx` `md` `html` `xhtml` `png` `jpg` `jpeg` `tiff` `webp` `bmp` |
 
-`mineru` and `docling` are external content extraction engines; before enabling related rules, the services must be running first, and the corresponding endpoint/token must be configured in LightRAG.
+`mineru` and `docling` are external content extraction engines; before enabling related rules, the services must be running first, and the corresponding endpoint/token must be configured in OntoRAG.
 
-LightRAG caches the parsing results of the `mineru` and `docling` engines locally. Re-uploading the same file usually does not trigger the engine to re-parse the document. To delete the parse cache, you must click the "also delete file" option in the delete-file dialog of the document management interface. Modifying the endpoint addresses and effective extraction parameters of the `mineru` / `docling` engines will also invalidate the cache, causing the engine to re-parse the file content on the next upload of the same file.
+OntoRAG caches the parsing results of the `mineru` and `docling` engines locally. Re-uploading the same file usually does not trigger the engine to re-parse the document. To delete the parse cache, you must click the "also delete file" option in the delete-file dialog of the document management interface. Modifying the endpoint addresses and effective extraction parameters of the `mineru` / `docling` engines will also invalidate the cache, causing the engine to re-parse the file content on the next upload of the same file.
 
 #### MinerU Configuration and Local Deployment
 
 The MinerU client supports two modes; choose one:
 
-- `local`: self-hosted MinerU service (the official Docker Compose deployment is recommended); LightRAG calls the local container via HTTP.
+- `local`: self-hosted MinerU service (the official Docker Compose deployment is recommended); OntoRAG calls the local container via HTTP.
 - `official`: directly connects to the MinerU official precise API v4; you need to apply for a token at [mineru.net](https://mineru.net).
 
 **Local deployment (Docker Compose)**
@@ -154,7 +154,7 @@ docker compose -f compose.yaml --profile api up -d
 
 For image build details, GPU driver setup, model weight locations, etc., refer to the official README: <https://github.com/opendatalab/MinerU>.
 
-**LightRAG-side env configuration**
+**OntoRAG-side env configuration**
 
 Local mode (self-hosted mineru-api):
 
@@ -171,7 +171,7 @@ MINERU_API_TOKEN=<your_token>
 # MINERU_OFFICIAL_ENDPOINT=https://mineru.net   # Default value, usually no need to change
 ```
 
-For the remaining advanced switches (`MINERU_MODEL_VERSION`, `MINERU_LANGUAGE`, `MINERU_ENABLE_TABLE` / `MINERU_ENABLE_FORMULA`, `MINERU_PAGE_RANGES`, `MINERU_LOCAL_BACKEND` / `MINERU_LOCAL_PARSE_METHOD`, `MINERU_POLL_INTERVAL_SECONDS` / `MINERU_MAX_POLLS`, `MINERU_ENGINE_VERSION`, `LIGHTRAG_FORCE_REPARSE_MINERU`, etc.), refer to the MinerU section of the `env.example` template at the repository root. Note that `MINERU_PAGE_RANGES` has different semantics in the two modes: `official` supports a complete list (e.g., `1-3,5,7-9`), while `local` only supports a single page (`3`) or a simple range (`1-10`); it does not accept comma-separated lists.
+For the remaining advanced switches (`MINERU_MODEL_VERSION`, `MINERU_LANGUAGE`, `MINERU_ENABLE_TABLE` / `MINERU_ENABLE_FORMULA`, `MINERU_PAGE_RANGES`, `MINERU_LOCAL_BACKEND` / `MINERU_LOCAL_PARSE_METHOD`, `MINERU_POLL_INTERVAL_SECONDS` / `MINERU_MAX_POLLS`, `MINERU_ENGINE_VERSION`, `ONTORAG_FORCE_REPARSE_MINERU`, etc.), refer to the MinerU section of the `env.example` template at the repository root. Note that `MINERU_PAGE_RANGES` has different semantics in the two modes: `official` supports a complete list (e.g., `1-3,5,7-9`), while `local` only supports a single page (`3`) or a simple range (`1-10`); it does not accept comma-separated lists.
 
 #### Docling Configuration
 
@@ -181,7 +181,7 @@ The `docling` content extraction engine requires an external [docling-serve](htt
 DOCLING_ENDPOINT=http://localhost:5001
 ```
 
-`DOCLING_ENDPOINT` is just the base URL (**without** `/v1/convert/file/async`). Currently LightRAG uses Docling's standard pipeline to process files. Users can control the behavior of the Docling pipeline through the following environment variables:
+`DOCLING_ENDPOINT` is just the base URL (**without** `/v1/convert/file/async`). Currently OntoRAG uses Docling's standard pipeline to process files. Users can control the behavior of the Docling pipeline through the following environment variables:
 
 | Env | Default | Meaning |
 | --- | --- | --- |
@@ -206,14 +206,14 @@ Three bundle-cache envs:
 | Env | Default | Meaning |
 | --- | --- | --- |
 | `DOCLING_ENGINE_VERSION` | (empty) | Docling engine version; version changes invalidate the parse cache |
-| `LIGHTRAG_FORCE_REPARSE_DOCLING` | `false` | When set to `true`/`1`, the parse cache is not used |
+| `ONTORAG_FORCE_REPARSE_DOCLING` | `false` | When set to `true`/`1`, the parse cache is not used |
 | `DOCLING_BBOX_ATTRIBUTES` | `{"origin":"LEFTBOTTOM"}` | Default coordinate system for Docling layout |
 
 **Prerequisites for `DOCLING_DO_FORMULA_ENRICHMENT`**: the docling-serve side must have the code-formula model weights ready. The adapter is dual-track compatible — when enabled, the `text` field is LaTeX; when disabled, or when missing weights cause `text == orig`, it falls back to plain text and does not write `equations.json`. Therefore the default of `false` is conservative; turn it on only after confirming the model is ready on the deployment side.
 
 #### Docling Local Deployment (enabling LaTeX equation recognition)
 
-The following uses a Docker-based docling-serve deployment as an example, giving the complete steps from image download to model mounting. After deployment completes, write `DOCLING_DO_FORMULA_ENRICHMENT=true` into LightRAG's `.env` to enable LaTeX equation recognition.
+The following uses a Docker-based docling-serve deployment as an example, giving the complete steps from image download to model mounting. After deployment completes, write `DOCLING_DO_FORMULA_ENRICHMENT=true` into OntoRAG's `.env` to enable LaTeX equation recognition.
 
 > **Important**: the steps below are based on an environment where the GPU supports CUDA 13. If your GPU is older and does not support CUDA 13, replace the image name `docling-serve-cu130:main` in the command and compose file with the tag corresponding to your CUDA version. For the list of available images, see [docling-serve Packages](https://github.com/orgs/docling-project/packages?repo_name=docling-serve).
 
@@ -275,14 +275,14 @@ services:
       - ./models:/opt/app-root/src/models
 ```
 
-Then execute `docker compose up -d` in that directory to start the service. After the container is ready, set the following in LightRAG's `.env`:
+Then execute `docker compose up -d` in that directory to start the service. After the container is ready, set the following in OntoRAG's `.env`:
 
 ```bash
 DOCLING_ENDPOINT=http://localhost:5001
 DOCLING_DO_FORMULA_ENRICHMENT=true
 ```
 
-This enables LightRAG to recognize equations in documents via the local docling-serve and output them in LaTeX form.
+This enables OntoRAG to recognize equations in documents via the local docling-serve and output them in LaTeX form.
 
 ### 2.5 File Processing Options
 
@@ -297,7 +297,7 @@ Processing options control the behavior of a single file with respect to multimo
 | `F` | Chunking | Default | Fix / fixed-length chunking: legacy method, splits mechanically by fixed token length or by separator (no chunk overlap when splitting by separator) |
 | `R` | Chunking | - | Recursive / recursive character chunking (RecursiveCharacterTextSplitter@LangChain): takes a list of separators (default `["\n\n","\n","。","！","？","；","，"," ",""]`, ordered from strongest to weakest semantic boundary). Splits by paragraph (double newline) first; if a chunk is still over the token limit, falls back stepwise to single newline → Chinese sentence-ending punctuation (`。！？`) → Chinese mid-sentence punctuation (`；，`) → space → per-character split. **The default cascade includes Chinese punctuation**, letting Chinese / mixed Chinese-English documents split at semantic boundaries. English `.?!` is deliberately excluded (literal matching would mis-split `0.95` / `e.g.`). |
 | `V` | Chunking | - | Vector / semantic vector chunking (SemanticChunker@LangChain): first splits text into sentences (the default sentence splitting regex recognizes both English `.?!` and Chinese `。？！`, allowing correct sentence splitting in Chinese / mixed Chinese-English documents), computes embeddings of adjacent sentences, then finds semantic breakpoints based on the specified threshold strategy (e.g., percentile, standard_deviation, or interquartile) for splitting. `SemanticChunker` itself has no chunk size cap — any semantic chunk that exceeds `chunk_token_size` is automatically split again by R before persistence (preserving V's non-overlap semantics). This chunking strategy never produces overlapping chunks. |
-| `P` | Chunking | - | Paragraph / paragraph semantic chunking (native); splits by heading first and strictly avoids mixing content from the bottom of the previous heading with content from the next heading, which would break semantics. Suited for chunking documents that can accurately identify headings with a clear heading structure. When the body under the same heading is too long and falls back to R, overlap can be preserved according to `CHUNK_P_OVERLAP_SIZE`; bridging text between adjacent large tables can also be repeated into the surrounding table chunks within that budget. This chunking method can only be applied to `lightrag` content stored in the sidecar directory. If `lightrag` content does not exist, it degrades to chunking with `R`. This chunking method produces far fewer overlapping chunks than the `R` or `F` strategies. |
+| `P` | Chunking | - | Paragraph / paragraph semantic chunking (native); splits by heading first and strictly avoids mixing content from the bottom of the previous heading with content from the next heading, which would break semantics. Suited for chunking documents that can accurately identify headings with a clear heading structure. When the body under the same heading is too long and falls back to R, overlap can be preserved according to `CHUNK_P_OVERLAP_SIZE`; bridging text between adjacent large tables can also be repeated into the surrounding table chunks within that budget. This chunking method can only be applied to `ontorag` content stored in the sidecar directory. If `ontorag` content does not exist, it degrades to chunking with `R`. This chunking method produces far fewer overlapping chunks than the `R` or `F` strategies. |
 
 > The global multimodal switch `addon_params["enable_multimodal_pipeline"]` is deprecated; the related behavior is now uniformly controlled by the file-level `i/t/e` options. See [Appendix A](#appendix-a-notes-on-upgrading-from-legacy).
 
@@ -315,15 +315,15 @@ Different characters of processing options take effect at different stages of th
 
 ### 2.6 Validation, Priority, and Fallback
 
-- `LIGHTRAG_PARSER` is strictly validated at startup: unknown content extraction engines, malformed extension syntax, explicitly using an unsupported extension, external engines missing endpoint, and illegal characters in processing options all cause startup to fail.
-- **When a wildcard rule matches a certain extension**, the engine must pass two usability checks (see `parser_routing._engine_is_usable`): (a) the engine's capability table supports that extension; (b) if it is an external engine (`mineru` / `docling`), the corresponding endpoint/token environment variable is configured. If either check fails, the rule is skipped and the next rule is matched. For example, in `*:mineru;html:docling`: MinerU does not support the `html` extension (condition a fails), so `html` continues to match `docling`; if `MINERU_API_MODE=local` but `MINERU_LOCAL_ENDPOINT` is not set, all PDFs also skip `*:mineru` and fall to the next rule (condition b fails). This behavior applies to both `LIGHTRAG_PARSER` rule matching and filename hint engine selection.
-- Filename hints have higher priority than `LIGHTRAG_PARSER`. If the engine specified in a hint does not support that extension, the system falls back to the default rules to continue selecting an available engine.
-- If the filename hint provides a non-empty options string, the hint takes precedence; otherwise the default options of the matching item in `LIGHTRAG_PARSER` are used; if neither is provided, all defaults are used.
+- `ONTORAG_PARSER` is strictly validated at startup: unknown content extraction engines, malformed extension syntax, explicitly using an unsupported extension, external engines missing endpoint, and illegal characters in processing options all cause startup to fail.
+- **When a wildcard rule matches a certain extension**, the engine must pass two usability checks (see `parser_routing._engine_is_usable`): (a) the engine's capability table supports that extension; (b) if it is an external engine (`mineru` / `docling`), the corresponding endpoint/token environment variable is configured. If either check fails, the rule is skipped and the next rule is matched. For example, in `*:mineru;html:docling`: MinerU does not support the `html` extension (condition a fails), so `html` continues to match `docling`; if `MINERU_API_MODE=local` but `MINERU_LOCAL_ENDPOINT` is not set, all PDFs also skip `*:mineru` and fall to the next rule (condition b fails). This behavior applies to both `ONTORAG_PARSER` rule matching and filename hint engine selection.
+- Filename hints have higher priority than `ONTORAG_PARSER`. If the engine specified in a hint does not support that extension, the system falls back to the default rules to continue selecting an available engine.
+- If the filename hint provides a non-empty options string, the hint takes precedence; otherwise the default options of the matching item in `ONTORAG_PARSER` are used; if neither is provided, all defaults are used.
 - If no rule is available, the file content extraction falls back to `legacy`; if `legacy` also does not support the file extension, an error entry is added to the system and the uploaded file remains in the `INPUT` directory.
 - At most one of F/R/V/P may appear; repeating the same option has effect only once but does not raise an error.
 - Case-sensitive: the chunking options F/R/V/P must be uppercase; other options i/t/e must be lowercase.
-- If illegal characters appear inside the square brackets, the entire hint is invalidated, the engine follows the default rules, and the options fall back to `LIGHTRAG_PARSER` defaults or all defaults; a warning is also logged.
-- `P` is only effective for structured `LightRAG Document` results extracted by `native`; for the `legacy` path or unstructured output, it automatically degrades to `R` and logs a warning.
+- If illegal characters appear inside the square brackets, the entire hint is invalidated, the engine follows the default rules, and the options fall back to `ONTORAG_PARSER` defaults or all defaults; a warning is also logged.
+- `P` is only effective for structured `OntoRAG Document` results extracted by `native`; for the `legacy` path or unstructured output, it automatically degrades to `R` and logs a warning.
 
 ## 3. Chunker Parameter Configuration (chunk_options)
 
@@ -335,7 +335,7 @@ Different characters of processing options take effect at different stages of th
 env vars                                                  (read once at startup)
    │
    ▼
-addon_params["chunker"]                                   (LightRAG instance field, filled by env with legacy fallback)
+addon_params["chunker"]                                   (OntoRAG instance field, filled by env with legacy fallback)
    │
    ▼  resolve_chunk_options(addon_params, split_by_character=…, split_by_character_only=…)
    │
@@ -345,23 +345,23 @@ full_docs[doc_id]["chunk_options"]                       (frozen at enqueue time
 chunker(tokenizer, content, chunk_token_size, **strategy_kwargs)   (dispatched by selector during chunking)
 ```
 
-- **env vars** are loaded into `addon_params["chunker"]` during the `LightRAG.__init__` stage (strategy-specific env is read by `default_chunker_config()`, then `_apply_chunk_size_overlay` fills in legacy env as a fallback).
+- **env vars** are loaded into `addon_params["chunker"]` during the `OntoRAG.__init__` stage (strategy-specific env is read by `default_chunker_config()`, then `_apply_chunk_size_overlay` fills in legacy env as a fallback).
 - **`addon_params["chunker"]`** is an `ObservableAddonParams` field; for Server deployments, you only need env / restart for the new values to take effect. To change it at runtime within the Python process (without restarting) and to do per-file overrides, see [Chapter 8: Python SDK Invocation](#8-python-sdk-invocation).
 - **`full_docs.chunk_options`** is frozen at `apipeline_enqueue_documents` enqueue time: by default it is assembled by `resolve_chunk_options(self.addon_params, ...)` on the spot; if the caller passes a `chunk_options` argument, it is persisted as-is (SDK usage, see §8.4).
 - **The chunker invocation** takes the corresponding sub-dictionary from `full_docs.chunk_options` and dispatches to F/R/V/P by the `process_options.chunking` selector.
 
 ### 3.2 Environment Variables
 
-All variables in the table below are read into `addon_params["chunker"]` once when `LightRAG` is instantiated: strategy-specific env is read by `default_chunker_config()`, while legacy env (`CHUNK_SIZE` / `CHUNK_OVERLAP_SIZE`) is filled in by `_apply_chunk_size_overlay` into slots that neither strategy env nor legacy constructor fields filled. After modifying env, the service must be restarted (or a new `LightRAG` instance created) for it to take effect; documents already enqueued hold the frozen snapshot and are unaffected.
+All variables in the table below are read into `addon_params["chunker"]` once when `OntoRAG` is instantiated: strategy-specific env is read by `default_chunker_config()`, while legacy env (`CHUNK_SIZE` / `CHUNK_OVERLAP_SIZE`) is filled in by `_apply_chunk_size_overlay` into slots that neither strategy env nor legacy constructor fields filled. After modifying env, the service must be restarted (or a new `OntoRAG` instance created) for it to take effect; documents already enqueued hold the frozen snapshot and are unaffected.
 
 | Variable | Default | Type | Scope |
 |---|---|---|---|
 | `CHUNK_SIZE` | `1200` | int | Legacy top-level `chunk_token_size` fallback; lower priority than strategy-specific env and the SDK path setting of `addon_params["chunker"]["chunk_token_size"]` |
-| `CHUNK_OVERLAP_SIZE` | `100` | int | Legacy overlap fallback; filled when a strategy has neither a specific env (`CHUNK_F_OVERLAP_SIZE` / `CHUNK_R_OVERLAP_SIZE` / `CHUNK_P_OVERLAP_SIZE`) nor the SDK path's `LightRAG(chunk_overlap_token_size=…)` |
+| `CHUNK_OVERLAP_SIZE` | `100` | int | Legacy overlap fallback; filled when a strategy has neither a specific env (`CHUNK_F_OVERLAP_SIZE` / `CHUNK_R_OVERLAP_SIZE` / `CHUNK_P_OVERLAP_SIZE`) nor the SDK path's `OntoRAG(chunk_overlap_token_size=…)` |
 | `CHUNK_F_OVERLAP_SIZE` | unset | int | F strategy-specific overlap; higher than the legacy constructor field and `CHUNK_OVERLAP_SIZE` |
 | `CHUNK_F_SPLIT_BY_CHARACTER` | (unset = `null`) | str? | F pre-split separator; `null` / empty string = split by token window only |
 | `CHUNK_F_SPLIT_BY_CHARACTER_ONLY` | `false` | bool | F strict mode: no secondary token split; raise error when oversized |
-| `CHUNK_R_SIZE` | unset | int | R strategy-specific `chunk_token_size`; higher than top-level legacy fallback (`CHUNK_SIZE` and the SDK path's `LightRAG(chunk_token_size=…)`). When unset, R inherits the top-level resolved value. |
+| `CHUNK_R_SIZE` | unset | int | R strategy-specific `chunk_token_size`; higher than top-level legacy fallback (`CHUNK_SIZE` and the SDK path's `OntoRAG(chunk_token_size=…)`). When unset, R inherits the top-level resolved value. |
 | `CHUNK_R_OVERLAP_SIZE` | unset | int | R strategy-specific overlap; higher than the legacy constructor field and `CHUNK_OVERLAP_SIZE` |
 | `CHUNK_R_SEPARATORS` | `["\n\n","\n","。","！","？","；","，"," ",""]` | JSON array string | R separator cascade, ordered from strongest to weakest semantic boundary. The default includes Chinese sentence-ending (`。！？`) and mid-sentence (`；，`) punctuation, letting Chinese / mixed Chinese-English documents split at semantic boundaries. English `.?!` is deliberately excluded (literal matching would mis-split numbers and abbreviations). |
 | `CHUNK_V_SIZE` | unset | int | V strategy-specific `chunk_token_size` (hard cap, automatically re-split through R when exceeded); higher than the top-level legacy fallback. When unset, V inherits the top-level resolved value. |
@@ -369,7 +369,7 @@ All variables in the table below are read into `addon_params["chunker"]` once wh
 | `CHUNK_V_BREAKPOINT_THRESHOLD_AMOUNT` | (unset = `null`) | float? | V threshold magnitude; `null` lets LangChain pick the default by type (e.g., percentile=95) |
 | `CHUNK_V_BUFFER_SIZE` | `1` | int | V sentence buffer window; the number of adjacent sentences to merge during distance computation |
 | `CHUNK_V_SENTENCE_SPLIT_REGEX` | `(?<=[.?!])\s+\|(?<=[。？！])` | str | V's sentence splitting regex, fed to LangChain's `SemanticChunker`. The default recognizes both English `.?!` (requiring trailing whitespace to avoid mis-splitting `0.95`) and Chinese `。？！` (no whitespace required, fitting Chinese continuous writing). The env value is the raw regex string; no JSON quoting needed. |
-| `CHUNK_P_SIZE` | `2000` (`DEFAULT_CHUNK_P_SIZE`) | int | P strategy-specific `chunk_token_size`. Unlike R/V, P does NOT inherit the top-level `CHUNK_SIZE` / `LightRAG(chunk_token_size=…)` when unset — paragraph-semantic merging needs more headroom than the global default to keep related paragraphs together, so the slot always carries `DEFAULT_CHUNK_P_SIZE` (2000) instead. |
+| `CHUNK_P_SIZE` | `2000` (`DEFAULT_CHUNK_P_SIZE`) | int | P strategy-specific `chunk_token_size`. Unlike R/V, P does NOT inherit the top-level `CHUNK_SIZE` / `OntoRAG(chunk_token_size=…)` when unset — paragraph-semantic merging needs more headroom than the global default to keep related paragraphs together, so the slot always carries `DEFAULT_CHUNK_P_SIZE` (2000) instead. |
 | `CHUNK_P_OVERLAP_SIZE` | unset | int | P strategy-specific overlap; higher than the legacy constructor field and `CHUNK_OVERLAP_SIZE`. Used for text overlap when long body text within the same JSONL content line falls back to R, and as the per-side budget for bridging text copied into the adjacent large-table chunks. |
 
 P's internal ratio constants are algorithmic scales and are automatically derived in proportion to `chunk_token_size`. P always uses an independent `chunk_token_size` decoupled from the global chain — even when `CHUNK_P_SIZE` is unset, P falls back to `DEFAULT_CHUNK_P_SIZE` (2000) rather than the global `CHUNK_SIZE`, because paragraph-semantic merging needs more headroom than the global default to keep related paragraphs together. Use `CHUNK_P_SIZE` to override that default per deployment. `CHUNK_P_OVERLAP_SIZE` only affects P's internal plain-text fallback and table bridging context; it does not let table row-level slices overlap each other. `CHUNK_R_SIZE` / `CHUNK_V_SIZE` work differently — when unset they DO fall back to the top-level `chunk_token_size` (R prefers a smaller target to better split sentences, while V — as an advisory ceiling — typically wants to be enlarged to reduce over-splitting).
@@ -380,12 +380,12 @@ The final value of each chunking slot is resolved by a specificity-ordered chain
 
 1. **`addon_params["chunker"]` explicit value** — field values explicitly written at construction time or set at runtime via the SDK path (see §8.3). Server-only deployments usually don't hit this tier. Most direct; wins everything.
 2. **Strategy-specific env** — e.g., `CHUNK_F_OVERLAP_SIZE` / `CHUNK_R_OVERLAP_SIZE` / `CHUNK_P_OVERLAP_SIZE` / `CHUNK_R_SIZE` / `CHUNK_V_SIZE` / `CHUNK_P_SIZE` (there is no strategy-specific `CHUNK_F_SIZE` yet; F reuses the top-level `chunk_token_size`). Filled only when the slot is not already occupied by ①.
-3. **Legacy constructor fields** — `LightRAG(chunk_token_size=…, chunk_overlap_token_size=…)`; only effective on the SDK path, see §8.2. Strategy-agnostic, "coarse-grained default", fills only the slots still empty.
+3. **Legacy constructor fields** — `OntoRAG(chunk_token_size=…, chunk_overlap_token_size=…)`; only effective on the SDK path, see §8.2. Strategy-agnostic, "coarse-grained default", fills only the slots still empty.
 4. **Legacy env** — `CHUNK_SIZE` / `CHUNK_OVERLAP_SIZE`. Final fallback.
 
-Example: `CHUNK_R_OVERLAP_SIZE=42` + `LightRAG(chunk_overlap_token_size=2)` → R sub-dictionary `chunk_overlap_token_size=42` (strategy env wins), F / P sub-dictionary `chunk_overlap_token_size=2` (no F / P-specific env; the legacy constructor field is filled in).
+Example: `CHUNK_R_OVERLAP_SIZE=42` + `OntoRAG(chunk_overlap_token_size=2)` → R sub-dictionary `chunk_overlap_token_size=42` (strategy env wins), F / P sub-dictionary `chunk_overlap_token_size=2` (no F / P-specific env; the legacy constructor field is filled in).
 
-**Special case for P's `chunk_token_size`**: the P `chunk_token_size` slot does NOT walk the full four-tier chain. When ① is not explicitly provided, it resolves directly via `CHUNK_P_SIZE` env > `DEFAULT_CHUNK_P_SIZE` (2000), **skipping** ③ legacy constructor field `LightRAG(chunk_token_size=…)` and ④ legacy env `CHUNK_SIZE`. See the `CHUNK_P_SIZE` row in §3.2 for the rationale.
+**Special case for P's `chunk_token_size`**: the P `chunk_token_size` slot does NOT walk the full four-tier chain. When ① is not explicitly provided, it resolves directly via `CHUNK_P_SIZE` env > `DEFAULT_CHUNK_P_SIZE` (2000), **skipping** ③ legacy constructor field `OntoRAG(chunk_token_size=…)` and ④ legacy env `CHUNK_SIZE`. See the `CHUNK_P_SIZE` row in §3.2 for the rationale.
 
 Three layers of semantic guarantee:
 
@@ -456,26 +456,26 @@ File enqueue and extraction results are written into `full_docs`:
 | `file_path` | Basename of the filename (without directory), **preserves the original name provided by the user (including the square-bracket hint)**, e.g., `abc.[native-iet].docx` is written as-is. When no valid source is provided, it is saved as `unknown_source`. The filename hint is not stripped, so the management UI can directly show the user's original naming intent. |
 | `canonical_basename` | The canonicalized basename with the processing hint stripped (e.g., `abc.docx`). Filename deduplication uses this field as the index key, ensuring `abc.docx` and `abc.[native-iet].docx` are treated as the same logical document. |
 | `source_path` | The original path provided at enqueue time (written only when it contains a directory separator or is an absolute path), used by the `native` / `mineru` / `docling` parsers to locate the actual file. |
-| `parse_format` | Content format: `pending_parse`, `raw`, `lightrag`. |
-| `content` | When `raw`, holds the extracted text; when `pending_parse`, it is an empty string; when `lightrag`, holds the **complete merged text** starting with `{{LRdoc}}` (concatenated body segments of all `type=="content"` lines in `.blocks.jsonl`). During chunking, `parse_native` strips the prefix and hands it to the chunking_func, going through exactly the same code path as `raw`. |
-| `content_hash` | MD5 of the content, used for cross-filename deduplication. For `parse_format=raw`, takes the hash of text after `sanitize_text_for_encoding`; for `parse_format=lightrag`, takes the hash of the `*.blocks.jsonl` file; for `parse_format=pending_parse`, not written, filled in after extraction completes. |
-| `lightrag_document_path` | When `parse_format=lightrag`, saves the path to the structured LightRAG Document; new records prefer to save the path relative to `INPUT_DIR`, e.g., `__parsed__/report.docx.parsed/report.blocks.jsonl`. Note that the subdirectories and the blocks filename in the path both use the canonicalized basename (without hint). |
+| `parse_format` | Content format: `pending_parse`, `raw`, `ontorag`. |
+| `content` | When `raw`, holds the extracted text; when `pending_parse`, it is an empty string; when `ontorag`, holds the **complete merged text** starting with `{{LRdoc}}` (concatenated body segments of all `type=="content"` lines in `.blocks.jsonl`). During chunking, `parse_native` strips the prefix and hands it to the chunking_func, going through exactly the same code path as `raw`. |
+| `content_hash` | MD5 of the content, used for cross-filename deduplication. For `parse_format=raw`, takes the hash of text after `sanitize_text_for_encoding`; for `parse_format=ontorag`, takes the hash of the `*.blocks.jsonl` file; for `parse_format=pending_parse`, not written, filled in after extraction completes. |
+| `ontorag_document_path` | When `parse_format=ontorag`, saves the path to the structured OntoRAG Document; new records prefer to save the path relative to `INPUT_DIR`, e.g., `__parsed__/report.docx.parsed/report.blocks.jsonl`. Note that the subdirectories and the blocks filename in the path both use the canonicalized basename (without hint). |
 | `parse_engine` | The engine that actually completed extraction: `legacy`, `native`, `mineru`, `docling`. For files awaiting extraction, can also temporarily store the target engine. |
 | `process_options` | The original processing options string recorded at enqueue time (without engine name and the separator `-`), e.g., `"iet"`, `"R!"`, `""`. Downstream stages take this field as the authoritative source for deciding whether to enable image / table / equation analysis (`i/t/e`), whether to disable knowledge graph construction (`!`), and the chunking method (`F/R/V/P`). An empty string is equivalent to all defaults. |
 | `chunk_options` | The **frozen** snapshot of chunker parameters at enqueue time (slim dictionary: only the strategy sub-dictionary selected by `process_options` is retained, others discarded). Passed in by the SDK-path caller or assembled by `resolve_chunk_options(self.addon_params, process_options=…)` from instance fields (containing env defaults) as a fallback (see §3.1). `process_options` chooses which chunking strategy (F/R/V/P); `chunk_options` decides which parameters that chunker uses. The downstream `process_single_document` reads strategy-specific kwargs from this field before chunking; persistence guarantees that old documents behave reproducibly across env changes, resumes, and restarts. Rewritten together with `process_options` when re-parsing. |
 
-`pending_parse` indicates the file has been enqueued but extraction is not yet complete. After successful extraction, it is rewritten to `raw` or `lightrag`, and `content_hash` is filled in. On extraction failure, `pending_parse` and the empty `content` are kept, making subsequent troubleshooting and retry easier.
+`pending_parse` indicates the file has been enqueued but extraction is not yet complete. After successful extraction, it is rewritten to `raw` or `ontorag`, and `content_hash` is filled in. On extraction failure, `pending_parse` and the empty `content` are kept, making subsequent troubleshooting and retry easier.
 
 > The original `file_path` (with hint), `canonical_basename`, and `content_hash` are also synchronized into `doc_status`, serving as the deduplication index sources for `get_doc_by_file_basename` / `get_doc_by_content_hash`. `get_doc_by_file_basename` internally canonicalizes the input through `canonicalize_parser_hinted_basename` before comparing against `canonical_basename`, so `abc.docx` and `abc.[native-iet].docx` always hit the same document.
 > `process_options` is also mirrored into `doc_status.metadata["process_options"]`, making it convenient for the management UI to directly display the current file's processing policy.
 
 ### 4.2 `__parsed__` Directory Structure
 
-`__parsed__` is the archival and analysis-result directory next to the input directory. It both stores already-processed original documents and the `LightRAG Document` (lightrag format) files and image assets produced by structured parsing.
+`__parsed__` is the archival and analysis-result directory next to the input directory. It both stores already-processed original documents and the `OntoRAG Document` (ontorag format) files and image assets produced by structured parsing.
 
 - Original file archival: after `legacy` local extraction succeeds and enqueueing finishes, the original file is moved into the sibling `__parsed__` directory; `native` / `mineru` / `docling` keep the original file first for the pipeline to parse, and only move it to `__parsed__` after successful parsing and writing to `full_docs`. **When archived, the original filename (including `[hint]`) is preserved**, e.g., `report.[native-iet].docx` is archived as `__parsed__/report.[native-iet].docx`, making it easy to trace the user's original name and processing options.
 - Analysis result directory: structured parsing results are written into a subdirectory named with the **canonicalized filename** (with `[hint]` removed) plus the `.parsed` suffix, avoiding name conflicts with the archived original file and ensuring that the same logical document continues to point to the same directory when the filename hint or processing options change. For example, the analysis results of `report.docx`, `report.[native].docx`, and `report.[native-iet].docx` are all written into `__parsed__/report.docx.parsed/`.
-- Analysis result files: the LightRAG Document blocks file and sidecars are named with the canonicalized filename stem, e.g., `__parsed__/report.docx.parsed/report.blocks.jsonl`; the same directory may also contain `report.tables.json`, `report.drawings.json`, `report.equations.json`, and the `report.blocks.assets/` image asset directory. **Whether a sidecar is generated is determined by the document content**: the parser only writes the corresponding file when the document actually contains tables / images / equations. This is the only signal of modality availability — the engine does not need to declare capabilities in meta. The `i`/`t`/`e` options only determine whether the next stage invokes the VLM for summarization analysis on already-existing sidecars.
+- Analysis result files: the OntoRAG Document blocks file and sidecars are named with the canonicalized filename stem, e.g., `__parsed__/report.docx.parsed/report.blocks.jsonl`; the same directory may also contain `report.tables.json`, `report.drawings.json`, `report.equations.json`, and the `report.blocks.assets/` image asset directory. **Whether a sidecar is generated is determined by the document content**: the parser only writes the corresponding file when the document actually contains tables / images / equations. This is the only signal of modality availability — the engine does not need to declare capabilities in meta. The `i`/`t`/`e` options only determine whether the next stage invokes the VLM for summarization analysis on already-existing sidecars.
 - When parsing fails, the original file is not moved, making it easy to fix the configuration and re-process.
 - When `/documents/scan` encounters a file with the same name that is already `PROCESSED`, the input file is treated as already processed and moved to `__parsed__`, not enqueued as a new document.
 - When `/documents/scan` finds multiple files that share the same canonicalized name in the same scan, it prefers the file with a supported engine hint to respect the user's engine selection; if no variant has a hint, it processes the first file in sorted order. Other variants emit warnings and are moved to `__parsed__`, avoiding files in the same batch overwriting each other. For example, if both `abc.docx` and `abc.[native].docx` exist, only `abc.[native].docx` is processed.
@@ -505,9 +505,9 @@ Lifecycle:
 | `clear_documents` / a full sweep of `__parsed__` | Naturally cleared together. |
 | scan cycle | Does not actively GC orphan `*.mineru_raw/` (only cleared on explicit deletion by the user, to avoid accidentally removing the debug site). |
 
-Force re-parse (bypass cache): set `LIGHTRAG_FORCE_REPARSE_MINERU=true`.
+Force re-parse (bypass cache): set `ONTORAG_FORCE_REPARSE_MINERU=true`.
 
-Concurrency safety: LightRAG mandates `canonical_basename` uniqueness within the same workspace (HTTP 409 on upload/enqueue), and combined with the pipeline's serialization per document, `*.mineru_raw/` has no concurrent write conflicts and needs no extra locks.
+Concurrency safety: OntoRAG mandates `canonical_basename` uniqueness within the same workspace (HTTP 409 on upload/enqueue), and combined with the pipeline's serialization per document, `*.mineru_raw/` has no concurrent write conflicts and needs no extra locks.
 
 `_manifest.json` invalidation conditions (any triggers a cache miss):
 
@@ -518,7 +518,7 @@ Concurrency safety: LightRAG mandates `canonical_basename` uniqueness within the
 - `content_list.json` size or sha256 does not match manifest;
 - Size of any recorded non-critical file (images, `middle.json`, etc.) does not match manifest.
 
-> About the "either side empty → skip" semantics of `engine_version` / `endpoint_signature`: when the field was empty at manifest-write time (e.g., `MINERU_ENGINE_VERSION` was not configured at first parse), or when the current environment variable is not set, the check is skipped for that item. If the version env was not set at first parse, setting it later does not automatically invalidate the historical cache — this scenario requires manually setting `LIGHTRAG_FORCE_REPARSE_MINERU=true` to trigger re-parsing.
+> About the "either side empty → skip" semantics of `engine_version` / `endpoint_signature`: when the field was empty at manifest-write time (e.g., `MINERU_ENGINE_VERSION` was not configured at first parse), or when the current environment variable is not set, the check is skipped for that item. If the version env was not set at first parse, setting it later does not automatically invalidate the historical cache — this scenario requires manually setting `ONTORAG_FORCE_REPARSE_MINERU=true` to trigger re-parsing.
 
 ### 4.4 Docling Raw Artifacts Directory `<base>.docling_raw/`
 
@@ -552,9 +552,9 @@ Lifecycle:
 | `clear_documents` / a full sweep of `__parsed__` | Naturally cleared together. |
 | scan cycle | Does not actively GC orphan `*.docling_raw/` (only cleared on explicit deletion by the user, to avoid accidentally removing the debug site). |
 
-Force re-parse (bypass cache): set `LIGHTRAG_FORCE_REPARSE_DOCLING=true`.
+Force re-parse (bypass cache): set `ONTORAG_FORCE_REPARSE_DOCLING=true`.
 
-Concurrency safety: identical to the MinerU path — LightRAG mandates `canonical_basename` uniqueness within the same workspace (HTTP 409 on upload / enqueue), and combined with the pipeline's serialization per document, `*.docling_raw/` has no concurrent write conflicts and needs no extra locks.
+Concurrency safety: identical to the MinerU path — OntoRAG mandates `canonical_basename` uniqueness within the same workspace (HTTP 409 on upload / enqueue), and combined with the pipeline's serialization per document, `*.docling_raw/` has no concurrent write conflicts and needs no extra locks.
 
 `_manifest.json` invalidation conditions (any triggers a cache miss):
 
@@ -566,9 +566,9 @@ Concurrency safety: identical to the MinerU path — LightRAG mandates `canonica
   - Hard-coded constants: `pipeline` / `target_type` / `to_formats` / `image_export_mode` (written into the signature to prevent old bundles from being mistakenly reused if these values change in the future);
 - Main JSON missing, size, or sha256 does not match;
 - Any image in `artifacts/` missing or size mismatch;
-- `LIGHTRAG_FORCE_REPARSE_DOCLING=true`.
+- `ONTORAG_FORCE_REPARSE_DOCLING=true`.
 
-> The "either side empty → skip" semantics of `engine_version` / `endpoint_signature` is the same as MinerU §4.3: when the field was empty at manifest-write time (first parse without `DOCLING_ENGINE_VERSION` configured) or when the current environment variable is not set, the check is skipped for that item; adding the version number later does not automatically invalidate the historical cache; `LIGHTRAG_FORCE_REPARSE_DOCLING=true` is needed to trigger.
+> The "either side empty → skip" semantics of `engine_version` / `endpoint_signature` is the same as MinerU §4.3: when the field was empty at manifest-write time (first parse without `DOCLING_ENGINE_VERSION` configured) or when the current environment variable is not set, the check is skipped for that item; adding the version number later does not automatically invalidate the historical cache; `ONTORAG_FORCE_REPARSE_DOCLING=true` is needed to trigger.
 
 ## 5. Document Duplicate Detection Rules
 
@@ -594,15 +594,15 @@ The storage backend provides basename direct lookup via `get_doc_by_file_basenam
 
 ### 5.2 Content Hash Deduplication
 
-- Documents with different filenames but identical extracted content are also considered duplicates. The hash here is the content hash of the final text or LightRAG Document obtained by the configured extraction engine; it is not the hash of the original file bytes.
+- Documents with different filenames but identical extracted content are also considered duplicates. The hash here is the content hash of the final text or OntoRAG Document obtained by the configured extraction engine; it is not the hash of the original file bytes.
 - `full_docs` and `doc_status` write or fill in the `content_hash` field according to the content format:
   - `parse_format=raw`: the MD5 of the text after `sanitize_text_for_encoding`.
-  - `parse_format=lightrag`: the MD5 of the `*.blocks.jsonl` file parsed out of `lightrag_document_path`. Relative paths are resolved against `INPUT_DIR`.
+  - `parse_format=ontorag`: the MD5 of the `*.blocks.jsonl` file parsed out of `ontorag_document_path`. Relative paths are resolved against `INPUT_DIR`.
   - `parse_format=pending_parse`: no hash is written yet; it is filled in by subsequent steps after parsing actually completes (to avoid mistakenly judging by empty content).
 - The `legacy` path deduplicates content hashes after locally extracting text and during enqueue; on hit, this record is written as `FAILED duplicate`, and no new `full_docs`, chunks, or graph data are generated.
 - The `native` / `mineru` / `docling` paths first enqueue with `pending_parse`; after parsing completes and `content_hash` is filled in, if another document already has the same hash, this record is stopped before entering analysis, chunking, entity extraction, and graph writing.
 - Duplicate records are marked as `filename` or `content_hash` in `metadata.duplicate_kind` for diagnosis. Content-hash duplicates also record `metadata.is_duplicate=true`, `metadata.original_doc_id`, and `metadata.original_track_id`; duplicates discovered only after parsing also have the temporarily-written `full_docs` deleted.
-- Related warnings minimize repetitive noise: when scanning discovers a same-name file already `PROCESSED`, a log and pipeline status are written; duplicates at the enqueue stage use the LightRAG layer's `Duplicate document detected (...)` log; content duplicates only discovered after parsing use `Duplicate content skipped after parsing` and write a pipeline status. Scan archiving does not emit the extra `[File Extraction]Duplicate skipped`.
+- Related warnings minimize repetitive noise: when scanning discovers a same-name file already `PROCESSED`, a log and pipeline status are written; duplicates at the enqueue stage use the OntoRAG layer's `Duplicate document detected (...)` log; content duplicates only discovered after parsing use `Duplicate content skipped after parsing` and write a pipeline status. Scan archiving does not emit the extra `[File Extraction]Duplicate skipped`.
 - The storage backend provides hash direct lookup via `get_doc_by_content_hash`; the naming convention is the same as `get_doc_by_file_basename`.
 
 > Within an enqueue batch (the same `apipeline_enqueue_documents` call), basename and content_hash dedup are also performed; on hit, subsequent entries are written as `FAILED` directly and marked with `existing_status=batch_duplicate`. Basename dedup only applies to valid filenames; `unknown_source`, `no-file-path`, and empty sources only participate in content-hash dedup.
@@ -714,7 +714,7 @@ PENDING ─►├─ q_mineru  ──► [mineru parser  × N2] ─┼─► q_a
           └─ q_docling ──► [docling parser × N3] ─┘
 ```
 
-At enqueue time, `resolve_stored_document_parser_engine` puts each document into the corresponding parse queue based on its `parser_engine` (from `LIGHTRAG_PARSER` defaults or the filename hint); the three parse queues are **completely non-blocking** with respect to each other — mineru saturation does not slow down docling or native. After parsing, they enter `q_analyze` (multimodal analysis) uniformly, and then enter `q_process` (entity/relation extraction + ingest).
+At enqueue time, `resolve_stored_document_parser_engine` puts each document into the corresponding parse queue based on its `parser_engine` (from `ONTORAG_PARSER` defaults or the filename hint); the three parse queues are **completely non-blocking** with respect to each other — mineru saturation does not slow down docling or native. After parsing, they enter `q_analyze` (multimodal analysis) uniformly, and then enter `q_process` (entity/relation extraction + ingest).
 
 | Environment variable | Default | Effect | Tuning advice |
 | --- | --- | --- | --- |
@@ -732,7 +732,7 @@ At enqueue time, `resolve_stored_document_parser_engine` puts each document into
 2. **mineru / docling default to serial (=1)**: in practice both have high resource usage, and concurrency benefits are unstable (prone to OOM / VRAM contention / failure retry). With multi-GPU or a dedicated parser server, you can raise them manually.
 3. **`MAX_PARALLEL_INSERT` doubles as worker pool size and semaphore cap**: the pipeline creates a `Semaphore(max_parallel_insert)`, and each process worker also takes the semaphore before extraction and ingest. So even if you manually raise the worker count, the actual concurrency cap is still bounded by this value — just tune it directly.
 4. **Queue size and backpressure**: the small default `QUEUE_SIZE_INSERT=4` is intentional — the process stage is slow and memory-hungry; when the queue fills, analyze blocks, and backpressure reaches the parse stage, preventing thousands of parsing results from piling up in memory at once.
-5. **How changes take effect**: all parameters are passed in via `.env` (or environment variables), read once at `LightRAG` construction; restart the service after changing them.
+5. **How changes take effect**: all parameters are passed in via `.env` (or environment variables), read once at `OntoRAG` construction; restart the service after changing them.
 
 **Typical tuning scenarios:**
 
@@ -753,7 +753,7 @@ Read `full_docs[doc_id]`:
 
 | `parse_format` | Verdict |
 | --- | --- |
-| `lightrag` and `lightrag_document_path` file exists | ✅ extracted |
+| `ontorag` and `ontorag_document_path` file exists | ✅ extracted |
 | `raw` and `content` is non-empty | ✅ extracted |
 | Other (including `pending_parse`, missing record) | ❌ not extracted |
 
@@ -770,29 +770,29 @@ Go through the full pipeline (`parse_native` / `parse_mineru` / `parse_docling` 
 | Engine comparison | If the engine implied by `process_options` ≠ `full_docs.parse_engine`, **only warn**, do not re-parse. The extracted content is an immutable fact; re-running a different engine would produce inconsistency. To switch engines, delete the whole document and re-upload it. |
 | Old chunks / entities / relations cleanup | Read `status_doc.chunks_list` to collect old chunk id set, call `_purge_doc_chunks_and_kg(doc_id, chunk_ids)`: delete chunk rows from `chunks_vdb` / `text_chunks`; reverse-lookup affected entities / relations by `entity_chunks` / `relation_chunks`, directly remove entries that have lost all sources from the graph and vector store, and call `rebuild_knowledge_from_chunks` to rebuild with the remaining chunks for entries still contributed by other documents; finally delete the index rows of this doc in `full_entities` / `full_relations`. After purge completes, `status_doc.chunks_list = []` / `chunks_count = 0` are reset to avoid the subsequent state-machine upsert writing back old IDs. |
 | `analyze_multimodal` | For enabled modalities, every run recomputes the sidecar item analysis and overwrites the existing `llm_analyze_result`. The LLM analysis cache still applies: a cache hit reuses the previous provider response, so semantic fields usually stay the same and only runtime fields such as `analyze_time` are rewritten. Cache misses, for example after changing the model or prompt, can produce different saved content. |
-| Re-chunk | Pick the strategy by the new `process_options.chunking`, with parameters read from `full_docs.chunk_options` (the enqueue snapshot; not overwritten by resume; env changes do not affect old documents that still chunk by the parameters from the moment of enqueue). The LightRAG Document path uses paragraph_semantic when `process_options=P`, otherwise dispatches to F/R/V by selector. |
+| Re-chunk | Pick the strategy by the new `process_options.chunking`, with parameters read from `full_docs.chunk_options` (the enqueue snapshot; not overwritten by resume; env changes do not affect old documents that still chunk by the parameters from the moment of enqueue). The OntoRAG Document path uses paragraph_semantic when `process_options=P`, otherwise dispatches to F/R/V by selector. |
 | Entity extraction / KG-skip | Determined by the new `process_options.skip_kg` |
 
 > This rule guarantees: when users change `i/t/e` and re-upload the same-named document (delete the old doc first, then upload the file with the new hint), multimodal analysis is incrementally filled in; when changing `F/R/V/P`, chunks and graph are rebuilt; when changing `!`, KG construction is stopped or restored. Engine changes are considered a "major change", uniformly handled by delete + re-upload, not implicitly happening on the resume path.
 
 ## 8. Python SDK Invocation
 
-This chapter targets developers who **directly import the `LightRAG` class** for integration, covering runtime APIs, constructor parameters, and removed legacy interfaces that Server deployments don't use. Server users usually don't need to read this chapter.
+This chapter targets developers who **directly import the `OntoRAG` class** for integration, covering runtime APIs, constructor parameters, and removed legacy interfaces that Server deployments don't use. Server users usually don't need to read this chapter.
 
 ### 8.1 Audience
 
 ```python
-from lightrag import LightRAG
-rag = LightRAG(working_dir="./rag_storage", ...)
+from ontorag import OntoRAG
+rag = OntoRAG(working_dir="./rag_storage", ...)
 await rag.initialize_storages()
 await rag.ainsert("text", file_paths="doc.pdf")
 ```
 
 The following behaviors of this invocation style differ from the Server path: you can change `addon_params["chunker"]` without restarting the process, you can pass per-file `chunk_options` into `apipeline_enqueue_documents`, and you can dynamically override the F strategy's pre-split parameters in an `ainsert` call.
 
-### 8.2 LightRAG Constructor Parameters
+### 8.2 OntoRAG Constructor Parameters
 
-`LightRAG(chunk_token_size=…, chunk_overlap_token_size=…)` is **tier 3** in §3.3's priority chain: "legacy constructor field". Strategy-agnostic and coarse-grained default, fills only slots still empty:
+`OntoRAG(chunk_token_size=…, chunk_overlap_token_size=…)` is **tier 3** in §3.3's priority chain: "legacy constructor field". Strategy-agnostic and coarse-grained default, fills only slots still empty:
 
 - Lower priority than `addon_params["chunker"]` explicit values (§8.3) and strategy-specific env (§3.2).
 - Higher priority than the legacy env `CHUNK_SIZE` / `CHUNK_OVERLAP_SIZE`.
@@ -836,7 +836,7 @@ For `apipeline_enqueue_documents`'s own concurrency constraints (last-line guard
 
 ### 8.5 `ainsert(split_by_character=…, split_by_character_only=…)`
 
-`LightRAG.ainsert(split_by_character=…, split_by_character_only=…)` runtime parameters are overridden into `chunk_options.fixed_token` by `resolve_chunk_options` at enqueue time:
+`OntoRAG.ainsert(split_by_character=…, split_by_character_only=…)` runtime parameters are overridden into `chunk_options.fixed_token` by `resolve_chunk_options` at enqueue time:
 
 - A non-`None` `split_by_character` overrides the env default;
 - `split_by_character_only=True` overrides (`False` is the signature default, indistinguishable from "not specified", so the env default wins).

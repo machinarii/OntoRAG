@@ -57,8 +57,8 @@ def test_existing_ssl_env_keeps_compose_mount_overrides(tmp_path: Path) -> None:
         "\n".join(
             [
                 "services:",
-                "  lightrag:",
-                "    image: example/lightrag:test",
+                "  ontorag:",
+                "    image: example/ontorag:test",
                 "    env_file:",
                 "      - .env",
             ]
@@ -109,10 +109,10 @@ def test_finalize_base_setup_rewrites_ssl_env_to_preserved_compose_paths(
             "SSL=true",
             "SSL_CERTFILE=/missing/original-cert.pem",
             "SSL_KEYFILE=/missing/original-key.pem",
-            "LIGHTRAG_KV_STORAGE=JsonKVStorage",
-            "LIGHTRAG_VECTOR_STORAGE=NanoVectorDBStorage",
-            "LIGHTRAG_GRAPH_STORAGE=NetworkXStorage",
-            "LIGHTRAG_DOC_STATUS_STORAGE=JsonDocStatusStorage",
+            "ONTORAG_KV_STORAGE=JsonKVStorage",
+            "ONTORAG_VECTOR_STORAGE=NanoVectorDBStorage",
+            "ONTORAG_GRAPH_STORAGE=NetworkXStorage",
+            "ONTORAG_DOC_STATUS_STORAGE=JsonDocStatusStorage",
         ],
     )
     write_text_lines(
@@ -123,8 +123,8 @@ def test_finalize_base_setup_rewrites_ssl_env_to_preserved_compose_paths(
         tmp_path / "docker-compose.final.yml",
         [
             "services:",
-            "  lightrag:",
-            "    image: example/lightrag:test",
+            "  ontorag:",
+            "    image: example/ontorag:test",
             "    volumes:",
             "      - ./.env:/app/.env",
             "      - ./data/certs/server.pem:/app/data/certs/server.pem:ro",
@@ -145,7 +145,7 @@ initialize_default_storage_backends
 show_summary() {{ :; }}
 confirm_default_yes() {{
   case "$1" in
-    "All wizard-managed services have been removed. Remove LightRAG from Docker and switch to host mode?") return 1 ;;
+    "All wizard-managed services have been removed. Remove OntoRAG from Docker and switch to host mode?") return 1 ;;
     *) return 0 ;;
   esac
 }}
@@ -173,8 +173,8 @@ def test_removing_ssl_strips_wizard_bind_mounts_from_compose(tmp_path: Path) -> 
         "\n".join(
             [
                 "services:",
-                "  lightrag:",
-                "    image: example/lightrag:test",
+                "  ontorag:",
+                "    image: example/ontorag:test",
                 "    volumes:",
                 '      - "./data/certs/cert.pem:/app/data/certs/cert.pem:ro"',
                 '      - "./data/certs/key.pem:/app/data/certs/key.pem:ro"',
@@ -212,15 +212,15 @@ def test_find_generated_compose_file_prefers_final_compose_file(tmp_path: Path) 
     write_text_lines(tmp_path / ".env", ["HOST=0.0.0.0"])
     write_text_lines(
         tmp_path / "docker-compose.final.yml",
-        ["services:", "  lightrag:", "    image: final/lightrag"],
+        ["services:", "  ontorag:", "    image: final/ontorag"],
     )
     write_text_lines(
         tmp_path / "docker-compose.development.yml",
-        ["services:", "  lightrag:", "    image: dev/lightrag"],
+        ["services:", "  ontorag:", "    image: dev/ontorag"],
     )
     write_text_lines(
         tmp_path / "docker-compose.production.yml",
-        ["services:", "  lightrag:", "    image: prod/lightrag"],
+        ["services:", "  ontorag:", "    image: prod/ontorag"],
     )
     output = run_bash(f"""
 set -euo pipefail
@@ -240,11 +240,11 @@ def test_find_generated_compose_file_falls_back_to_order_without_profile(
     write_text_lines(tmp_path / ".env", ["HOST=0.0.0.0"])
     write_text_lines(
         tmp_path / "docker-compose.development.yml",
-        ["services:", "  lightrag:", "    image: dev/lightrag"],
+        ["services:", "  ontorag:", "    image: dev/ontorag"],
     )
     write_text_lines(
         tmp_path / "docker-compose.production.yml",
-        ["services:", "  lightrag:", "    image: prod/lightrag"],
+        ["services:", "  ontorag:", "    image: prod/ontorag"],
     )
     output = run_bash(f"""
 set -euo pipefail
@@ -339,7 +339,7 @@ def test_load_existing_env_forces_cohere_binding_for_vllm_rerank(
         tmp_path / ".env",
         [
             "RERANK_BINDING=jina",
-            "LIGHTRAG_SETUP_RERANK_PROVIDER=vllm",
+            "ONTORAG_SETUP_RERANK_PROVIDER=vllm",
             "RERANK_BINDING_HOST=http://localhost:8000/rerank",
         ],
     )
@@ -351,10 +351,10 @@ reset_state
 load_existing_env_if_present
 
 printf 'RERANK_BINDING=%s\\n' "${{ENV_VALUES[RERANK_BINDING]}}"
-printf 'LIGHTRAG_SETUP_RERANK_PROVIDER=%s\\n' "${{ENV_VALUES[LIGHTRAG_SETUP_RERANK_PROVIDER]}}\"
+printf 'ONTORAG_SETUP_RERANK_PROVIDER=%s\\n' "${{ENV_VALUES[ONTORAG_SETUP_RERANK_PROVIDER]}}\"
 """)
     assert values["RERANK_BINDING"] == "cohere"
-    assert values["LIGHTRAG_SETUP_RERANK_PROVIDER"] == "vllm"
+    assert values["ONTORAG_SETUP_RERANK_PROVIDER"] == "vllm"
 
 
 @pytest.mark.parametrize(
@@ -421,15 +421,15 @@ def test_finalize_base_setup_uses_compose_native_storage_endpoints_on_rerun(
     write_text_lines(
         tmp_path / ".env",
         [
-            "LIGHTRAG_RUNTIME_TARGET=compose",
-            "LIGHTRAG_SETUP_NEO4J_DEPLOYMENT=docker",
-            "LIGHTRAG_SETUP_MILVUS_DEPLOYMENT=docker",
+            "ONTORAG_RUNTIME_TARGET=compose",
+            "ONTORAG_SETUP_NEO4J_DEPLOYMENT=docker",
+            "ONTORAG_SETUP_MILVUS_DEPLOYMENT=docker",
             "NEO4J_URI=neo4j://localhost:7687",
             "MILVUS_URI=http://localhost:19530",
-            "LIGHTRAG_KV_STORAGE=JsonKVStorage",
-            "LIGHTRAG_VECTOR_STORAGE=NanoVectorDBStorage",
-            "LIGHTRAG_GRAPH_STORAGE=NetworkXStorage",
-            "LIGHTRAG_DOC_STATUS_STORAGE=JsonDocStatusStorage",
+            "ONTORAG_KV_STORAGE=JsonKVStorage",
+            "ONTORAG_VECTOR_STORAGE=NanoVectorDBStorage",
+            "ONTORAG_GRAPH_STORAGE=NetworkXStorage",
+            "ONTORAG_DOC_STATUS_STORAGE=JsonDocStatusStorage",
         ],
     )
     write_text_lines(
@@ -440,8 +440,8 @@ def test_finalize_base_setup_uses_compose_native_storage_endpoints_on_rerun(
         tmp_path / "docker-compose.final.yml",
         [
             "services:",
-            "  lightrag:",
-            "    image: example/lightrag:test",
+            "  ontorag:",
+            "    image: example/ontorag:test",
             "  neo4j:",
             "    image: neo4j:latest",
             "  milvus:",
@@ -498,14 +498,14 @@ def test_finalize_base_setup_migrates_mongodb_to_atlas_local_for_mongo_vector_st
     write_text_lines(
         tmp_path / ".env",
         [
-            "LIGHTRAG_RUNTIME_TARGET=compose",
-            "LIGHTRAG_SETUP_MONGODB_DEPLOYMENT=docker",
-            "LIGHTRAG_KV_STORAGE=MongoKVStorage",
-            "LIGHTRAG_VECTOR_STORAGE=MongoVectorDBStorage",
-            "LIGHTRAG_GRAPH_STORAGE=MongoGraphStorage",
-            "LIGHTRAG_DOC_STATUS_STORAGE=MongoDocStatusStorage",
+            "ONTORAG_RUNTIME_TARGET=compose",
+            "ONTORAG_SETUP_MONGODB_DEPLOYMENT=docker",
+            "ONTORAG_KV_STORAGE=MongoKVStorage",
+            "ONTORAG_VECTOR_STORAGE=MongoVectorDBStorage",
+            "ONTORAG_GRAPH_STORAGE=MongoGraphStorage",
+            "ONTORAG_DOC_STATUS_STORAGE=MongoDocStatusStorage",
             "MONGO_URI=mongodb://localhost:27017/?directConnection=true",
-            "MONGO_DATABASE=LightRAG",
+            "MONGO_DATABASE=OntoRAG",
         ],
     )
     write_text_lines(
@@ -516,8 +516,8 @@ def test_finalize_base_setup_migrates_mongodb_to_atlas_local_for_mongo_vector_st
         tmp_path / "docker-compose.final.yml",
         [
             "services:",
-            "  lightrag:",
-            "    image: example/lightrag:test",
+            "  ontorag:",
+            "    image: example/ontorag:test",
             "  mongodb:",
             "    image: mongo:8.2.4",
             "    volumes:",
@@ -552,14 +552,14 @@ def test_finalize_base_setup_rejects_invalid_preserved_mongo_vector_config(
     write_text_lines(
         tmp_path / ".env",
         [
-            "LIGHTRAG_RUNTIME_TARGET=compose",
-            "LIGHTRAG_SETUP_MONGODB_DEPLOYMENT=docker",
-            "LIGHTRAG_KV_STORAGE=MongoKVStorage",
-            "LIGHTRAG_VECTOR_STORAGE=MongoVectorDBStorage",
-            "LIGHTRAG_GRAPH_STORAGE=MongoGraphStorage",
-            "LIGHTRAG_DOC_STATUS_STORAGE=MongoDocStatusStorage",
+            "ONTORAG_RUNTIME_TARGET=compose",
+            "ONTORAG_SETUP_MONGODB_DEPLOYMENT=docker",
+            "ONTORAG_KV_STORAGE=MongoKVStorage",
+            "ONTORAG_VECTOR_STORAGE=MongoVectorDBStorage",
+            "ONTORAG_GRAPH_STORAGE=MongoGraphStorage",
+            "ONTORAG_DOC_STATUS_STORAGE=MongoDocStatusStorage",
             "MONGO_URI=mongodb://mongo.example.com:27017/?directConnection=true",
-            "MONGO_DATABASE=LightRAG",
+            "MONGO_DATABASE=OntoRAG",
         ],
     )
     write_text_lines(
@@ -570,8 +570,8 @@ def test_finalize_base_setup_rejects_invalid_preserved_mongo_vector_config(
         tmp_path / "docker-compose.final.yml",
         [
             "services:",
-            "  lightrag:",
-            "    image: example/lightrag:test",
+            "  ontorag:",
+            "    image: example/ontorag:test",
             "  mongodb:",
             "    image: mongo:8.2.4",
             "    volumes:",
@@ -612,7 +612,7 @@ def test_finalize_base_setup_drops_stale_storage_services_missing_from_env_marke
     write_text_lines(
         tmp_path / ".env",
         [
-            "LIGHTRAG_RUNTIME_TARGET=compose",
+            "ONTORAG_RUNTIME_TARGET=compose",
             "LLM_BINDING=openai",
             "LLM_MODEL=gpt-4o-mini",
             "LLM_BINDING_HOST=https://api.openai.com/v1",
@@ -622,10 +622,10 @@ def test_finalize_base_setup_drops_stale_storage_services_missing_from_env_marke
             "EMBEDDING_DIM=1536",
             "EMBEDDING_BINDING_HOST=https://api.openai.com/v1",
             "EMBEDDING_BINDING_API_KEY=sk-existing",
-            "LIGHTRAG_KV_STORAGE=JsonKVStorage",
-            "LIGHTRAG_VECTOR_STORAGE=NanoVectorDBStorage",
-            "LIGHTRAG_GRAPH_STORAGE=NetworkXStorage",
-            "LIGHTRAG_DOC_STATUS_STORAGE=JsonDocStatusStorage",
+            "ONTORAG_KV_STORAGE=JsonKVStorage",
+            "ONTORAG_VECTOR_STORAGE=NanoVectorDBStorage",
+            "ONTORAG_GRAPH_STORAGE=NetworkXStorage",
+            "ONTORAG_DOC_STATUS_STORAGE=JsonDocStatusStorage",
         ],
     )
     write_text_lines(
@@ -636,8 +636,8 @@ def test_finalize_base_setup_drops_stale_storage_services_missing_from_env_marke
         tmp_path / "docker-compose.final.yml",
         [
             "services:",
-            "  lightrag:",
-            "    image: example/lightrag:test",
+            "  ontorag:",
+            "    image: example/ontorag:test",
             "  redis:",
             "    image: redis:latest",
             "  qdrant:",
@@ -662,12 +662,12 @@ finalize_base_setup
 """)
     result = (tmp_path / "docker-compose.final.yml").read_text(encoding="utf-8")
     generated_env = (tmp_path / ".env").read_text(encoding="utf-8")
-    assert "  lightrag:" in result
+    assert "  ontorag:" in result
     assert "  redis:" not in result
     assert "  qdrant:" not in result
     assert "redis_data:" not in result
     assert "qdrant_data:" not in result
-    assert "LIGHTRAG_RUNTIME_TARGET=compose" in generated_env
+    assert "ONTORAG_RUNTIME_TARGET=compose" in generated_env
 
 
 @pytest.mark.parametrize(
@@ -739,12 +739,12 @@ ORIGINAL_ENV_VALUES[POSTGRES_HOST]="localhost"
 ORIGINAL_ENV_VALUES[POSTGRES_PORT]="5432"
 ORIGINAL_ENV_VALUES[POSTGRES_USER]="rag"
 ORIGINAL_ENV_VALUES[POSTGRES_PASSWORD]="rag"
-ORIGINAL_ENV_VALUES[POSTGRES_DATABASE]="lightrag"
+ORIGINAL_ENV_VALUES[POSTGRES_DATABASE]="ontorag"
 ENV_VALUES[POSTGRES_HOST]="localhost"
 ENV_VALUES[POSTGRES_PORT]="5432"
 ENV_VALUES[POSTGRES_USER]="rag"
 ENV_VALUES[POSTGRES_PASSWORD]="rag"
-ENV_VALUES[POSTGRES_DATABASE]="lightrag"
+ENV_VALUES[POSTGRES_DATABASE]="ontorag"
 ENV_VALUES[{changed_key}]="{changed_value}"
 
 configure_storage_compose_rewrites
@@ -780,8 +780,8 @@ def test_configure_mongodb_compose_migration_rewrite_only_runs_for_atlas_local_v
         tmp_path / "docker-compose.final.yml",
         [
             "services:",
-            "  lightrag:",
-            "    image: example/lightrag:test",
+            "  ontorag:",
+            "    image: example/ontorag:test",
             "  mongodb:",
             "    image: mongo:8.2.4",
             "    volumes:",
@@ -796,8 +796,8 @@ source "{REPO_ROOT}/scripts/setup/setup.sh"
 REPO_ROOT="{tmp_path}"
 reset_state
 
-ENV_VALUES[LIGHTRAG_VECTOR_STORAGE]="{vector_storage}"
-ENV_VALUES[LIGHTRAG_SETUP_MONGODB_DEPLOYMENT]="{deployment_marker}"
+ENV_VALUES[ONTORAG_VECTOR_STORAGE]="{vector_storage}"
+ENV_VALUES[ONTORAG_SETUP_MONGODB_DEPLOYMENT]="{deployment_marker}"
 EXISTING_MANAGED_ROOT_SERVICE_SET[mongodb]=1
 DOCKER_SERVICE_SET[mongodb]=1
 
@@ -820,8 +820,8 @@ def test_configure_mongodb_compose_migration_rewrite_repairs_missing_mongot_volu
         tmp_path / "docker-compose.final.yml",
         [
             "services:",
-            "  lightrag:",
-            "    image: example/lightrag:test",
+            "  ontorag:",
+            "    image: example/ontorag:test",
             "  mongodb:",
             "    image: mongodb/mongodb-atlas-local:8",
             "    volumes:",
@@ -838,8 +838,8 @@ source "{REPO_ROOT}/scripts/setup/setup.sh"
 REPO_ROOT="{tmp_path}"
 reset_state
 
-ENV_VALUES[LIGHTRAG_VECTOR_STORAGE]="MongoVectorDBStorage"
-ENV_VALUES[LIGHTRAG_SETUP_MONGODB_DEPLOYMENT]="docker"
+ENV_VALUES[ONTORAG_VECTOR_STORAGE]="MongoVectorDBStorage"
+ENV_VALUES[ONTORAG_SETUP_MONGODB_DEPLOYMENT]="docker"
 EXISTING_MANAGED_ROOT_SERVICE_SET[mongodb]=1
 DOCKER_SERVICE_SET[mongodb]=1
 
@@ -863,8 +863,8 @@ def test_switching_to_non_docker_storage_removes_stale_services_from_compose(
         "\n".join(
             [
                 "services:",
-                "  lightrag:",
-                "    image: example/lightrag:test",
+                "  ontorag:",
+                "    image: example/ontorag:test",
                 "  postgres:",
                 "    image: gzdaniel/postgres-for-rag:16.6",
                 "  neo4j:",
@@ -898,10 +898,10 @@ REPO_ROOT="{tmp_path}"
 reset_state
 
 select_storage_backends() {{
-  ENV_VALUES[LIGHTRAG_KV_STORAGE]="JsonKVStorage"
-  ENV_VALUES[LIGHTRAG_VECTOR_STORAGE]="NanoVectorDBStorage"
-  ENV_VALUES[LIGHTRAG_GRAPH_STORAGE]="NetworkXStorage"
-  ENV_VALUES[LIGHTRAG_DOC_STATUS_STORAGE]="JsonDocStatusStorage"
+  ENV_VALUES[ONTORAG_KV_STORAGE]="JsonKVStorage"
+  ENV_VALUES[ONTORAG_VECTOR_STORAGE]="NanoVectorDBStorage"
+  ENV_VALUES[ONTORAG_GRAPH_STORAGE]="NetworkXStorage"
+  ENV_VALUES[ONTORAG_DOC_STATUS_STORAGE]="JsonDocStatusStorage"
 }}
 collect_database_config() {{ :; }}
 collect_docker_image_tags() {{ :; }}
@@ -917,7 +917,7 @@ env_storage_flow
     assert "neo4j:" not in result
     assert "postgres_data:" not in result
     assert "neo4j_data:" not in result
-    assert "  lightrag:" in result
+    assert "  ontorag:" in result
     assert "  sidecar:" in result
     assert "sidecar_data:" in result
 
@@ -1009,7 +1009,7 @@ prepare_compose_runtime_overrides
 
 printf 'HOST=%s\\n' "${{COMPOSE_ENV_OVERRIDES[HOST]}}"
 printf 'PORT=%s\\n' "${{COMPOSE_ENV_OVERRIDES[PORT]}}"
-printf 'PORT_MAPPING=%s\\n' "${{LIGHTRAG_COMPOSE_SERVER_PORT_MAPPING}}\"
+printf 'PORT_MAPPING=%s\\n' "${{ONTORAG_COMPOSE_SERVER_PORT_MAPPING}}\"
 """)
     assert values["HOST"] == "0.0.0.0"
     assert values["PORT"] == "9621"
@@ -1025,8 +1025,8 @@ def test_finalize_server_setup_skips_embedded_milvus_sub_services(
         "\n".join(
             [
                 "services:",
-                "  lightrag:",
-                "    image: example/lightrag:test",
+                "  ontorag:",
+                "    image: example/ontorag:test",
                 "  milvus:",
                 "    image: milvusdb/milvus:v2.6.11",
                 "  milvus-etcd:",
@@ -1045,7 +1045,7 @@ def test_finalize_server_setup_skips_embedded_milvus_sub_services(
     (tmp_path / "env.example").write_text(
         (REPO_ROOT / "env.example").read_text(encoding="utf-8"), encoding="utf-8"
     )
-    write_text_lines(tmp_path / ".env", ["LIGHTRAG_SETUP_MILVUS_DEPLOYMENT=docker"])
+    write_text_lines(tmp_path / ".env", ["ONTORAG_SETUP_MILVUS_DEPLOYMENT=docker"])
     run_bash(f"""
 set -euo pipefail
 source "{REPO_ROOT}/scripts/setup/setup.sh"
@@ -1085,7 +1085,7 @@ def test_finalize_server_setup_uses_compose_native_neo4j_endpoint_on_rerun(
     """Preserved managed services should inject compose-native endpoints on server reruns."""
     write_text_lines(
         tmp_path / ".env",
-        ["LIGHTRAG_SETUP_NEO4J_DEPLOYMENT=docker", "NEO4J_URI=neo4j://localhost:7687"],
+        ["ONTORAG_SETUP_NEO4J_DEPLOYMENT=docker", "NEO4J_URI=neo4j://localhost:7687"],
     )
     write_text_lines(
         tmp_path / "env.example",
@@ -1095,8 +1095,8 @@ def test_finalize_server_setup_uses_compose_native_neo4j_endpoint_on_rerun(
         tmp_path / "docker-compose.final.yml",
         [
             "services:",
-            "  lightrag:",
-            "    image: example/lightrag:test",
+            "  ontorag:",
+            "    image: example/ontorag:test",
             "  neo4j:",
             "    image: neo4j:latest",
         ],
@@ -1125,14 +1125,14 @@ def test_finalize_server_setup_migrates_mongodb_to_atlas_local_for_mongo_vector_
     write_text_lines(
         tmp_path / ".env",
         [
-            "LIGHTRAG_RUNTIME_TARGET=compose",
-            "LIGHTRAG_SETUP_MONGODB_DEPLOYMENT=docker",
-            "LIGHTRAG_KV_STORAGE=MongoKVStorage",
-            "LIGHTRAG_VECTOR_STORAGE=MongoVectorDBStorage",
-            "LIGHTRAG_GRAPH_STORAGE=MongoGraphStorage",
-            "LIGHTRAG_DOC_STATUS_STORAGE=MongoDocStatusStorage",
+            "ONTORAG_RUNTIME_TARGET=compose",
+            "ONTORAG_SETUP_MONGODB_DEPLOYMENT=docker",
+            "ONTORAG_KV_STORAGE=MongoKVStorage",
+            "ONTORAG_VECTOR_STORAGE=MongoVectorDBStorage",
+            "ONTORAG_GRAPH_STORAGE=MongoGraphStorage",
+            "ONTORAG_DOC_STATUS_STORAGE=MongoDocStatusStorage",
             "MONGO_URI=mongodb://localhost:27017/?directConnection=true",
-            "MONGO_DATABASE=LightRAG",
+            "MONGO_DATABASE=OntoRAG",
             "HOST=0.0.0.0",
             "PORT=9621",
         ],
@@ -1145,8 +1145,8 @@ def test_finalize_server_setup_migrates_mongodb_to_atlas_local_for_mongo_vector_
         tmp_path / "docker-compose.final.yml",
         [
             "services:",
-            "  lightrag:",
-            "    image: example/lightrag:test",
+            "  ontorag:",
+            "    image: example/ontorag:test",
             "  mongodb:",
             "    image: mongo:8.2.4",
             "    volumes:",
@@ -1181,14 +1181,14 @@ def test_finalize_server_setup_rejects_invalid_preserved_mongo_vector_config(
     write_text_lines(
         tmp_path / ".env",
         [
-            "LIGHTRAG_RUNTIME_TARGET=compose",
-            "LIGHTRAG_SETUP_MONGODB_DEPLOYMENT=docker",
-            "LIGHTRAG_KV_STORAGE=MongoKVStorage",
-            "LIGHTRAG_VECTOR_STORAGE=MongoVectorDBStorage",
-            "LIGHTRAG_GRAPH_STORAGE=MongoGraphStorage",
-            "LIGHTRAG_DOC_STATUS_STORAGE=MongoDocStatusStorage",
+            "ONTORAG_RUNTIME_TARGET=compose",
+            "ONTORAG_SETUP_MONGODB_DEPLOYMENT=docker",
+            "ONTORAG_KV_STORAGE=MongoKVStorage",
+            "ONTORAG_VECTOR_STORAGE=MongoVectorDBStorage",
+            "ONTORAG_GRAPH_STORAGE=MongoGraphStorage",
+            "ONTORAG_DOC_STATUS_STORAGE=MongoDocStatusStorage",
             "MONGO_URI=mongodb://mongo.example.com:27017/?directConnection=true",
-            "MONGO_DATABASE=LightRAG",
+            "MONGO_DATABASE=OntoRAG",
             "HOST=0.0.0.0",
             "PORT=9621",
         ],
@@ -1201,8 +1201,8 @@ def test_finalize_server_setup_rejects_invalid_preserved_mongo_vector_config(
         tmp_path / "docker-compose.final.yml",
         [
             "services:",
-            "  lightrag:",
-            "    image: example/lightrag:test",
+            "  ontorag:",
+            "    image: example/ontorag:test",
             "  mongodb:",
             "    image: mongo:8.2.4",
             "    volumes:",
@@ -1249,8 +1249,8 @@ def test_finalize_server_setup_drops_stale_managed_services_missing_from_env_mar
         tmp_path / "docker-compose.final.yml",
         [
             "services:",
-            "  lightrag:",
-            "    image: example/lightrag:test",
+            "  ontorag:",
+            "    image: example/ontorag:test",
             "  redis:",
             "    image: redis:latest",
             "  vllm-embed:",
@@ -1273,7 +1273,7 @@ collect_ssl_config() {{ :; }}
 confirm_required_yes_no() {{ return 0; }}
 confirm_default_yes() {{
   case "$1" in
-    "All wizard-managed services have been removed. Remove LightRAG from Docker and switch to host mode?") return 1 ;;
+    "All wizard-managed services have been removed. Remove OntoRAG from Docker and switch to host mode?") return 1 ;;
     *) return 0 ;;
   esac
 }}
@@ -1287,8 +1287,8 @@ finalize_server_setup
     assert "  vllm-embed:" not in result
     assert "redis_data:" not in result
     assert "vllm_embed_cache:" not in result
-    assert "  lightrag:" in result
-    assert "LIGHTRAG_RUNTIME_TARGET=compose" in generated_env
+    assert "  ontorag:" in result
+    assert "ONTORAG_RUNTIME_TARGET=compose" in generated_env
 
 
 def test_detect_managed_root_services_deduplicates_embedded_milvus_children(
@@ -1299,8 +1299,8 @@ def test_detect_managed_root_services_deduplicates_embedded_milvus_children(
         tmp_path / "docker-compose.final.yml",
         [
             "services:",
-            "  lightrag:",
-            "    image: example/lightrag:test",
+            "  ontorag:",
+            "    image: example/ontorag:test",
             "  milvus:",
             "    image: milvusdb/milvus:v2.6.11",
             "  milvus-etcd:",
@@ -1485,8 +1485,8 @@ def test_ssl_staging_uses_distinct_names_for_same_basename_inputs(
         "\n".join(
             [
                 "services:",
-                "  lightrag:",
-                "    image: example/lightrag:test",
+                "  ontorag:",
+                "    image: example/ontorag:test",
                 "    env_file:",
                 "      - .env",
             ]
@@ -1580,13 +1580,13 @@ stage_ssl_assets "./data/certs/server.pem" "./data/certs/server.key\"
         (
             "storage",
             [
-                "LIGHTRAG_KV_STORAGE=PGKVStorage",
-                "LIGHTRAG_VECTOR_STORAGE=NanoVectorDBStorage",
-                "LIGHTRAG_GRAPH_STORAGE=NetworkXStorage",
-                "LIGHTRAG_DOC_STATUS_STORAGE=PGDocStatusStorage",
-                "POSTGRES_USER=lightrag",
+                "ONTORAG_KV_STORAGE=PGKVStorage",
+                "ONTORAG_VECTOR_STORAGE=NanoVectorDBStorage",
+                "ONTORAG_GRAPH_STORAGE=NetworkXStorage",
+                "ONTORAG_DOC_STATUS_STORAGE=PGDocStatusStorage",
+                "POSTGRES_USER=ontorag",
                 "POSTGRES_PASSWORD=secret",
-                "POSTGRES_DATABASE=lightrag",
+                "POSTGRES_DATABASE=ontorag",
             ],
             'add_docker_service "postgres"',
             "finalize_storage_setup",
@@ -1745,7 +1745,7 @@ def test_security_check_reports_api_key_only_with_default_whitelist(
     tmp_path: Path,
 ) -> None:
     """API-key-only deployment with unset WHITELIST_PATHS inherits /api/* and must be flagged."""
-    write_text_lines(tmp_path / ".env", ["LIGHTRAG_API_KEY=my-secret-key"])
+    write_text_lines(tmp_path / ".env", ["ONTORAG_API_KEY=my-secret-key"])
     result = subprocess.run(
         [
             "bash",
@@ -1773,7 +1773,7 @@ def test_security_check_reports_api_key_only_with_explicit_api_wildcard_whitelis
     """API-key-only deployment with WHITELIST_PATHS=/health,/api/* must be flagged."""
     write_text_lines(
         tmp_path / ".env",
-        ["LIGHTRAG_API_KEY=my-secret-key", "WHITELIST_PATHS=/health,/api/*"],
+        ["ONTORAG_API_KEY=my-secret-key", "WHITELIST_PATHS=/health,/api/*"],
     )
     result = subprocess.run(
         [
@@ -1801,7 +1801,7 @@ def test_security_check_passes_for_api_key_only_with_safe_whitelist(
 ) -> None:
     """API-key-only deployment with a safe WHITELIST_PATHS should pass the security check."""
     write_text_lines(
-        tmp_path / ".env", ["LIGHTRAG_API_KEY=my-secret-key", "WHITELIST_PATHS=/health"]
+        tmp_path / ".env", ["ONTORAG_API_KEY=my-secret-key", "WHITELIST_PATHS=/health"]
     )
     result = subprocess.run(
         [
@@ -1834,11 +1834,11 @@ def test_security_check_ignores_default_opensearch_password_when_opensearch_unus
             "AUTH_ACCOUNTS=admin:secret",
             "TOKEN_SECRET=jwt-secret",
             "WHITELIST_PATHS=/health",
-            "LIGHTRAG_KV_STORAGE=JsonKVStorage",
-            "LIGHTRAG_VECTOR_STORAGE=NanoVectorDBStorage",
-            "LIGHTRAG_GRAPH_STORAGE=NetworkXStorage",
-            "LIGHTRAG_DOC_STATUS_STORAGE=JsonDocStatusStorage",
-            "OPENSEARCH_PASSWORD=LightRAG2026_!@",
+            "ONTORAG_KV_STORAGE=JsonKVStorage",
+            "ONTORAG_VECTOR_STORAGE=NanoVectorDBStorage",
+            "ONTORAG_GRAPH_STORAGE=NetworkXStorage",
+            "ONTORAG_DOC_STATUS_STORAGE=JsonDocStatusStorage",
+            "OPENSEARCH_PASSWORD=OntoRAG2026_!@",
         ],
     )
     result = subprocess.run(
@@ -1872,13 +1872,13 @@ def test_security_check_reports_default_opensearch_password_when_opensearch_sele
             "AUTH_ACCOUNTS=admin:secret",
             "TOKEN_SECRET=jwt-secret",
             "WHITELIST_PATHS=/health",
-            "LIGHTRAG_KV_STORAGE=OpenSearchKVStorage",
-            "LIGHTRAG_VECTOR_STORAGE=OpenSearchVectorDBStorage",
-            "LIGHTRAG_GRAPH_STORAGE=OpenSearchGraphStorage",
-            "LIGHTRAG_DOC_STATUS_STORAGE=OpenSearchDocStatusStorage",
+            "ONTORAG_KV_STORAGE=OpenSearchKVStorage",
+            "ONTORAG_VECTOR_STORAGE=OpenSearchVectorDBStorage",
+            "ONTORAG_GRAPH_STORAGE=OpenSearchGraphStorage",
+            "ONTORAG_DOC_STATUS_STORAGE=OpenSearchDocStatusStorage",
             "OPENSEARCH_HOSTS=localhost:9200",
             "OPENSEARCH_USER=admin",
-            "OPENSEARCH_PASSWORD=LightRAG2026_!@",
+            "OPENSEARCH_PASSWORD=OntoRAG2026_!@",
         ],
     )
     result = subprocess.run(
@@ -1946,7 +1946,7 @@ fi
 def test_backup_only_backs_up_env_and_generated_compose(tmp_path: Path) -> None:
     """backup_only should back up both .env and the active generated compose file."""
     compose_content = (
-        "\n".join(["services:", "  lightrag:", "    image: example/lightrag:test"])
+        "\n".join(["services:", "  ontorag:", "    image: example/ontorag:test"])
         + "\n"
     )
     write_text_lines(tmp_path / ".env", ["HOST=0.0.0.0"])

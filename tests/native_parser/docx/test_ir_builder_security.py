@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from lightrag.native_parser.docx.ir_builder import NativeDocxIRBuilder
+from ontorag.native_parser.docx.ir_builder import NativeDocxIRBuilder
 
 
 def _build_ir(content: str):

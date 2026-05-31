@@ -9,18 +9,18 @@
 > or query Wikidata. Switching to YAGO 4.0's `yago-wd-class.nt` (one file,
 > ~60 MB uncompressed) gives us 10K classes with English labels + comments in
 > plain N-Triples — no Turtle parser, no labels gap. Files are committed at
-> `/Users/jin/OntoRAG/yago/`, pinned by SHA256 in `lightrag/taxonomy/manifest.py`.
+> `/Users/jin/OntoRAG/yago/`, pinned by SHA256 in `ontorag/taxonomy/manifest.py`.
 > Task 7 (download script) has been replaced with Task 7 (SHA256 manifest);
 > `scripts/yago/fetch_yago.sh` survives as a redirect pointing to the canonical
 > URLs in case the local copies are lost.
 
-**Goal:** Build the standalone YAGO 4.0 taxonomy stack — RDF loader, in-storage class graph, working vocabulary, class vector index, and a document classifier — that can take a piece of text and return weighted YAGO class assignments. No LightRAG ingestion or query-path changes in this plan; those land in Plan B once we've validated corpus coverage with this code.
+**Goal:** Build the standalone YAGO 4.0 taxonomy stack — RDF loader, in-storage class graph, working vocabulary, class vector index, and a document classifier — that can take a piece of text and return weighted YAGO class assignments. No OntoRAG ingestion or query-path changes in this plan; those land in Plan B once we've validated corpus coverage with this code.
 
-**Architecture:** A new `lightrag/taxonomy/` module. Parses YAGO N-Triples → populates a dedicated graph namespace with class nodes + `subClassOf` edges → selects ~200 working-vocabulary classes by descendant count → embeds those into a dedicated vector namespace → exposes `DocumentClassifier.classify(text)` which retrieves top-N candidates from the index, runs a single LLM call with a JSON-schema prompt, and applies the ≥50%-of-top threshold + 10-class cap. Reuses existing `BaseGraphStorage` / `BaseVectorStorage` interfaces; no changes to those interfaces or to backends. Test fixtures use tiny in-memory fakes for the embedding and LLM functions.
+**Architecture:** A new `ontorag/taxonomy/` module. Parses YAGO N-Triples → populates a dedicated graph namespace with class nodes + `subClassOf` edges → selects ~200 working-vocabulary classes by descendant count → embeds those into a dedicated vector namespace → exposes `DocumentClassifier.classify(text)` which retrieves top-N candidates from the index, runs a single LLM call with a JSON-schema prompt, and applies the ≥50%-of-top threshold + 10-class cap. Reuses existing `BaseGraphStorage` / `BaseVectorStorage` interfaces; no changes to those interfaces or to backends. Test fixtures use tiny in-memory fakes for the embedding and LLM functions.
 
 **Tech Stack:** Python 3.10+, pytest, existing `NetworkXStorage` + `NanoVectorDBStorage` backends, `numpy` (already a dep). No new third-party deps — we parse N-Triples with a small regex parser to avoid adding `rdflib`.
 
-**Data:** YAGO 4.0 (release dated 2020-02-24) — `yago-wd-class.nt`, `yago-wd-schema.nt`, `yago-wd-shapes.nt` committed at `/Users/jin/OntoRAG/yago/`. SHA256s pinned in `lightrag/taxonomy/manifest.py`.
+**Data:** YAGO 4.0 (release dated 2020-02-24) — `yago-wd-class.nt`, `yago-wd-schema.nt`, `yago-wd-shapes.nt` committed at `/Users/jin/OntoRAG/yago/`. SHA256s pinned in `ontorag/taxonomy/manifest.py`.
 
 **Reference docs:** `docs/GraphAndRagArchitecture.md` §5 (planned architecture), in particular §5.3 (storage model), §5.4 (classification step), §5.7 (limitations to watch).
 
@@ -29,13 +29,13 @@
 ## File Structure
 
 **New files:**
-- `lightrag/taxonomy/__init__.py` — package init, exports `DocumentClassifier`, `YagoClass`, key constants
-- `lightrag/taxonomy/constants.py` — RDF prefix constants, namespace names, sentinel IRIs, thresholds
-- `lightrag/taxonomy/parser.py` — `YagoClass` dataclass + N-Triples → `list[YagoClass]` parser
-- `lightrag/taxonomy/graph_loader.py` — load parsed classes into a `BaseGraphStorage` instance + ancestor walker
-- `lightrag/taxonomy/vocabulary.py` — descendant-count-based working vocabulary selection
-- `lightrag/taxonomy/class_index.py` — build/query the YAGO class vector index
-- `lightrag/taxonomy/classifier.py` — `DocumentClassifier` class + threshold/cap logic
+- `ontorag/taxonomy/__init__.py` — package init, exports `DocumentClassifier`, `YagoClass`, key constants
+- `ontorag/taxonomy/constants.py` — RDF prefix constants, namespace names, sentinel IRIs, thresholds
+- `ontorag/taxonomy/parser.py` — `YagoClass` dataclass + N-Triples → `list[YagoClass]` parser
+- `ontorag/taxonomy/graph_loader.py` — load parsed classes into a `BaseGraphStorage` instance + ancestor walker
+- `ontorag/taxonomy/vocabulary.py` — descendant-count-based working vocabulary selection
+- `ontorag/taxonomy/class_index.py` — build/query the YAGO class vector index
+- `ontorag/taxonomy/classifier.py` — `DocumentClassifier` class + threshold/cap logic
 - `scripts/yago/fetch_yago.sh` — download YAGO 4.5 schema + taxonomy N-Triples to `data/yago/{version}/`
 - `scripts/yago/build_yago_taxonomy.py` — CLI: parse files → graph → vocabulary → index, idempotent
 - `tests/test_yago_parser.py`
@@ -46,7 +46,7 @@
 - `tests/fixtures/yago/mini_taxonomy.nt` — ~30-line N-Triples fixture covering the 4-level test taxonomy used across all tests
 
 **Modified files:**
-- `lightrag/namespace.py` — add two namespace constants
+- `ontorag/namespace.py` — add two namespace constants
 
 ---
 
@@ -93,22 +93,22 @@ Class hierarchy this encodes:
 ## Task 0: Module Skeleton + Namespace Constants
 
 **Files:**
-- Create: `lightrag/taxonomy/__init__.py` (empty for now)
-- Create: `lightrag/taxonomy/constants.py`
-- Modify: `lightrag/namespace.py` (lines 7-22)
+- Create: `ontorag/taxonomy/__init__.py` (empty for now)
+- Create: `ontorag/taxonomy/constants.py`
+- Modify: `ontorag/namespace.py` (lines 7-22)
 - Create: `tests/fixtures/yago/__init__.py` (empty marker for the fixture dir)
 - Create: `tests/fixtures/yago/mini_taxonomy.nt` (paste fixture above)
 
 - [ ] **Step 1: Create the empty package init**
 
 ```bash
-mkdir -p /Users/jin/OntoRAG/lightrag/taxonomy /Users/jin/OntoRAG/tests/fixtures/yago
-touch /Users/jin/OntoRAG/lightrag/taxonomy/__init__.py /Users/jin/OntoRAG/tests/fixtures/yago/__init__.py
+mkdir -p /Users/jin/OntoRAG/ontorag/taxonomy /Users/jin/OntoRAG/tests/fixtures/yago
+touch /Users/jin/OntoRAG/ontorag/taxonomy/__init__.py /Users/jin/OntoRAG/tests/fixtures/yago/__init__.py
 ```
 
 - [ ] **Step 2: Write the constants file**
 
-Create `/Users/jin/OntoRAG/lightrag/taxonomy/constants.py` with:
+Create `/Users/jin/OntoRAG/ontorag/taxonomy/constants.py` with:
 
 ```python
 """Constants for the YAGO 4.5 taxonomy integration.
@@ -129,7 +129,7 @@ RDFS_COMMENT = "http://www.w3.org/2000/01/rdf-schema#comment"
 YAGO_NODE_ENTITY_TYPE = "YagoClass"
 
 # Fallback IRI when classification can't find a confident YAGO match.
-UNCATEGORIZED_IRI = "lightrag:Uncategorized"
+UNCATEGORIZED_IRI = "ontorag:Uncategorized"
 
 # Threshold rule from docs/GraphAndRagArchitecture.md §5.4.
 DEFAULT_MAX_CLASSES_PER_DOC = 10
@@ -151,7 +151,7 @@ LABEL_LANGUAGE = "en"
 
 - [ ] **Step 3: Add namespace constants**
 
-Edit `/Users/jin/OntoRAG/lightrag/namespace.py`, replace the class body with:
+Edit `/Users/jin/OntoRAG/ontorag/namespace.py`, replace the class body with:
 
 ```python
 from __future__ import annotations
@@ -192,7 +192,7 @@ Create `/Users/jin/OntoRAG/tests/fixtures/yago/mini_taxonomy.nt` with the N-Trip
 
 - [ ] **Step 5: Verify nothing broke**
 
-Run: `ruff check lightrag/namespace.py lightrag/taxonomy/`
+Run: `ruff check ontorag/namespace.py ontorag/taxonomy/`
 Expected: no output (success).
 
 Run: `./scripts/test.sh tests/test_workspace_sanitization.py -v` (sanity check that namespace.py still imports cleanly across the codebase)
@@ -201,7 +201,7 @@ Expected: existing tests still pass.
 - [ ] **Step 6: Commit**
 
 ```bash
-git add lightrag/taxonomy/ lightrag/namespace.py tests/fixtures/yago/
+git add ontorag/taxonomy/ ontorag/namespace.py tests/fixtures/yago/
 git commit -m "feat(taxonomy): add YAGO module skeleton and namespace constants"
 ```
 
@@ -210,7 +210,7 @@ git commit -m "feat(taxonomy): add YAGO module skeleton and namespace constants"
 ## Task 1: YagoClass Dataclass + N-Triples Parser
 
 **Files:**
-- Create: `lightrag/taxonomy/parser.py`
+- Create: `ontorag/taxonomy/parser.py`
 - Create: `tests/test_yago_parser.py`
 
 - [ ] **Step 1: Write the failing tests**
@@ -218,7 +218,7 @@ git commit -m "feat(taxonomy): add YAGO module skeleton and namespace constants"
 Create `/Users/jin/OntoRAG/tests/test_yago_parser.py`:
 
 ```python
-"""Tests for lightrag.taxonomy.parser."""
+"""Tests for ontorag.taxonomy.parser."""
 
 from __future__ import annotations
 
@@ -226,7 +226,7 @@ from pathlib import Path
 
 import pytest
 
-from lightrag.taxonomy.parser import YagoClass, parse_ntriples_file
+from ontorag.taxonomy.parser import YagoClass, parse_ntriples_file
 
 FIXTURE = Path(__file__).parent / "fixtures" / "yago" / "mini_taxonomy.nt"
 
@@ -312,11 +312,11 @@ def test_rejects_missing_file(tmp_path: Path):
 - [ ] **Step 2: Run tests, verify they fail**
 
 Run: `./scripts/test.sh tests/test_yago_parser.py -v`
-Expected: every test FAILS with `ModuleNotFoundError: No module named 'lightrag.taxonomy.parser'`.
+Expected: every test FAILS with `ModuleNotFoundError: No module named 'ontorag.taxonomy.parser'`.
 
 - [ ] **Step 3: Implement the parser**
 
-Create `/Users/jin/OntoRAG/lightrag/taxonomy/parser.py`:
+Create `/Users/jin/OntoRAG/ontorag/taxonomy/parser.py`:
 
 ```python
 """Parse YAGO 4.5 schema+taxonomy N-Triples into YagoClass records.
@@ -333,7 +333,7 @@ import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from lightrag.taxonomy.constants import (
+from ontorag.taxonomy.constants import (
     LABEL_LANGUAGE,
     RDFS_COMMENT,
     RDFS_LABEL,
@@ -436,13 +436,13 @@ Expected: all 8 tests PASS.
 
 - [ ] **Step 5: Lint**
 
-Run: `ruff check lightrag/taxonomy/parser.py tests/test_yago_parser.py`
+Run: `ruff check ontorag/taxonomy/parser.py tests/test_yago_parser.py`
 Expected: no output.
 
 - [ ] **Step 6: Commit**
 
 ```bash
-git add lightrag/taxonomy/parser.py tests/test_yago_parser.py
+git add ontorag/taxonomy/parser.py tests/test_yago_parser.py
 git commit -m "feat(taxonomy): N-Triples parser for YAGO classes"
 ```
 
@@ -451,7 +451,7 @@ git commit -m "feat(taxonomy): N-Triples parser for YAGO classes"
 ## Task 2: Taxonomy Graph Loader + Ancestor Walker
 
 **Files:**
-- Create: `lightrag/taxonomy/graph_loader.py`
+- Create: `ontorag/taxonomy/graph_loader.py`
 - Create: `tests/test_yago_graph_loader.py`
 
 The loader takes parsed `YagoClass` records and writes them as nodes + `subClassOf` edges into a `BaseGraphStorage` instance. The walker reads ancestors back. Edge-based modeling (not list-property) because it stays native across all six graph backends without a list shim.
@@ -461,7 +461,7 @@ The loader takes parsed `YagoClass` records and writes them as nodes + `subClass
 Create `/Users/jin/OntoRAG/tests/test_yago_graph_loader.py`:
 
 ```python
-"""Tests for lightrag.taxonomy.graph_loader."""
+"""Tests for ontorag.taxonomy.graph_loader."""
 
 from __future__ import annotations
 
@@ -469,19 +469,19 @@ from pathlib import Path
 
 import pytest
 
-from lightrag.kg.networkx_impl import NetworkXStorage
-from lightrag.kg.shared_storage import (
+from ontorag.kg.networkx_impl import NetworkXStorage
+from ontorag.kg.shared_storage import (
     finalize_share_data,
     initialize_share_data,
 )
-from lightrag.namespace import NameSpace
-from lightrag.taxonomy.constants import YAGO_NODE_ENTITY_TYPE
-from lightrag.taxonomy.graph_loader import (
+from ontorag.namespace import NameSpace
+from ontorag.taxonomy.constants import YAGO_NODE_ENTITY_TYPE
+from ontorag.taxonomy.graph_loader import (
     SUBCLASS_OF_EDGE_TYPE,
     load_taxonomy_to_graph,
     walk_ancestors,
 )
-from lightrag.taxonomy.parser import parse_ntriples_file
+from ontorag.taxonomy.parser import parse_ntriples_file
 
 FIXTURE = Path(__file__).parent / "fixtures" / "yago" / "mini_taxonomy.nt"
 
@@ -592,11 +592,11 @@ async def test_walk_ancestors_unknown_iri_returns_empty(graph_storage):
 - [ ] **Step 2: Run tests, verify they fail**
 
 Run: `./scripts/test.sh tests/test_yago_graph_loader.py -v`
-Expected: every test FAILS with `ModuleNotFoundError: No module named 'lightrag.taxonomy.graph_loader'`.
+Expected: every test FAILS with `ModuleNotFoundError: No module named 'ontorag.taxonomy.graph_loader'`.
 
 - [ ] **Step 3: Implement the loader**
 
-Create `/Users/jin/OntoRAG/lightrag/taxonomy/graph_loader.py`:
+Create `/Users/jin/OntoRAG/ontorag/taxonomy/graph_loader.py`:
 
 ```python
 """Load parsed YAGO classes into a BaseGraphStorage instance.
@@ -615,9 +615,9 @@ from __future__ import annotations
 import time
 from typing import Iterable
 
-from lightrag.base import BaseGraphStorage
-from lightrag.taxonomy.constants import YAGO_NODE_ENTITY_TYPE
-from lightrag.taxonomy.parser import YagoClass
+from ontorag.base import BaseGraphStorage
+from ontorag.taxonomy.constants import YAGO_NODE_ENTITY_TYPE
+from ontorag.taxonomy.parser import YagoClass
 
 SUBCLASS_OF_EDGE_TYPE = "subClassOf"
 
@@ -731,13 +731,13 @@ Expected: all 7 tests PASS.
 
 - [ ] **Step 5: Lint**
 
-Run: `ruff check lightrag/taxonomy/graph_loader.py tests/test_yago_graph_loader.py`
+Run: `ruff check ontorag/taxonomy/graph_loader.py tests/test_yago_graph_loader.py`
 Expected: no output.
 
 - [ ] **Step 6: Commit**
 
 ```bash
-git add lightrag/taxonomy/graph_loader.py tests/test_yago_graph_loader.py
+git add ontorag/taxonomy/graph_loader.py tests/test_yago_graph_loader.py
 git commit -m "feat(taxonomy): load YAGO classes into graph storage + ancestor walker"
 ```
 
@@ -746,7 +746,7 @@ git commit -m "feat(taxonomy): load YAGO classes into graph storage + ancestor w
 ## Task 3: Working Vocabulary Selection
 
 **Files:**
-- Create: `lightrag/taxonomy/vocabulary.py`
+- Create: `ontorag/taxonomy/vocabulary.py`
 - Create: `tests/test_yago_vocabulary.py`
 
 Algorithm: count transitive descendants per class, sort descending, take the top `target_size` excluding the literal root (`Thing` is too broad to be useful as a classification target — every doc matches it). Provide an explicit `excluded_iris` knob for manual pruning.
@@ -756,7 +756,7 @@ Algorithm: count transitive descendants per class, sort descending, take the top
 Create `/Users/jin/OntoRAG/tests/test_yago_vocabulary.py`:
 
 ```python
-"""Tests for lightrag.taxonomy.vocabulary."""
+"""Tests for ontorag.taxonomy.vocabulary."""
 
 from __future__ import annotations
 
@@ -764,15 +764,15 @@ from pathlib import Path
 
 import pytest
 
-from lightrag.kg.networkx_impl import NetworkXStorage
-from lightrag.kg.shared_storage import (
+from ontorag.kg.networkx_impl import NetworkXStorage
+from ontorag.kg.shared_storage import (
     finalize_share_data,
     initialize_share_data,
 )
-from lightrag.namespace import NameSpace
-from lightrag.taxonomy.graph_loader import load_taxonomy_to_graph
-from lightrag.taxonomy.parser import parse_ntriples_file
-from lightrag.taxonomy.vocabulary import (
+from ontorag.namespace import NameSpace
+from ontorag.taxonomy.graph_loader import load_taxonomy_to_graph
+from ontorag.taxonomy.parser import parse_ntriples_file
+from ontorag.taxonomy.vocabulary import (
     count_descendants,
     select_working_vocabulary,
 )
@@ -858,11 +858,11 @@ async def test_select_vocab_orders_by_descendant_count_desc(loaded_graph):
 - [ ] **Step 2: Run tests, verify they fail**
 
 Run: `./scripts/test.sh tests/test_yago_vocabulary.py -v`
-Expected: every test FAILS with `ModuleNotFoundError: No module named 'lightrag.taxonomy.vocabulary'`.
+Expected: every test FAILS with `ModuleNotFoundError: No module named 'ontorag.taxonomy.vocabulary'`.
 
 - [ ] **Step 3: Implement the selector**
 
-Create `/Users/jin/OntoRAG/lightrag/taxonomy/vocabulary.py`:
+Create `/Users/jin/OntoRAG/ontorag/taxonomy/vocabulary.py`:
 
 ```python
 """Pick the ~200-class working vocabulary the classifier offers as choices.
@@ -883,9 +883,9 @@ from __future__ import annotations
 from collections import deque
 from typing import Iterable
 
-from lightrag.base import BaseGraphStorage
-from lightrag.taxonomy.constants import DEFAULT_WORKING_VOCABULARY_SIZE
-from lightrag.taxonomy.graph_loader import SUBCLASS_OF_EDGE_TYPE
+from ontorag.base import BaseGraphStorage
+from ontorag.taxonomy.constants import DEFAULT_WORKING_VOCABULARY_SIZE
+from ontorag.taxonomy.graph_loader import SUBCLASS_OF_EDGE_TYPE
 
 # Root of the YAGO 4.5 schema.org-rooted hierarchy. Excluded by default
 # because every entity matches it and it carries zero information.
@@ -959,13 +959,13 @@ Expected: all 5 tests PASS.
 
 - [ ] **Step 5: Lint**
 
-Run: `ruff check lightrag/taxonomy/vocabulary.py tests/test_yago_vocabulary.py`
+Run: `ruff check ontorag/taxonomy/vocabulary.py tests/test_yago_vocabulary.py`
 Expected: no output.
 
 - [ ] **Step 6: Commit**
 
 ```bash
-git add lightrag/taxonomy/vocabulary.py tests/test_yago_vocabulary.py
+git add ontorag/taxonomy/vocabulary.py tests/test_yago_vocabulary.py
 git commit -m "feat(taxonomy): descendant-count-based working vocabulary selection"
 ```
 
@@ -974,17 +974,17 @@ git commit -m "feat(taxonomy): descendant-count-based working vocabulary selecti
 ## Task 4: Class Vector Index Builder + Candidate Retrieval
 
 **Files:**
-- Create: `lightrag/taxonomy/class_index.py`
+- Create: `ontorag/taxonomy/class_index.py`
 - Create: `tests/test_yago_class_index.py`
 
-The index embeds `label + " — " + comment` for every working-vocabulary class. Queries return top-N candidates ordered by similarity. Must use the same `EmbeddingFunc` instance as the rest of LightRAG (the embedding-model pitfall from `AGENTS.md`).
+The index embeds `label + " — " + comment` for every working-vocabulary class. Queries return top-N candidates ordered by similarity. Must use the same `EmbeddingFunc` instance as the rest of OntoRAG (the embedding-model pitfall from `AGENTS.md`).
 
 - [ ] **Step 1: Write the failing tests**
 
 Create `/Users/jin/OntoRAG/tests/test_yago_class_index.py`:
 
 ```python
-"""Tests for lightrag.taxonomy.class_index."""
+"""Tests for ontorag.taxonomy.class_index."""
 
 from __future__ import annotations
 
@@ -994,20 +994,20 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from lightrag.kg.nano_vector_db_impl import NanoVectorDBStorage
-from lightrag.kg.networkx_impl import NetworkXStorage
-from lightrag.kg.shared_storage import (
+from ontorag.kg.nano_vector_db_impl import NanoVectorDBStorage
+from ontorag.kg.networkx_impl import NetworkXStorage
+from ontorag.kg.shared_storage import (
     finalize_share_data,
     initialize_share_data,
 )
-from lightrag.namespace import NameSpace
-from lightrag.taxonomy.class_index import (
+from ontorag.namespace import NameSpace
+from ontorag.taxonomy.class_index import (
     build_class_index,
     retrieve_candidate_classes,
 )
-from lightrag.taxonomy.graph_loader import load_taxonomy_to_graph
-from lightrag.taxonomy.parser import parse_ntriples_file
-from lightrag.utils import EmbeddingFunc
+from ontorag.taxonomy.graph_loader import load_taxonomy_to_graph
+from ontorag.taxonomy.parser import parse_ntriples_file
+from ontorag.utils import EmbeddingFunc
 
 FIXTURE = Path(__file__).parent / "fixtures" / "yago" / "mini_taxonomy.nt"
 
@@ -1118,17 +1118,17 @@ async def test_build_index_respects_iri_subset(storages):
 - [ ] **Step 2: Run tests, verify they fail**
 
 Run: `./scripts/test.sh tests/test_yago_class_index.py -v`
-Expected: every test FAILS with `ModuleNotFoundError: No module named 'lightrag.taxonomy.class_index'`.
+Expected: every test FAILS with `ModuleNotFoundError: No module named 'ontorag.taxonomy.class_index'`.
 
 - [ ] **Step 3: Implement the index**
 
-Create `/Users/jin/OntoRAG/lightrag/taxonomy/class_index.py`:
+Create `/Users/jin/OntoRAG/ontorag/taxonomy/class_index.py`:
 
 ```python
 """Build and query the vector index of YAGO working-vocabulary classes.
 
 Indexed text per class is `label — comment` (or just the label when no
-comment exists). The same embedding model used by the rest of LightRAG
+comment exists). The same embedding model used by the rest of OntoRAG
 must be used here; switching embedding models after the index is built
 requires rebuilding it from scratch.
 """
@@ -1137,7 +1137,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from lightrag.base import BaseGraphStorage, BaseVectorStorage
+from ontorag.base import BaseGraphStorage, BaseVectorStorage
 
 
 def _iri_to_id(iri: str) -> str:
@@ -1219,13 +1219,13 @@ Expected: all 3 tests PASS.
 
 - [ ] **Step 5: Lint**
 
-Run: `ruff check lightrag/taxonomy/class_index.py tests/test_yago_class_index.py`
+Run: `ruff check ontorag/taxonomy/class_index.py tests/test_yago_class_index.py`
 Expected: no output.
 
 - [ ] **Step 6: Commit**
 
 ```bash
-git add lightrag/taxonomy/class_index.py tests/test_yago_class_index.py
+git add ontorag/taxonomy/class_index.py tests/test_yago_class_index.py
 git commit -m "feat(taxonomy): YAGO class vector index + candidate retrieval"
 ```
 
@@ -1234,17 +1234,17 @@ git commit -m "feat(taxonomy): YAGO class vector index + candidate retrieval"
 ## Task 5: Document Classifier with Threshold Rule
 
 **Files:**
-- Create: `lightrag/taxonomy/classifier.py`
+- Create: `ontorag/taxonomy/classifier.py`
 - Create: `tests/test_yago_classifier.py`
 
-`DocumentClassifier.classify(text)` runs the full pipeline: retrieve top-N candidates → format an LLM prompt asking for JSON `[{iri, score}, ...]` → parse and apply the threshold rule (≥50% of top score, cap 10) → fall back to `lightrag:Uncategorized` if nothing scores ≥ 0.3.
+`DocumentClassifier.classify(text)` runs the full pipeline: retrieve top-N candidates → format an LLM prompt asking for JSON `[{iri, score}, ...]` → parse and apply the threshold rule (≥50% of top score, cap 10) → fall back to `ontorag:Uncategorized` if nothing scores ≥ 0.3.
 
 - [ ] **Step 1: Write the failing tests**
 
 Create `/Users/jin/OntoRAG/tests/test_yago_classifier.py`:
 
 ```python
-"""Tests for lightrag.taxonomy.classifier."""
+"""Tests for ontorag.taxonomy.classifier."""
 
 from __future__ import annotations
 
@@ -1254,19 +1254,19 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from lightrag.kg.nano_vector_db_impl import NanoVectorDBStorage
-from lightrag.kg.networkx_impl import NetworkXStorage
-from lightrag.kg.shared_storage import (
+from ontorag.kg.nano_vector_db_impl import NanoVectorDBStorage
+from ontorag.kg.networkx_impl import NetworkXStorage
+from ontorag.kg.shared_storage import (
     finalize_share_data,
     initialize_share_data,
 )
-from lightrag.namespace import NameSpace
-from lightrag.taxonomy.class_index import build_class_index
-from lightrag.taxonomy.classifier import DocumentClassifier
-from lightrag.taxonomy.constants import UNCATEGORIZED_IRI
-from lightrag.taxonomy.graph_loader import load_taxonomy_to_graph
-from lightrag.taxonomy.parser import parse_ntriples_file
-from lightrag.utils import EmbeddingFunc
+from ontorag.namespace import NameSpace
+from ontorag.taxonomy.class_index import build_class_index
+from ontorag.taxonomy.classifier import DocumentClassifier
+from ontorag.taxonomy.constants import UNCATEGORIZED_IRI
+from ontorag.taxonomy.graph_loader import load_taxonomy_to_graph
+from ontorag.taxonomy.parser import parse_ntriples_file
+from ontorag.utils import EmbeddingFunc
 
 FIXTURE = Path(__file__).parent / "fixtures" / "yago" / "mini_taxonomy.nt"
 _DIM = 16
@@ -1420,11 +1420,11 @@ async def test_llm_prompt_contains_candidate_iris_and_labels(classifier):
 - [ ] **Step 2: Run tests, verify they fail**
 
 Run: `./scripts/test.sh tests/test_yago_classifier.py -v`
-Expected: every test FAILS with `ModuleNotFoundError: No module named 'lightrag.taxonomy.classifier'`.
+Expected: every test FAILS with `ModuleNotFoundError: No module named 'ontorag.taxonomy.classifier'`.
 
 - [ ] **Step 3: Implement the classifier**
 
-Create `/Users/jin/OntoRAG/lightrag/taxonomy/classifier.py`:
+Create `/Users/jin/OntoRAG/ontorag/taxonomy/classifier.py`:
 
 ```python
 """Document-level YAGO classification.
@@ -1444,9 +1444,9 @@ import json
 import logging
 from typing import Any, Awaitable, Callable
 
-from lightrag.base import BaseVectorStorage
-from lightrag.taxonomy.class_index import retrieve_candidate_classes
-from lightrag.taxonomy.constants import (
+from ontorag.base import BaseVectorStorage
+from ontorag.taxonomy.class_index import retrieve_candidate_classes
+from ontorag.taxonomy.constants import (
     DEFAULT_CANDIDATE_COUNT,
     DEFAULT_MAX_CLASSES_PER_DOC,
     DEFAULT_MIN_SCORE,
@@ -1546,7 +1546,7 @@ def _apply_threshold_rule(
 class DocumentClassifier:
     """Per-document classifier wrapping candidate retrieval + LLM call.
 
-    `llm_func` must be an async callable matching the LightRAG LLM
+    `llm_func` must be an async callable matching the OntoRAG LLM
     signature: `await llm_func(prompt, system_prompt=..., **kwargs) -> str`.
     """
 
@@ -1610,13 +1610,13 @@ Expected: all 7 tests PASS.
 
 - [ ] **Step 5: Lint**
 
-Run: `ruff check lightrag/taxonomy/classifier.py tests/test_yago_classifier.py`
+Run: `ruff check ontorag/taxonomy/classifier.py tests/test_yago_classifier.py`
 Expected: no output.
 
 - [ ] **Step 6: Commit**
 
 ```bash
-git add lightrag/taxonomy/classifier.py tests/test_yago_classifier.py
+git add ontorag/taxonomy/classifier.py tests/test_yago_classifier.py
 git commit -m "feat(taxonomy): document classifier with threshold rule and Uncategorized fallback"
 ```
 
@@ -1625,14 +1625,14 @@ git commit -m "feat(taxonomy): document classifier with threshold rule and Uncat
 ## Task 6: Public Module Surface
 
 **Files:**
-- Modify: `lightrag/taxonomy/__init__.py`
+- Modify: `ontorag/taxonomy/__init__.py`
 
 - [ ] **Step 1: Rewrite the package init**
 
-Replace the empty `/Users/jin/OntoRAG/lightrag/taxonomy/__init__.py` with:
+Replace the empty `/Users/jin/OntoRAG/ontorag/taxonomy/__init__.py` with:
 
 ```python
-"""YAGO 4.5 taxonomy integration for LightRAG.
+"""YAGO 4.5 taxonomy integration for OntoRAG.
 
 Public surface:
 - `YagoClass`, `parse_ntriples_file` — RDF parsing
@@ -1644,12 +1644,12 @@ Public surface:
 See docs/GraphAndRagArchitecture.md §5 for the design.
 """
 
-from lightrag.taxonomy.class_index import (
+from ontorag.taxonomy.class_index import (
     build_class_index,
     retrieve_candidate_classes,
 )
-from lightrag.taxonomy.classifier import DocumentClassifier
-from lightrag.taxonomy.constants import (
+from ontorag.taxonomy.classifier import DocumentClassifier
+from ontorag.taxonomy.constants import (
     DEFAULT_ANCESTOR_RENDER_DEPTH,
     DEFAULT_CANDIDATE_COUNT,
     DEFAULT_MAX_CLASSES_PER_DOC,
@@ -1659,13 +1659,13 @@ from lightrag.taxonomy.constants import (
     UNCATEGORIZED_IRI,
     YAGO_NODE_ENTITY_TYPE,
 )
-from lightrag.taxonomy.graph_loader import (
+from ontorag.taxonomy.graph_loader import (
     SUBCLASS_OF_EDGE_TYPE,
     load_taxonomy_to_graph,
     walk_ancestors,
 )
-from lightrag.taxonomy.parser import YagoClass, parse_ntriples_file
-from lightrag.taxonomy.vocabulary import (
+from ontorag.taxonomy.parser import YagoClass, parse_ntriples_file
+from ontorag.taxonomy.vocabulary import (
     count_descendants,
     select_working_vocabulary,
 )
@@ -1694,7 +1694,7 @@ __all__ = [
 
 - [ ] **Step 2: Verify imports**
 
-Run: `python -c "from lightrag.taxonomy import DocumentClassifier, parse_ntriples_file, load_taxonomy_to_graph; print('ok')"`
+Run: `python -c "from ontorag.taxonomy import DocumentClassifier, parse_ntriples_file, load_taxonomy_to_graph; print('ok')"`
 Expected: prints `ok`.
 
 - [ ] **Step 3: Run full taxonomy test suite**
@@ -1705,7 +1705,7 @@ Expected: every test passes.
 - [ ] **Step 4: Commit**
 
 ```bash
-git add lightrag/taxonomy/__init__.py
+git add ontorag/taxonomy/__init__.py
 git commit -m "feat(taxonomy): expose public module surface"
 ```
 
@@ -1714,7 +1714,7 @@ git commit -m "feat(taxonomy): expose public module surface"
 ## Task 7: SHA256 Manifest for the YAGO 4.0 T-Box (replaces the original download script)
 
 **Files:**
-- Create: `lightrag/taxonomy/manifest.py`
+- Create: `ontorag/taxonomy/manifest.py`
 - Modify (redirect-only): `scripts/yago/fetch_yago.sh`
 
 The original Task 7 was a download script targeting YAGO 4.5. The 4.5 → 4.0 switch made it obsolete: YAGO 4.0 files are tiny (~60 MB total uncompressed) and now committed under `/Users/jin/OntoRAG/yago/`. We replace the download task with a checksum-pinning task so "YAGO 4.0" in this repo is tied to specific bytes — anyone who replaces the files with a different snapshot trips a verification error from the build CLI.
@@ -1736,7 +1736,7 @@ Expected (matches the pinned manifest):
 
 - [ ] **Step 2: Write the manifest module**
 
-Create `/Users/jin/OntoRAG/lightrag/taxonomy/manifest.py` exposing:
+Create `/Users/jin/OntoRAG/ontorag/taxonomy/manifest.py` exposing:
 - `YAGO_VERSION = "yago-4.0-2020-02-24"`
 - `YAGO_DATA_DIR` — `<repo>/yago/`
 - `PINNED_FILES: dict[str, str]` — filename → sha256
@@ -1752,23 +1752,23 @@ Verification reads in 1 MB chunks so the 60 MB `yago-wd-class.nt` doesn't load t
 Replace the body with a `cat <<EOF` that explains:
 1. Where the files are expected (`/Users/jin/OntoRAG/yago/`)
 2. Where they came from (`https://yago-knowledge.org/data/yago4/full/2020-02-24/yago-wd-{class,schema,shapes}.nt.gz`)
-3. How to verify (`python -c 'from lightrag.taxonomy.manifest import verify_yago_files; verify_yago_files()'`)
+3. How to verify (`python -c 'from ontorag.taxonomy.manifest import verify_yago_files; verify_yago_files()'`)
 
 Support an optional `--fetch` flag that does the curl + gunzip if explicitly invoked.
 
 - [ ] **Step 4: Smoke-test**
 
 ```bash
-.venv/bin/python -c "from lightrag.taxonomy.manifest import verify_yago_files; verify_yago_files(); print('ok')"
+.venv/bin/python -c "from ontorag.taxonomy.manifest import verify_yago_files; verify_yago_files(); print('ok')"
 bash scripts/yago/fetch_yago.sh   # prints redirect, exits cleanly
 bash -n scripts/yago/fetch_yago.sh
-.venv/bin/ruff check lightrag/taxonomy/manifest.py
+.venv/bin/ruff check ontorag/taxonomy/manifest.py
 ```
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add lightrag/taxonomy/manifest.py scripts/yago/fetch_yago.sh
+git add ontorag/taxonomy/manifest.py scripts/yago/fetch_yago.sh
 git commit -m "feat(taxonomy): pin YAGO 4.0 T-Box by SHA256; fetch_yago.sh becomes a redirect"
 ```
 
@@ -1780,10 +1780,10 @@ git commit -m "feat(taxonomy): pin YAGO 4.0 T-Box by SHA256; fetch_yago.sh becom
 - Create: `scripts/yago/build_yago_taxonomy.py`
 - Create: `tests/test_yago_build_cli.py`
 
-CLI that parses given N-Triples files → loads classes into the YAGO graph namespace → selects working vocabulary → builds the class vector index. Targets a LightRAG `working_dir` (creates the storage instances directly without booting the full `LightRAG` class). Idempotent re-runs.
+CLI that parses given N-Triples files → loads classes into the YAGO graph namespace → selects working vocabulary → builds the class vector index. Targets a OntoRAG `working_dir` (creates the storage instances directly without booting the full `OntoRAG` class). Idempotent re-runs.
 
 > **2026-05-22 update (paired with Task 7):** `--files` is now optional and
-> defaults to `lightrag.taxonomy.manifest.default_taxonomy_paths()` — the two
+> defaults to `ontorag.taxonomy.manifest.default_taxonomy_paths()` — the two
 > committed YAGO 4.0 files (`yago-wd-class.nt`, `yago-wd-schema.nt`). When the
 > default is used, `main()` calls `verify_yago_files()` before parsing; pass
 > `--skip-verify` (or override `--files` with custom paths) to bypass. Tests
@@ -1805,7 +1805,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from lightrag.utils import EmbeddingFunc
+from ontorag.utils import EmbeddingFunc
 
 ROOT = Path(__file__).resolve().parent.parent
 SCRIPT_PATH = ROOT / "scripts" / "yago" / "build_yago_taxonomy.py"
@@ -1880,14 +1880,14 @@ Expected: every test FAILS with `FileNotFoundError` for the CLI script.
 Create `/Users/jin/OntoRAG/scripts/yago/build_yago_taxonomy.py`:
 
 ```python
-"""Bootstrap the YAGO taxonomy layer in a LightRAG working directory.
+"""Bootstrap the YAGO taxonomy layer in a OntoRAG working directory.
 
 Parses one or more YAGO N-Triples files, loads the class graph into the
 yago_taxonomy namespace, selects a working vocabulary by descendant count,
 and builds the YAGO class vector index against the working vocabulary.
 
 This script directly instantiates the storage backends rather than booting
-a full LightRAG instance — it doesn't need any of the LLM/embedding/role
+a full OntoRAG instance — it doesn't need any of the LLM/embedding/role
 machinery beyond `embedding_func`. The taxonomy lives in its own
 namespaces and is consumed at query/ingest time by Plan B's wiring.
 
@@ -1909,21 +1909,21 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from lightrag.kg.nano_vector_db_impl import NanoVectorDBStorage
-from lightrag.kg.networkx_impl import NetworkXStorage
-from lightrag.kg.shared_storage import (
+from ontorag.kg.nano_vector_db_impl import NanoVectorDBStorage
+from ontorag.kg.networkx_impl import NetworkXStorage
+from ontorag.kg.shared_storage import (
     finalize_share_data,
     initialize_share_data,
 )
-from lightrag.namespace import NameSpace
-from lightrag.taxonomy import (
+from ontorag.namespace import NameSpace
+from ontorag.taxonomy import (
     DEFAULT_WORKING_VOCABULARY_SIZE,
     build_class_index,
     load_taxonomy_to_graph,
     parse_ntriples_file,
     select_working_vocabulary,
 )
-from lightrag.utils import EmbeddingFunc
+from ontorag.utils import EmbeddingFunc
 
 logger = logging.getLogger("yago.build")
 
@@ -2014,10 +2014,10 @@ async def build_taxonomy(
 def _resolve_embedding(binding: str, model: str | None) -> EmbeddingFunc:
     """Resolve an EmbeddingFunc by binding name (e.g. 'openai', 'ollama').
 
-    Mirrors how the API server resolves bindings — we re-use the LightRAG
+    Mirrors how the API server resolves bindings — we re-use the OntoRAG
     LLM module convention: each binding exposes an `embed` callable.
     """
-    module = importlib.import_module(f"lightrag.llm.{binding}")
+    module = importlib.import_module(f"ontorag.llm.{binding}")
     embed_func = getattr(module, "embed", None) or getattr(module, "openai_embed", None)
     if embed_func is None:
         raise SystemExit(
@@ -2036,7 +2036,7 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
     p.add_argument("--files", nargs="+", required=True, type=Path,
                    help="YAGO N-Triples files (schema + taxonomy)")
     p.add_argument("--working-dir", required=True, type=Path,
-                   help="LightRAG working_dir to populate")
+                   help="OntoRAG working_dir to populate")
     p.add_argument("--workspace", default="default",
                    help="Workspace name (default: 'default')")
     p.add_argument("--vocabulary-size", type=int,
@@ -2044,7 +2044,7 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
                    help=f"Working vocabulary size "
                         f"(default {DEFAULT_WORKING_VOCABULARY_SIZE})")
     p.add_argument("--embedding-binding", default="openai",
-                   help="lightrag.llm.<binding> module to import")
+                   help="ontorag.llm.<binding> module to import")
     p.add_argument("--embedding-model", default=None,
                    help="Embedding model name (binding-specific)")
     p.add_argument("--exclude", action="append", default=[],
@@ -2113,7 +2113,7 @@ Create `/Users/jin/OntoRAG/scripts/yago/check_coverage.py`:
 """Sample-based coverage check for the YAGO taxonomy layer.
 
 Run this against a representative sample of your corpus (~100 docs)
-before committing to Plan B (the LightRAG pipeline integration). If
+before committing to Plan B (the OntoRAG pipeline integration). If
 the Uncategorized rate is >40-50%, the taxonomy needs domain-specific
 overlays or a domain ontology — see docs/GraphAndRagArchitecture.md §5.7.
 
@@ -2136,14 +2136,14 @@ import sys
 from collections import Counter
 from pathlib import Path
 
-from lightrag.kg.nano_vector_db_impl import NanoVectorDBStorage
-from lightrag.kg.shared_storage import (
+from ontorag.kg.nano_vector_db_impl import NanoVectorDBStorage
+from ontorag.kg.shared_storage import (
     finalize_share_data,
     initialize_share_data,
 )
-from lightrag.namespace import NameSpace
-from lightrag.taxonomy import DocumentClassifier, UNCATEGORIZED_IRI
-from lightrag.utils import EmbeddingFunc
+from ontorag.namespace import NameSpace
+from ontorag.taxonomy import DocumentClassifier, UNCATEGORIZED_IRI
+from ontorag.utils import EmbeddingFunc
 
 logger = logging.getLogger("yago.coverage")
 
@@ -2209,12 +2209,12 @@ async def _check(
 
 
 def _resolve_callable(binding: str, names: list[str]):
-    module = importlib.import_module(f"lightrag.llm.{binding}")
+    module = importlib.import_module(f"ontorag.llm.{binding}")
     for n in names:
         fn = getattr(module, n, None)
         if fn is not None:
             return fn
-    raise SystemExit(f"None of {names} found on lightrag.llm.{binding}")
+    raise SystemExit(f"None of {names} found on ontorag.llm.{binding}")
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -2292,7 +2292,7 @@ Replace it with:
 Plan A (infrastructure) landed in `docs/superpowers/plans/2026-05-22-yago-taxonomy-infrastructure.md`. Items shipped as part of Plan A are marked `[x] (Plan A)`. Remaining items gate Plan B.
 
 - [x] (Plan A) Pin a specific YAGO 4.5 release; document the file list (schema + taxonomy only). — see `scripts/yago/fetch_yago.sh`, default version `2024-02-29`.
-- [x] (Plan A) Select the ~200-class working vocabulary (top-N by `subClassOf` descendant count, manually pruned for utility). — `lightrag/taxonomy/vocabulary.py`, `select_working_vocabulary`; manual exclusions via `--exclude` on the bootstrap CLI.
+- [x] (Plan A) Select the ~200-class working vocabulary (top-N by `subClassOf` descendant count, manually pruned for utility). — `ontorag/taxonomy/vocabulary.py`, `select_working_vocabulary`; manual exclusions via `--exclude` on the bootstrap CLI.
 - [ ] Validate corpus coverage on a 100-doc sample; check `Uncategorized` rate. — run `scripts/yago/check_coverage.py` once Plan A bootstrap is complete on the target working directory.
 - [ ] Build an eval harness with a held-out query set + reference answers, run against current `main` *before* Plan B's taxonomy enrichment lands. Otherwise there's no apples-to-apples comparison once context formatting changes.
 - [ ] Pick the document content used for classification (full text vs summary vs first-N tokens) — currently the classifier accepts arbitrary text; Plan B chooses what to pass in.
@@ -2314,12 +2314,12 @@ git commit -m "docs(taxonomy): mark Plan A items shipped in spike checklist"
 | §5 requirement | Plan A task |
 |---|---|
 | YAGO T-Box only (§5.2) | Task 7 (manifest pins YAGO 4.0 `yago-wd-class.nt` + `yago-wd-schema.nt`; A-Box files excluded) |
-| Pinned version (§5.2) | Task 7 — SHA256 in `lightrag/taxonomy/manifest.py`, verified by build CLI |
+| Pinned version (§5.2) | Task 7 — SHA256 in `ontorag/taxonomy/manifest.py`, verified by build CLI |
 | ~200 working vocabulary (§5.2) | Task 3 |
 | Separate graph namespace (§5.3) | Task 0 (namespace const), Task 2 (loader writes there) |
 | Class node schema (§5.3) | Task 2 |
 | Subset of nodes via edges, not list field (§5.3 implication of Option A) | Task 2 (no NetworkX shim needed) |
-| `lightrag:Uncategorized` sentinel (§5.3) | Task 0 (constant), Task 5 (fallback) |
+| `ontorag:Uncategorized` sentinel (§5.3) | Task 0 (constant), Task 5 (fallback) |
 | Same embedding model as rest of system (§5.4) | Task 4 docstring, Task 8 CLI passes `EmbeddingFunc` through |
 | Per-document classification step (§5.4) | Task 5 (standalone; Plan B does the pipeline hook) |
 | Multi-class cap 10 + ≥50%-of-top threshold + 0.3 floor (§5.4) | Task 5 |
@@ -2333,7 +2333,7 @@ git commit -m "docs(taxonomy): mark Plan A items shipped in spike checklist"
 **Type consistency:**
 - `YagoClass` constructed in Task 1, consumed in Task 2 (loader), Task 8 (CLI dedup) — field names match (`iri`, `label`, `comment`, `parent_iris`).
 - `BaseGraphStorage` / `BaseVectorStorage` used throughout — unchanged abstract interfaces.
-- `EmbeddingFunc` is the existing `lightrag.utils.EmbeddingFunc` — verified callable signature `(texts, **kw) -> np.ndarray`.
+- `EmbeddingFunc` is the existing `ontorag.utils.EmbeddingFunc` — verified callable signature `(texts, **kw) -> np.ndarray`.
 - `DocumentClassifier.classify` returns `list[{"iri": str, "score": float}]` — same shape in every test assertion and in the coverage script's consumption.
 - `SUBCLASS_OF_EDGE_TYPE = "subClassOf"` defined in `graph_loader.py`, imported by `vocabulary.py` — single source of truth.
 
@@ -2345,9 +2345,9 @@ Plan A is complete and saved to `docs/superpowers/plans/2026-05-22-yago-taxonomy
 
 After Plan A lands:
 1. Confirm the pinned YAGO 4.0 files are present:
-   `python -c "from lightrag.taxonomy.manifest import verify_yago_files; verify_yago_files(); print('ok')"`.
+   `python -c "from ontorag.taxonomy.manifest import verify_yago_files; verify_yago_files(); print('ok')"`.
    If they were lost, run `bash scripts/yago/fetch_yago.sh --fetch` to re-download.
 2. Run `python scripts/yago/build_yago_taxonomy.py --working-dir ./rag_storage …` to populate the taxonomy in your working dir (the CLI defaults to the pinned files and verifies before parsing).
 3. Run `python scripts/yago/check_coverage.py …` against a 100-doc corpus sample. **Coverage gate:** Uncategorized rate < 40% before writing Plan B; otherwise revisit vocabulary selection or add a domain overlay.
 4. Build the eval harness (Plan A doesn't ship one — it's an open §5.8 item).
-5. Write Plan B (LightRAG pipeline integration + query-path enrichment) once the gate passes.
+5. Write Plan B (OntoRAG pipeline integration + query-path enrichment) once the gate passes.

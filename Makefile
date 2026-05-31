@@ -65,14 +65,14 @@ dev:
 	@printf "$(COLOR_BLUE)Syncing backend and test dependencies with uv...$(COLOR_RESET)\n"
 	@uv sync --extra test --extra offline
 	@printf "$(COLOR_BLUE)Installing frontend dependencies with Bun...$(COLOR_RESET)\n"
-	@cd lightrag_webui && bun install --frozen-lockfile
+	@cd ontorag_webui && bun install --frozen-lockfile
 	@printf "$(COLOR_BLUE)Building frontend assets...$(COLOR_RESET)\n"
-	@cd lightrag_webui && bun run build
+	@cd ontorag_webui && bun run build
 	@printf "$(COLOR_GREEN)Development environment is ready.$(COLOR_RESET)\n"
 	@printf "Next steps:\n"
 	@printf "  source .venv/bin/activate\n"
 	@printf "  make env-base\n"
-	@printf "  lightrag-server\n"
+	@printf "  ontorag-server\n"
 
 env-base env base configure:
 	@$(SETUP_BASH) $(SETUP_SCRIPT) --base $(SETUP_OPTS)

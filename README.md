@@ -3,8 +3,8 @@
 OntōRAG grounds LightRAG's knowledge graph in a formal ontology (YAGO) instead of letting arbitrary entity and relation types emerge ad hoc from the source text. It is a fork of [HKUDS/LightRAG](https://github.com/HKUDS/LightRAG); the upstream README follows below — everything in this fork header is OntoRAG-specific.
 
 **Fork-specific additions**
-- **YAGO 4.0 document taxonomy** (`lightrag/taxonomy/`) — RDF loader, class graph, working vocabulary, vector index, and a `DocumentClassifier` that assigns weighted YAGO classes per document. Design: [`docs/GraphAndRagArchitecture.md` §5](docs/GraphAndRagArchitecture.md#5-yago-taxonomy-integration). Implementation plan: [`docs/superpowers/plans/2026-05-22-yago-taxonomy-infrastructure.md`](docs/superpowers/plans/2026-05-22-yago-taxonomy-infrastructure.md).
-- **Pinned YAGO 4.0 T-Box** at `yago/` (sha256s in `lightrag/taxonomy/manifest.py`).
+- **YAGO 4.0 document taxonomy** (`ontorag/taxonomy/`) — RDF loader, class graph, working vocabulary, vector index, and a `DocumentClassifier` that assigns weighted YAGO classes per document. Design: [`docs/GraphAndRagArchitecture.md` §5](docs/GraphAndRagArchitecture.md#5-yago-taxonomy-integration). Implementation plan: [`docs/superpowers/plans/2026-05-22-yago-taxonomy-infrastructure.md`](docs/superpowers/plans/2026-05-22-yago-taxonomy-infrastructure.md).
+- **Pinned YAGO 4.0 T-Box** at `yago/` (sha256s in `ontorag/taxonomy/manifest.py`).
 - **Bootstrap + coverage CLIs** at `scripts/yago/`.
 
 **License:** [MIT](LICENSE) — Copyright © 2025 LightRAG Team and © 2026 Jinsoo An (OntoRAG fork additions). Mirrors upstream LightRAG's MIT terms with the fork contributor credited alongside.
@@ -21,23 +21,23 @@ OntōRAG grounds LightRAG's knowledge graph in a formal ontology (YAGO) instead 
 >
 > **📦 Offline Deployment**: For offline or air-gapped environments, see the [Offline Deployment Guide](./docs/OfflineDeployment.md) for instructions on pre-installing all dependencies and cache files.
 
-### Install LightRAG Server
+### Install OntoRAG Server
 
-The LightRAG Server is designed to provide Web UI and API support. The Web UI facilitates document indexing, knowledge graph exploration, and a simple RAG query interface. LightRAG Server also provide an Ollama compatible interfaces, aiming to emulate LightRAG as an Ollama chat model. This allows AI chat bot, such as Open WebUI, to access LightRAG easily.
+The OntoRAG Server is designed to provide Web UI and API support. The Web UI facilitates document indexing, knowledge graph exploration, and a simple RAG query interface. OntoRAG Server also provide an Ollama compatible interfaces, aiming to emulate OntoRAG as an Ollama chat model. This allows AI chat bot, such as Open WebUI, to access OntoRAG easily.
 
 * Install from PyPI
 
 ```bash
-### Install LightRAG Server as tool using uv (recommended)
-uv tool install "lightrag-hku[api]"
+### Install OntoRAG Server as tool using uv (recommended)
+uv tool install "ontorag-hku[api]"
 
 ### Or using pip
 # python -m venv .venv
 # source .venv/bin/activate  # Windows: .venv\Scripts\activate
-# pip install "lightrag-hku[api]"
+# pip install "ontorag-hku[api]"
 
 ### Build front-end artifacts
-cd lightrag_webui
+cd ontorag_webui
 bun install --frozen-lockfile
 bun run build
 cd ..
@@ -47,14 +47,14 @@ cd ..
 # or by copying it from a local source checkout.
 cp env.example .env  # Update the .env with your LLM and embedding configurations
 # Launch the server
-lightrag-server
+ontorag-server
 ```
 
 * Installation from Source
 
 ```bash
-git clone https://github.com/HKUDS/LightRAG.git
-cd LightRAG
+git clone https://github.com/machinarii/OntoRAG.git
+cd OntoRAG
 
 # Bootstrap the development environment (recommended)
 make dev
@@ -77,7 +77,7 @@ source .venv/bin/activate  # Activate the virtual environment (Linux/macOS)
 # pip install -e ".[test,offline]"
 
 # Build front-end artifacts
-cd lightrag_webui
+cd ontorag_webui
 bun install --frozen-lockfile
 bun run build
 cd ..
@@ -85,20 +85,20 @@ cd ..
 # setup env file
 make env-base  # Or: cp env.example .env and update it manually
 # Launch API-WebUI server
-lightrag-server
+ontorag-server
 ```
 
-* Launching the LightRAG Server with Docker Compose
+* Launching the OntoRAG Server with Docker Compose
 
 ```bash
-git clone https://github.com/HKUDS/LightRAG.git
-cd LightRAG
+git clone https://github.com/machinarii/OntoRAG.git
+cd OntoRAG
 cp env.example .env  # Update the .env with your LLM and embedding configurations
 # modify LLM and Embedding settings in .env
 docker compose up
 ```
 
-> Historical versions of LightRAG docker images can be found here: [LightRAG Docker Images]( https://github.com/HKUDS/LightRAG/pkgs/container/lightrag)
+> Historical versions of OntoRAG docker images can be found here: [OntoRAG Docker Images]( https://github.com/HKUDS/OntoRAG/pkgs/container/ontorag)
 >
 > Official GHCR images published by GitHub Actions are signed with Sigstore Cosign using GitHub OIDC. See [docs/DockerDeployment.md](./docs/DockerDeployment.md#verify-official-ghcr-images-with-cosign) for verification commands.
 
@@ -121,12 +121,12 @@ current `.env` for security risks before deployment.
 By default, rerunning the setup preserves unchanged wizard-managed compose service blocks; use a
 `*-rewrite` target only when you need to rebuild those managed blocks from the bundled templates.
 
-### Install  LightRAG Core
+### Install  OntoRAG Core
 
 * Install from source (Recommended)
 
 ```bash
-cd LightRAG
+cd OntoRAG
 # Note: uv sync automatically creates a virtual environment in .venv/
 uv sync
 source .venv/bin/activate  # Activate the virtual environment (Linux/macOS)
@@ -138,15 +138,15 @@ source .venv/bin/activate  # Activate the virtual environment (Linux/macOS)
 * Install from PyPI
 
 ```bash
-uv pip install lightrag-hku
-# Or: pip install lightrag-hku
+uv pip install ontorag-hku
+# Or: pip install ontorag-hku
 ```
 
 ## Quick Start
 
-### LLM and Technology Stack Requirements for LightRAG
+### LLM and Technology Stack Requirements for OntoRAG
 
-LightRAG's demands on the capabilities of Large Language Models (LLMs) are significantly higher than those of traditional RAG, as it requires the LLM to perform entity-relationship extraction tasks from documents. Configuring appropriate Embedding and Reranker models is also crucial for improving query performance.
+OntoRAG's demands on the capabilities of Large Language Models (LLMs) are significantly higher than those of traditional RAG, as it requires the LLM to perform entity-relationship extraction tasks from documents. Configuring appropriate Embedding and Reranker models is also crucial for improving query performance.
 
 - **LLM Selection**:
   - It is recommended to use an LLM with at least 32 billion parameters.
@@ -156,58 +156,58 @@ LightRAG's demands on the capabilities of Large Language Models (LLMs) are signi
 - **Embedding Model**:
   - A high-performance Embedding model is essential for RAG.
   - We recommend using mainstream multilingual Embedding models, such as: `BAAI/bge-m3` and `text-embedding-3-large`.
-  - **Important Note**: The Embedding model must be determined before document indexing, and the same model must be used during the document query phase. For certain storage solutions (e.g., PostgreSQL), the vector dimension must be defined upon initial table creation. Therefore, when changing embedding models, it is necessary to delete the existing vector-related tables and allow LightRAG to recreate them with the new dimensions.
+  - **Important Note**: The Embedding model must be determined before document indexing, and the same model must be used during the document query phase. For certain storage solutions (e.g., PostgreSQL), the vector dimension must be defined upon initial table creation. Therefore, when changing embedding models, it is necessary to delete the existing vector-related tables and allow OntoRAG to recreate them with the new dimensions.
 - **Reranker Model Configuration**:
-  - Configuring a Reranker model can significantly enhance LightRAG's retrieval performance.
+  - Configuring a Reranker model can significantly enhance OntoRAG's retrieval performance.
   - When a Reranker model is enabled, it is recommended to set the "mix mode" as the default query mode.
   - We recommend using mainstream Reranker models, such as: `BAAI/bge-reranker-v2-m3` or models provided by services like Jina.
 
-### Quick Start for LightRAG Server
+### Quick Start for OntoRAG Server
 
-The LightRAG Server is designed to provide Web UI and API support. The LightRAG Server offers a comprehensive knowledge graph visualization feature. It supports various gravity layouts, node queries, subgraph filtering, and more. For more information about LightRAG Server, please refer to [LightRAG Server](./docs/LightRAG-API-Server.md).
+The OntoRAG Server is designed to provide Web UI and API support. The OntoRAG Server offers a comprehensive knowledge graph visualization feature. It supports various gravity layouts, node queries, subgraph filtering, and more. For more information about OntoRAG Server, please refer to [OntoRAG Server](./docs/OntoRAG-API-Server.md).
 
 ![iShot_2025-03-23_12.40.08](./README.assets/iShot_2025-03-23_12.40.08.png)
 
 
-### Quick Start for LightRAG core
+### Quick Start for OntoRAG core
 
-To get started with LightRAG core, refer to the sample codes available in the `examples` folder. Additionally, a [video demo](https://www.youtube.com/watch?v=g21royNJ4fw) demonstration is provided to guide you through the local setup process. If you already possess an OpenAI API key, you can run the demo right away:
+To get started with OntoRAG core, refer to the sample codes available in the `examples` folder. Additionally, a [video demo](https://www.youtube.com/watch?v=g21royNJ4fw) demonstration is provided to guide you through the local setup process. If you already possess an OpenAI API key, you can run the demo right away:
 
 ```bash
 ### you should run the demo code with project folder
-cd LightRAG
+cd OntoRAG
 ### provide your API-KEY for OpenAI
 export OPENAI_API_KEY="sk-...your_opeai_key..."
 ### download the demo document of "A Christmas Carol" by Charles Dickens
 curl https://raw.githubusercontent.com/gusye1234/nano-graphrag/main/tests/mock_data.txt > ./book.txt
 ### run the demo code
-python examples/lightrag_openai_demo.py
+python examples/ontorag_openai_demo.py
 ```
 
-For a streaming response implementation example, please see `examples/lightrag_openai_compatible_demo.py`. Prior to execution, ensure you modify the sample code's LLM and embedding configurations accordingly.
+For a streaming response implementation example, please see `examples/ontorag_openai_compatible_demo.py`. Prior to execution, ensure you modify the sample code's LLM and embedding configurations accordingly.
 
 **Note 1**: When running the demo program, please be aware that different test scripts may use different embedding models. If you switch to a different embedding model, you must clear the data directory (`./dickens`); otherwise, the program may encounter errors. If you wish to retain the LLM cache, you can preserve the `kv_store_llm_response_cache.json` file while clearing the data directory.
 
-**Note 2**: Only `lightrag_openai_demo.py` and `lightrag_openai_compatible_demo.py` are officially supported sample codes. Other sample files are community contributions that haven't undergone full testing and optimization.
+**Note 2**: Only `ontorag_openai_demo.py` and `ontorag_openai_compatible_demo.py` are officially supported sample codes. Other sample files are community contributions that haven't undergone full testing and optimization.
 
-## Programming with LightRAG Core
+## Programming with OntoRAG Core
 
 For the complete Core API reference — including init parameters, `QueryParam`, LLM/embedding provider examples (OpenAI, Ollama, Azure, Gemini, HuggingFace, LlamaIndex), reranker injection, insert operations, entity/relation management, and delete/merge — see **[docs/ProgramingWithCore.md](./docs/ProgramingWithCore.md)**.
 
-> ⚠️ **If you would like to integrate LightRAG into your project, we recommend utilizing the REST API provided by the LightRAG Server**. LightRAG Core is typically intended for embedded applications or for researchers who wish to conduct studies and evaluations.
+> ⚠️ **If you would like to integrate OntoRAG into your project, we recommend utilizing the REST API provided by the OntoRAG Server**. OntoRAG Core is typically intended for embedded applications or for researchers who wish to conduct studies and evaluations.
 
 ### Advanced Features
 
-LightRAG provides additional capabilities including token usage tracking, knowledge graph data export, LLM cache management, Langfuse observability integration, and RAGAS-based evaluation. See **[docs/AdvancedFeatures.md](./docs/AdvancedFeatures.md)**.
+OntoRAG provides additional capabilities including token usage tracking, knowledge graph data export, LLM cache management, Langfuse observability integration, and RAGAS-based evaluation. See **[docs/AdvancedFeatures.md](./docs/AdvancedFeatures.md)**.
 
 ### Multimodal Document Processing
 
-LightRAG Server includes a multimodal document pipeline for PDFs, Office documents, images, tables, and formulas. Parsing is handled through external MinerU or Docling services, while multimodal indexing runs in the LightRAG pipeline. For setup details, see **[docs/AdvancedFeatures.md](./docs/AdvancedFeatures.md)**.
+OntoRAG Server includes a multimodal document pipeline for PDFs, Office documents, images, tables, and formulas. Parsing is handled through external MinerU or Docling services, while multimodal indexing runs in the OntoRAG pipeline. For setup details, see **[docs/AdvancedFeatures.md](./docs/AdvancedFeatures.md)**.
 
-## LightRAG Contributors
+## OntoRAG Contributors
 
 <div>
-  <a href="https://github.com/HKUDS/LightRAG?tab=readme-ov-file#-contribution">Please checkout all of the contributors for LightRAG who made it happen</a>
+  <a href="https://github.com/HKUDS/LightRAG?tab=readme-ov-file#-contribution">Please checkout all of the contributors for OntoRAG who made it happen</a>
 </div>
 
 ---

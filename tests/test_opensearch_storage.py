@@ -16,7 +16,7 @@ pytest.importorskip(
 )
 
 from opensearchpy.exceptions import NotFoundError, OpenSearchException  # type: ignore
-from lightrag.kg.opensearch_impl import (
+from ontorag.kg.opensearch_impl import (
     OpenSearchKVStorage,
     OpenSearchDocStatusStorage,
     OpenSearchGraphStorage,
@@ -27,13 +27,13 @@ from lightrag.kg.opensearch_impl import (
     _sanitize_index_name,
     _verify_mirrored_id_mapping,
 )
-from lightrag.base import DocStatus, DocProcessingStatus
+from ontorag.base import DocStatus, DocProcessingStatus
 
 pytestmark = pytest.mark.offline
 
 
 # ---------------------------------------------------------------------------
-# Mock the shared storage lock so tests don't need full LightRAG init
+# Mock the shared storage lock so tests don't need full OntoRAG init
 # ---------------------------------------------------------------------------
 
 
@@ -54,7 +54,7 @@ def _missing_index_error() -> NotFoundError:
 def patch_data_init_lock():
     """Patch get_data_init_lock globally so initialize() works without shared storage."""
     with patch(
-        "lightrag.kg.opensearch_impl.get_data_init_lock", side_effect=_mock_lock_factory
+        "ontorag.kg.opensearch_impl.get_data_init_lock", side_effect=_mock_lock_factory
     ):
         yield
 
@@ -65,7 +65,7 @@ def patch_shard_doc_supported():
 
     Tests covering the < 3.3.0 fallback should override this with their own patch.
     """
-    with patch("lightrag.kg.opensearch_impl._shard_doc_supported", True):
+    with patch("ontorag.kg.opensearch_impl._shard_doc_supported", True):
         yield
 
 
@@ -218,7 +218,7 @@ class TestClientManager:
     @pytest.mark.asyncio
     async def test_singleton_and_refcount(self):
         ClientManager._instances = {"client": None, "ref_count": 0}
-        with patch("lightrag.kg.opensearch_impl.AsyncOpenSearch") as mock_cls:
+        with patch("ontorag.kg.opensearch_impl.AsyncOpenSearch") as mock_cls:
             mock_cls.return_value = self._stub_client()
             c1 = await ClientManager.get_client()
             c2 = await ClientManager.get_client()
@@ -233,7 +233,7 @@ class TestClientManager:
     @pytest.mark.asyncio
     async def test_close_called_on_last_release(self):
         ClientManager._instances = {"client": None, "ref_count": 0}
-        with patch("lightrag.kg.opensearch_impl.AsyncOpenSearch") as mock_cls:
+        with patch("ontorag.kg.opensearch_impl.AsyncOpenSearch") as mock_cls:
             inner = self._stub_client()
             mock_cls.return_value = inner
             c = await ClientManager.get_client()
@@ -266,7 +266,7 @@ class TestMirroredIdVerification:
                 }
             }
         )
-        with patch("lightrag.kg.opensearch_impl._shard_doc_supported", False):
+        with patch("ontorag.kg.opensearch_impl._shard_doc_supported", False):
             await _verify_mirrored_id_mapping(mock_client, "my_index")
 
     @pytest.mark.asyncio
@@ -279,7 +279,7 @@ class TestMirroredIdVerification:
                 }
             }
         )
-        with patch("lightrag.kg.opensearch_impl._shard_doc_supported", False):
+        with patch("ontorag.kg.opensearch_impl._shard_doc_supported", False):
             with pytest.raises(RuntimeError, match="__mirrored_id"):
                 await _verify_mirrored_id_mapping(mock_client, "my_index")
 
@@ -289,7 +289,7 @@ class TestMirroredIdVerification:
         mock_client.indices.get_mapping = AsyncMock(
             side_effect=OpenSearchException("transport error")
         )
-        with patch("lightrag.kg.opensearch_impl._shard_doc_supported", False):
+        with patch("ontorag.kg.opensearch_impl._shard_doc_supported", False):
             await _verify_mirrored_id_mapping(mock_client, "my_index")
 
 
@@ -349,7 +349,7 @@ class TestKVStorage:
         )
         with (
             patch.object(ClientManager, "get_client", return_value=mock_client),
-            patch("lightrag.kg.opensearch_impl._shard_doc_supported", False),
+            patch("ontorag.kg.opensearch_impl._shard_doc_supported", False),
         ):
             s = self._make(global_config, embed_func)
             with pytest.raises(RuntimeError, match="__mirrored_id"):
@@ -428,7 +428,7 @@ class TestKVStorage:
     ):
         with patch.object(ClientManager, "get_client", return_value=mock_client):
             with patch(
-                "lightrag.kg.opensearch_impl.helpers.async_bulk", new_callable=AsyncMock
+                "ontorag.kg.opensearch_impl.helpers.async_bulk", new_callable=AsyncMock
             ) as mock_bulk:
                 mock_bulk.return_value = (1, [])
                 s = self._make(global_config, embed_func)
@@ -441,7 +441,7 @@ class TestKVStorage:
     async def test_upsert_sets_timestamps(self, global_config, embed_func, mock_client):
         with patch.object(ClientManager, "get_client", return_value=mock_client):
             with patch(
-                "lightrag.kg.opensearch_impl.helpers.async_bulk", new_callable=AsyncMock
+                "ontorag.kg.opensearch_impl.helpers.async_bulk", new_callable=AsyncMock
             ) as mock_bulk:
                 mock_bulk.return_value = (1, [])
                 s = self._make(global_config, embed_func)
@@ -464,7 +464,7 @@ class TestKVStorage:
     async def test_delete(self, global_config, embed_func, mock_client):
         with patch.object(ClientManager, "get_client", return_value=mock_client):
             with patch(
-                "lightrag.kg.opensearch_impl.helpers.async_bulk", new_callable=AsyncMock
+                "ontorag.kg.opensearch_impl.helpers.async_bulk", new_callable=AsyncMock
             ) as mock_bulk:
                 mock_bulk.return_value = (2, [])
                 s = self._make(global_config, embed_func)
@@ -491,7 +491,7 @@ class TestKVStorage:
         )
         with patch.object(ClientManager, "get_client", return_value=mock_client):
             with patch(
-                "lightrag.kg.opensearch_impl.helpers.async_bulk", new_callable=AsyncMock
+                "ontorag.kg.opensearch_impl.helpers.async_bulk", new_callable=AsyncMock
             ) as mock_bulk:
                 mock_bulk.return_value = (1, [])
                 s = self._make(global_config, embed_func)
@@ -511,7 +511,7 @@ class TestKVStorage:
     ):
         with patch.object(ClientManager, "get_client", return_value=mock_client):
             with patch(
-                "lightrag.kg.opensearch_impl.helpers.async_bulk", new_callable=AsyncMock
+                "ontorag.kg.opensearch_impl.helpers.async_bulk", new_callable=AsyncMock
             ) as mock_bulk:
                 mock_bulk.return_value = (1, [])
                 s = self._make(global_config, embed_func)
@@ -697,7 +697,7 @@ class TestDocStatusStorage:
     ):
         with patch.object(ClientManager, "get_client", return_value=mock_client):
             with patch(
-                "lightrag.kg.opensearch_impl.helpers.async_bulk", new_callable=AsyncMock
+                "ontorag.kg.opensearch_impl.helpers.async_bulk", new_callable=AsyncMock
             ) as mock_bulk:
                 mock_bulk.return_value = (1, [])
                 s = self._make(global_config, embed_func)
@@ -1202,7 +1202,7 @@ class TestDocStatusStorage:
         )
         with patch.object(ClientManager, "get_client", return_value=mock_client):
             with patch(
-                "lightrag.kg.opensearch_impl.helpers.async_bulk", new_callable=AsyncMock
+                "ontorag.kg.opensearch_impl.helpers.async_bulk", new_callable=AsyncMock
             ) as mock_bulk:
                 mock_bulk.return_value = (1, [])
                 s = self._make(global_config, embed_func)
@@ -1222,7 +1222,7 @@ class TestDocStatusStorage:
     ):
         with patch.object(ClientManager, "get_client", return_value=mock_client):
             with patch(
-                "lightrag.kg.opensearch_impl.helpers.async_bulk", new_callable=AsyncMock
+                "ontorag.kg.opensearch_impl.helpers.async_bulk", new_callable=AsyncMock
             ) as mock_bulk:
                 mock_bulk.return_value = (1, [])
                 s = self._make(global_config, embed_func)
@@ -1525,7 +1525,7 @@ class TestGraphStorage:
             )
 
             with patch(
-                "lightrag.kg.opensearch_impl.helpers.async_bulk",
+                "ontorag.kg.opensearch_impl.helpers.async_bulk",
                 new=AsyncMock(side_effect=capture_bulk),
             ):
                 await s.upsert_edges_batch(
@@ -1614,7 +1614,7 @@ class TestGraphStorage:
     async def test_remove_nodes(self, global_config, embed_func, mock_client):
         with patch.object(ClientManager, "get_client", return_value=mock_client):
             with patch(
-                "lightrag.kg.opensearch_impl.helpers.async_bulk", new_callable=AsyncMock
+                "ontorag.kg.opensearch_impl.helpers.async_bulk", new_callable=AsyncMock
             ) as mock_bulk:
                 mock_bulk.return_value = (2, [])
                 s = self._make(global_config, embed_func)
@@ -2354,7 +2354,7 @@ class TestVectorStorage:
     ):
         with patch.object(ClientManager, "get_client", return_value=mock_client):
             with patch(
-                "lightrag.kg.opensearch_impl.helpers.async_bulk", new_callable=AsyncMock
+                "ontorag.kg.opensearch_impl.helpers.async_bulk", new_callable=AsyncMock
             ) as mock_bulk:
                 mock_bulk.return_value = (2, [])
                 s = self._make(global_config, embed_func)
@@ -2533,7 +2533,7 @@ class TestVectorStorage:
     async def test_delete(self, global_config, embed_func, mock_client):
         with patch.object(ClientManager, "get_client", return_value=mock_client):
             with patch(
-                "lightrag.kg.opensearch_impl.helpers.async_bulk", new_callable=AsyncMock
+                "ontorag.kg.opensearch_impl.helpers.async_bulk", new_callable=AsyncMock
             ) as mock_bulk:
                 mock_bulk.return_value = (2, [])
                 s = self._make(global_config, embed_func)

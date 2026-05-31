@@ -13,9 +13,9 @@ import json
 import pytest
 import numpy as np
 from unittest.mock import AsyncMock, MagicMock
-from lightrag.kg.postgres_impl import PGDocStatusStorage, PGKVStorage, PGVectorStorage
-from lightrag.namespace import NameSpace
-from lightrag.utils import EmbeddingFunc
+from ontorag.kg.postgres_impl import PGDocStatusStorage, PGKVStorage, PGVectorStorage
+from ontorag.namespace import NameSpace
+from ontorag.utils import EmbeddingFunc
 
 
 # ---------------------------------------------------------------------------
@@ -160,7 +160,7 @@ async def test_upsert_text_chunks_tuple_order():
 
     assert len(storage._captured) == 1
     sql, rows = storage._captured[0]
-    assert "LIGHTRAG_DOC_CHUNKS" in sql
+    assert "ONTORAG_DOC_CHUNKS" in sql
     assert len(rows) == 1
     row = rows[0]
     # SQL: (workspace, id, tokens, chunk_order_index, full_doc_id,
@@ -238,8 +238,8 @@ async def test_upsert_full_docs_tuple_order():
         "doc-1": {
             "content": "full text",
             "file_path": "/path/doc.[mineru-Fi].pdf",
-            "sidecar_location": "lightrag://sidecar/doc-1",
-            "parse_format": "lightrag",
+            "sidecar_location": "ontorag://sidecar/doc-1",
+            "parse_format": "ontorag",
             "content_hash": "deadbeef",
             "process_options": "Fi",
             "chunk_options": {"chunk_token_size": 1200, "chunk_overlap": 100},
@@ -257,8 +257,8 @@ async def test_upsert_full_docs_tuple_order():
     assert row[1] == "full text"
     assert row[2] == "/path/doc.[mineru-Fi].pdf"
     assert row[3] == "test_ws"
-    assert row[4] == "lightrag://sidecar/doc-1"
-    assert row[5] == "lightrag"
+    assert row[4] == "ontorag://sidecar/doc-1"
+    assert row[5] == "ontorag"
     assert row[6] == "deadbeef"
     assert row[7] == "Fi"
     assert json.loads(row[8]) == {"chunk_token_size": 1200, "chunk_overlap": 100}
@@ -275,7 +275,7 @@ async def test_upsert_full_docs_missing_pipeline_fields_pass_through_as_none():
     initial insert; the Python layer must NOT inject it, otherwise the
     COALESCE guard never triggers on subsequent partial writes (a follow-up
     upsert with no parse_format would re-stamp the column with 'raw' and
-    blow away a previously-set 'lightrag').
+    blow away a previously-set 'ontorag').
     """
     storage = make_storage(NameSpace.KV_STORE_FULL_DOCS)
     data = {"doc-1": {"content": "full text", "file_path": "/path/doc.pdf"}}
@@ -336,13 +336,13 @@ async def test_upsert_full_docs_sql_protects_partial_writes():
             f"coalesce( nullif(excluded.{col}, '')" in normalized
         ), f"upsert_doc_full must guard {col} via COALESCE+NULLIF"
         assert (
-            f"lightrag_doc_full.{col}" in normalized
+            f"ontorag_doc_full.{col}" in normalized
         ), f"upsert_doc_full must preserve existing {col} on partial write"
 
     # chunk_options (JSONB) is guarded via CASE on NULL/empty-object literal
     assert "excluded.chunk_options is null" in normalized
     assert "excluded.chunk_options = '{}'::jsonb" in normalized
-    assert "lightrag_doc_full.chunk_options" in normalized
+    assert "ontorag_doc_full.chunk_options" in normalized
 
     # content / doc_name remain straight overwrites — they ARE the payload
     assert "content = excluded.content" in normalized
@@ -677,7 +677,7 @@ async def test_doc_status_upsert_sql_protects_existing_content_hash():
     normalized = " ".join(sql.split()).lower()
     assert "coalesce(" in normalized
     assert "nullif(excluded.content_hash, '')" in normalized
-    assert "lightrag_doc_status.content_hash" in normalized
+    assert "ontorag_doc_status.content_hash" in normalized
 
 
 @pytest.mark.asyncio

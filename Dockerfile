@@ -8,11 +8,11 @@ FROM --platform=$BUILDPLATFORM oven/bun:1 AS frontend-builder
 WORKDIR /app
 
 # Copy frontend source code
-COPY lightrag_webui/ ./lightrag_webui/
+COPY ontorag_webui/ ./ontorag_webui/
 
 # Build frontend assets for inclusion in the API package
 RUN --mount=type=cache,target=/root/.bun/install/cache \
-    cd lightrag_webui \
+    cd ontorag_webui \
     && bun install --frozen-lockfile \
     && bun run build
 
@@ -49,10 +49,10 @@ RUN --mount=type=cache,target=/root/.local/share/uv \
     uv sync --frozen --no-dev --extra api --extra offline --no-install-project --no-editable
 
 # Copy project sources after dependency layer
-COPY lightrag/ ./lightrag/
+COPY ontorag/ ./ontorag/
 
 # Include pre-built frontend assets from the previous stage
-COPY --from=frontend-builder /app/lightrag/api/webui ./lightrag/api/webui
+COPY --from=frontend-builder /app/ontorag/api/webui ./ontorag/api/webui
 
 # Sync project in non-editable mode and ensure pip is available for runtime installs
 RUN --mount=type=cache,target=/root/.local/share/uv \
@@ -62,7 +62,7 @@ RUN --mount=type=cache,target=/root/.local/share/uv \
 # Prepare offline cache directory and pre-populate tiktoken data
 # Use uv run to execute commands from the virtual environment
 RUN mkdir -p /app/data/tiktoken \
-    && uv run lightrag-download-cache --cache-dir /app/data/tiktoken || status=$?; \
+    && uv run ontorag-download-cache --cache-dir /app/data/tiktoken || status=$?; \
     if [ -n "${status:-}" ] && [ "$status" -ne 0 ] && [ "$status" -ne 2 ]; then exit "$status"; fi
 
 # Final stage
@@ -78,7 +78,7 @@ ENV UV_SYSTEM_PYTHON=1
 # Copy installed packages and application code
 COPY --from=builder /root/.local /root/.local
 COPY --from=builder /app/.venv /app/.venv
-COPY --from=builder /app/lightrag ./lightrag
+COPY --from=builder /app/ontorag ./ontorag
 COPY pyproject.toml .
 COPY setup.py .
 COPY uv.lock .
@@ -107,4 +107,4 @@ ENV PROMPT_DIR=/app/data/prompts
 # Expose API port
 EXPOSE 9621
 
-ENTRYPOINT ["python", "-m", "lightrag.api.lightrag_server"]
+ENTRYPOINT ["python", "-m", "ontorag.api.ontorag_server"]

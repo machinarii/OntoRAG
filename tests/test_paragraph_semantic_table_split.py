@@ -4,7 +4,7 @@ import json
 
 import pytest
 
-from lightrag.chunker.paragraph_semantic import (
+from ontorag.chunker.paragraph_semantic import (
     _detect_table_format,
     _expand_block_with_table_splits,
     _split_html_rows,
@@ -13,7 +13,7 @@ from lightrag.chunker.paragraph_semantic import (
     _split_table_text,
     chunking_by_paragraph_semantic,
 )
-from lightrag.utils import Tokenizer, TokenizerInterface
+from ontorag.utils import Tokenizer, TokenizerInterface
 
 
 class _CharTokenizer(TokenizerInterface):

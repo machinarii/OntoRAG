@@ -42,8 +42,8 @@ def test_generate_files_keep_host_env_values_and_inject_compose_overrides(
         "\n".join(
             [
                 "services:",
-                "  lightrag:",
-                "    image: example/lightrag:test",
+                "  ontorag:",
+                "    image: example/ontorag:test",
                 "    env_file:",
                 "      - .env",
                 "    volumes:",
@@ -101,7 +101,7 @@ generate_docker_compose "$REPO_ROOT/docker-compose.generated.yml\"
     assert "env_file:" not in generated_compose
 
 
-def test_generate_docker_compose_removes_lightrag_env_file_to_preserve_dollar_values(
+def test_generate_docker_compose_removes_ontorag_env_file_to_preserve_dollar_values(
     tmp_path: Path,
 ) -> None:
     """Generated compose should remove `env_file` and skip empty environment blocks."""
@@ -109,9 +109,9 @@ def test_generate_docker_compose_removes_lightrag_env_file_to_preserve_dollar_va
         tmp_path / "docker-compose.yml",
         [
             "services:",
-            "  lightrag:",
-            "    container_name: lightrag",
-            "    image: example/lightrag:test",
+            "  ontorag:",
+            "    container_name: ontorag",
+            "    image: example/ontorag:test",
             "    env_file:",
             "      - .env",
             "    volumes:",
@@ -135,17 +135,17 @@ generate_docker_compose "$REPO_ROOT/docker-compose.generated.yml\"
     assert "- ./.env:/app/.env" in generated_compose
 
 
-def test_generate_docker_compose_removes_lightrag_container_name_from_existing_output(
+def test_generate_docker_compose_removes_ontorag_container_name_from_existing_output(
     tmp_path: Path,
 ) -> None:
-    """Compose regeneration should strip fixed lightrag container names from prior output."""
+    """Compose regeneration should strip fixed ontorag container names from prior output."""
     write_text_lines(
         tmp_path / "docker-compose.final.yml",
         [
             "services:",
-            "  lightrag:",
-            "    container_name: lightrag",
-            "    image: example/lightrag:test",
+            "  ontorag:",
+            "    container_name: ontorag",
+            "    image: example/ontorag:test",
         ],
     )
     run_bash(f"""
@@ -162,7 +162,7 @@ generate_docker_compose "$REPO_ROOT/docker-compose.final.yml\"
     assert "container_name:" not in generated_compose
 
 
-def test_generate_docker_compose_preserves_list_style_lightrag_environment(
+def test_generate_docker_compose_preserves_list_style_ontorag_environment(
     tmp_path: Path,
 ) -> None:
     """Compose regeneration should not mix mapping entries into list-style environments."""
@@ -170,8 +170,8 @@ def test_generate_docker_compose_preserves_list_style_lightrag_environment(
         tmp_path / "docker-compose.final.yml",
         [
             "services:",
-            "  lightrag:",
-            "    image: example/lightrag:test",
+            "  ontorag:",
+            "    image: example/ontorag:test",
             "    environment:",
             "      - PORT=9621",
             "      - FOO=bar",
@@ -197,13 +197,13 @@ generate_docker_compose "$REPO_ROOT/docker-compose.final.yml\"
     assert "      PORT:" not in generated_compose
 
 
-def test_generate_docker_compose_injects_healthchecks_and_lightrag_depends_on(
+def test_generate_docker_compose_injects_healthchecks_and_ontorag_depends_on(
     tmp_path: Path,
 ) -> None:
-    """Generated compose should gate LightRAG on all managed dependencies becoming healthy."""
+    """Generated compose should gate OntoRAG on all managed dependencies becoming healthy."""
     write_text_lines(
         tmp_path / "docker-compose.yml",
-        ["services:", "  lightrag:", "    image: example/lightrag:test"],
+        ["services:", "  ontorag:", "    image: example/ontorag:test"],
     )
     write_text_lines(
         tmp_path / "env.example",
@@ -230,11 +230,11 @@ generate_docker_compose "$REPO_ROOT/docker-compose.final.yml\"
     generated_compose = (tmp_path / "docker-compose.final.yml").read_text(
         encoding="utf-8"
     )
-    lightrag_start = generated_compose.index("  lightrag:\n")
+    ontorag_start = generated_compose.index("  ontorag:\n")
     embed_start = generated_compose.index("\n  vllm-embed:\n")
-    lightrag_block = generated_compose[lightrag_start:embed_start]
+    ontorag_block = generated_compose[ontorag_start:embed_start]
     assert "    depends_on:" in generated_compose
-    assert "    depends_on:" in lightrag_block
+    assert "    depends_on:" in ontorag_block
     for service_name in (
         "postgres",
         "neo4j",
@@ -249,7 +249,7 @@ generate_docker_compose "$REPO_ROOT/docker-compose.final.yml\"
         assert (
             f"""      {service_name}:
         condition: service_healthy"""
-            in lightrag_block
+            in ontorag_block
         )
     assert generated_compose.count("    healthcheck:") == 10
     assert "  milvus-etcd:" in generated_compose
@@ -274,8 +274,8 @@ def test_generate_docker_compose_preserves_user_depends_on_and_removes_stale_man
         tmp_path / "docker-compose.final.yml",
         [
             "services:",
-            "  lightrag:",
-            "    image: example/lightrag:test",
+            "  ontorag:",
+            "    image: example/ontorag:test",
             "    depends_on:",
             "      sidecar:",
             "        condition: service_started",
@@ -327,16 +327,16 @@ generate_docker_compose "$REPO_ROOT/docker-compose.final.yml\"
     )
 
 
-def test_generate_docker_compose_repairs_misplaced_lightrag_depends_on_from_existing_output(
+def test_generate_docker_compose_repairs_misplaced_ontorag_depends_on_from_existing_output(
     tmp_path: Path,
 ) -> None:
-    """Regeneration should move stale lightrag depends_on content back onto the lightrag service."""
+    """Regeneration should move stale ontorag depends_on content back onto the ontorag service."""
     write_text_lines(
         tmp_path / "docker-compose.final.yml",
         [
             "services:",
-            "  lightrag:",
-            "    image: example/lightrag:test",
+            "  ontorag:",
+            "    image: example/ontorag:test",
             "    environment:",
             "  vllm-rerank:",
             "    image: example/vllm:test",
@@ -365,35 +365,35 @@ generate_docker_compose "$REPO_ROOT/docker-compose.final.yml\"
     generated_compose = (tmp_path / "docker-compose.final.yml").read_text(
         encoding="utf-8"
     )
-    lightrag_start = generated_compose.index("  lightrag:\n")
+    ontorag_start = generated_compose.index("  ontorag:\n")
     rerank_start = generated_compose.index("\n  vllm-rerank:\n")
-    lightrag_block = generated_compose[lightrag_start:rerank_start]
+    ontorag_block = generated_compose[ontorag_start:rerank_start]
     rerank_block = generated_compose[rerank_start:]
-    assert "    depends_on:" in lightrag_block
+    assert "    depends_on:" in ontorag_block
     assert (
         """      my-service:
         condition: service_healthy"""
-        in lightrag_block
+        in ontorag_block
     )
     assert (
         """      vllm-rerank:
         condition: service_healthy"""
-        in lightrag_block
+        in ontorag_block
     )
     assert "    depends_on:" not in rerank_block
     assert generated_compose.count("\n  vllm-rerank:\n") == 1
 
 
-def test_generate_docker_compose_normalizes_lightrag_restart_policy_from_existing_output(
+def test_generate_docker_compose_normalizes_ontorag_restart_policy_from_existing_output(
     tmp_path: Path,
 ) -> None:
-    """Regeneration should replace legacy lightrag restart with deploy.restart_policy."""
+    """Regeneration should replace legacy ontorag restart with deploy.restart_policy."""
     write_text_lines(
         tmp_path / "docker-compose.final.yml",
         [
             "services:",
-            "  lightrag:",
-            "    image: example/lightrag:test",
+            "  ontorag:",
+            "    image: example/ontorag:test",
             "    restart: unless-stopped",
             "    extra_hosts:",
             '      - "host.docker.internal:host-gateway"',
@@ -414,16 +414,16 @@ generate_docker_compose "$REPO_ROOT/docker-compose.final.yml\"
     generated_compose = (tmp_path / "docker-compose.final.yml").read_text(
         encoding="utf-8"
     )
-    lightrag_start = generated_compose.index("  lightrag:\n")
-    lightrag_block = generated_compose[lightrag_start:]
-    assert "    restart: unless-stopped" not in lightrag_block
-    assert "    deploy:\n" in lightrag_block
-    assert "      restart_policy:\n" in lightrag_block
-    assert "        condition: on-failure\n" in lightrag_block
-    assert "        max_attempts: 10\n" in lightrag_block
+    ontorag_start = generated_compose.index("  ontorag:\n")
+    ontorag_block = generated_compose[ontorag_start:]
+    assert "    restart: unless-stopped" not in ontorag_block
+    assert "    deploy:\n" in ontorag_block
+    assert "      restart_policy:\n" in ontorag_block
+    assert "        condition: on-failure\n" in ontorag_block
+    assert "        max_attempts: 10\n" in ontorag_block
 
 
-def test_generate_docker_compose_normalizes_lightrag_restart_policy_without_blank_line_before_deploy(
+def test_generate_docker_compose_normalizes_ontorag_restart_policy_without_blank_line_before_deploy(
     tmp_path: Path,
 ) -> None:
     """Regeneration should move the separator blank line after deploy, not before it."""
@@ -431,8 +431,8 @@ def test_generate_docker_compose_normalizes_lightrag_restart_policy_without_blan
         tmp_path / "docker-compose.final.yml",
         [
             "services:",
-            "  lightrag:",
-            "    image: example/lightrag:test",
+            "  ontorag:",
+            "    image: example/ontorag:test",
             "    restart: unless-stopped",
             "",
             "  sidecar:",
@@ -455,14 +455,14 @@ generate_docker_compose "$REPO_ROOT/docker-compose.final.yml\"
         encoding="utf-8"
     )
     assert (
-        """    image: example/lightrag:test
+        """    image: example/ontorag:test
 
     deploy:
 """
         not in generated_compose
     )
     assert (
-        """    image: example/lightrag:test
+        """    image: example/ontorag:test
     deploy:
 """
         in generated_compose
@@ -482,8 +482,8 @@ def test_generate_docker_compose_preserves_non_managed_named_volumes(
         tmp_path / "docker-compose.final.yml",
         [
             "services:",
-            "  lightrag:",
-            "    image: example/lightrag:test",
+            "  ontorag:",
+            "    image: example/ontorag:test",
             "    volumes:",
             "      - my_cache:/app/cache",
             "  sidecar:",
@@ -532,8 +532,8 @@ def test_generate_docker_compose_inserts_managed_services_before_top_level_secti
         tmp_path / "docker-compose.final.yml",
         [
             "services:",
-            "  lightrag:",
-            "    image: example/lightrag:test",
+            "  ontorag:",
+            "    image: example/ontorag:test",
             "    volumes:",
             "      - ./.env:/app/.env",
             "  worker:",
@@ -555,9 +555,9 @@ source "{REPO_ROOT}/scripts/setup/setup.sh"
 REPO_ROOT="{tmp_path}"
 reset_state
 
-ENV_VALUES[POSTGRES_USER]="lightrag"
+ENV_VALUES[POSTGRES_USER]="ontorag"
 ENV_VALUES[POSTGRES_PASSWORD]="secret"
-ENV_VALUES[POSTGRES_DATABASE]="lightrag"
+ENV_VALUES[POSTGRES_DATABASE]="ontorag"
 add_docker_service "postgres"
 
 generate_docker_compose "$REPO_ROOT/docker-compose.final.yml\"
@@ -569,7 +569,7 @@ generate_docker_compose "$REPO_ROOT/docker-compose.final.yml\"
     assert "  appnet:" in result
 
 
-def test_generate_docker_compose_cleans_marker_and_blank_lines_when_only_lightrag_remains(
+def test_generate_docker_compose_cleans_marker_and_blank_lines_when_only_ontorag_remains(
     tmp_path: Path,
 ) -> None:
     """Regeneration should not leave a managed-services marker or stacked blank lines behind."""
@@ -577,8 +577,8 @@ def test_generate_docker_compose_cleans_marker_and_blank_lines_when_only_lightra
         tmp_path / "docker-compose.final.yml",
         [
             "services:",
-            "  lightrag:",
-            "    image: example/lightrag:test",
+            "  ontorag:",
+            "    image: example/ontorag:test",
             "    depends_on:",
             "      vllm-embed:",
             "        condition: service_healthy",
@@ -627,8 +627,8 @@ def test_generate_docker_compose_keeps_blank_line_between_managed_service_and_to
         tmp_path / "docker-compose.final.yml",
         [
             "services:",
-            "  lightrag:",
-            "    image: example/lightrag:test",
+            "  ontorag:",
+            "    image: example/ontorag:test",
             "networks:",
             "  web_network:",
             "    driver: bridge",
@@ -667,8 +667,8 @@ def test_generate_docker_compose_keeps_single_blank_line_before_generated_volume
         tmp_path / "docker-compose.final.yml",
         [
             "services:",
-            "  lightrag:",
-            "    image: example/lightrag:test",
+            "  ontorag:",
+            "    image: example/ontorag:test",
             "networks:",
             "  web_network:",
             "    driver: bridge",
@@ -1306,7 +1306,7 @@ def test_generate_env_file_round_trips_dollar_signs_in_single_quoted_values(
         "\n".join(
             [
                 "TOKEN_SECRET=placeholder",
-                "LIGHTRAG_API_KEY=placeholder",
+                "ONTORAG_API_KEY=placeholder",
                 "WEBUI_DESCRIPTION=placeholder",
             ]
         )
@@ -1320,7 +1320,7 @@ REPO_ROOT="{tmp_path}"
 reset_state
 
 ENV_VALUES[TOKEN_SECRET]='abc$HOME'
-ENV_VALUES[LIGHTRAG_API_KEY]='plain$token'
+ENV_VALUES[ONTORAG_API_KEY]='plain$token'
 ENV_VALUES[WEBUI_DESCRIPTION]='value with "$PATH" and $HOME'
 
 generate_env_file "$REPO_ROOT/env.example" "$REPO_ROOT/.env"
@@ -1328,16 +1328,16 @@ reset_state
 load_env_file "$REPO_ROOT/.env"
 
 printf 'TOKEN_SECRET=%s\\n' "${{ENV_VALUES[TOKEN_SECRET]}}"
-printf 'LIGHTRAG_API_KEY=%s\\n' "${{ENV_VALUES[LIGHTRAG_API_KEY]}}"
+printf 'ONTORAG_API_KEY=%s\\n' "${{ENV_VALUES[ONTORAG_API_KEY]}}"
 printf 'WEBUI_DESCRIPTION=%s\\n' "${{ENV_VALUES[WEBUI_DESCRIPTION]}}\"
 """)
     values = parse_lines(output)
     generated_env = (tmp_path / ".env").read_text(encoding="utf-8")
     assert "TOKEN_SECRET='abc$HOME'" in generated_env
-    assert "LIGHTRAG_API_KEY='plain$token'" in generated_env
+    assert "ONTORAG_API_KEY='plain$token'" in generated_env
     assert "WEBUI_DESCRIPTION='value with \"$PATH\" and $HOME'" in generated_env
     assert values["TOKEN_SECRET"] == "abc$HOME"
-    assert values["LIGHTRAG_API_KEY"] == "plain$token"
+    assert values["ONTORAG_API_KEY"] == "plain$token"
     assert values["WEBUI_DESCRIPTION"] == 'value with "$PATH" and $HOME'
 
 
@@ -1403,8 +1403,8 @@ def test_generate_docker_compose_escapes_dollar_signs_in_overrides_and_service_s
         tmp_path / "docker-compose.yml",
         [
             "services:",
-            "  lightrag:",
-            "    image: example/lightrag:test",
+            "  ontorag:",
+            "    image: example/ontorag:test",
             "    env_file:",
             "      - .env",
         ],
@@ -1507,8 +1507,8 @@ def test_generate_docker_compose_preserves_long_form_named_sidecar_volumes(
         tmp_path / "docker-compose.final.yml",
         [
             "services:",
-            "  lightrag:",
-            "    image: example/lightrag:test",
+            "  ontorag:",
+            "    image: example/ontorag:test",
             "  sidecar:",
             "    image: busybox",
             '    command: ["sleep", "infinity"]',
@@ -1572,8 +1572,8 @@ def test_generate_docker_compose_injects_server_host_and_port_overrides(
         "\n".join(
             [
                 "services:",
-                "  lightrag:",
-                "    image: example/lightrag:test",
+                "  ontorag:",
+                "    image: example/ontorag:test",
                 "    env_file:",
                 "      - .env",
                 "    ports:",
@@ -1603,24 +1603,24 @@ generate_docker_compose "$REPO_ROOT/docker-compose.generated.yml\"
     assert '      - "${HOST:-0.0.0.0}:${PORT:-9621}:9621"' in generated_compose
 
 
-def test_generate_docker_compose_injects_env_overrides_into_lightrag_not_after_managed_services(
+def test_generate_docker_compose_injects_env_overrides_into_ontorag_not_after_managed_services(
     tmp_path: Path,
 ) -> None:
-    """Env overrides must appear inside the lightrag environment block, not after managed services.
+    """Env overrides must appear inside the ontorag environment block, not after managed services.
 
     When the base compose has a top-level volumes: section, the strip pass inserts a
     __WIZARD_MANAGED_SERVICES__ marker at the point where volumes: begins.  Before the
     fix the environment injector would miss that marker (column-0 comment) as an
     end-of-environment boundary and append overrides after it — which placed them outside
-    the lightrag service once postgres/neo4j were merged in.
+    the ontorag service once postgres/neo4j were merged in.
     """
     compose_file = tmp_path / "docker-compose.yml"
     compose_file.write_text(
         "\n".join(
             [
                 "services:",
-                "  lightrag:",
-                "    image: example/lightrag:test",
+                "  ontorag:",
+                "    image: example/ontorag:test",
                 "    environment:",
                 "      EXISTING_KEY: existing_value",
                 "    volumes:",
@@ -1638,19 +1638,19 @@ source "{REPO_ROOT}/scripts/setup/setup.sh"
 REPO_ROOT="{tmp_path}"
 reset_state
 
-ENV_VALUES[POSTGRES_USER]="lightrag"
+ENV_VALUES[POSTGRES_USER]="ontorag"
 ENV_VALUES[POSTGRES_PASSWORD]="secret"
-ENV_VALUES[POSTGRES_DATABASE]="lightrag"
+ENV_VALUES[POSTGRES_DATABASE]="ontorag"
 add_docker_service "postgres"
 set_compose_override "LLM_BINDING_HOST" "http://host.docker.internal:11434"
 
 generate_docker_compose "$REPO_ROOT/docker-compose.generated.yml\"
 """)
     result = (tmp_path / "docker-compose.generated.yml").read_text(encoding="utf-8")
-    lightrag_pos = result.index("  lightrag:")
+    ontorag_pos = result.index("  ontorag:")
     postgres_pos = result.index("  postgres:")
     override_pos = result.index('LLM_BINDING_HOST: "http://host.docker.internal:11434"')
-    assert lightrag_pos < override_pos < postgres_pos
+    assert ontorag_pos < override_pos < postgres_pos
 
 
 def test_generate_docker_compose_vllm_gpu_honors_documented_gpu_selector(
@@ -1674,8 +1674,8 @@ def test_generate_docker_compose_vllm_gpu_honors_documented_gpu_selector(
         "\n".join(
             [
                 "services:",
-                "  lightrag:",
-                "    image: example/lightrag:test",
+                "  ontorag:",
+                "    image: example/ontorag:test",
                 "    env_file:",
                 "      - .env",
             ]
@@ -1729,7 +1729,7 @@ def test_generate_docker_compose_selects_milvus_template_from_device(
     )
     write_text_lines(
         tmp_path / "docker-compose.yml",
-        ["services:", "  lightrag:", "    image: example/lightrag:test"],
+        ["services:", "  ontorag:", "    image: example/ontorag:test"],
     )
     run_bash(f"""
 set -euo pipefail
@@ -1756,8 +1756,8 @@ def test_generate_docker_compose_omits_config_ini_mount_from_base_template(
         "\n".join(
             [
                 "services:",
-                "  lightrag:",
-                "    image: example/lightrag:test",
+                "  ontorag:",
+                "    image: example/ontorag:test",
                 "    volumes:",
                 "      - ./data/rag_storage:/app/data/rag_storage",
                 "      - ./data/inputs:/app/data/inputs",
@@ -1797,8 +1797,8 @@ def test_generate_docker_compose_preserves_existing_config_ini_mount(
         "\n".join(
             [
                 "services:",
-                "  lightrag:",
-                "    image: example/lightrag:test",
+                "  ontorag:",
+                "    image: example/ontorag:test",
                 "    volumes:",
                 "      - ./data/rag_storage:/app/data/rag_storage",
                 "      - ./data/inputs:/app/data/inputs",

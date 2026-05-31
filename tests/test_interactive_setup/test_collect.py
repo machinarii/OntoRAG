@@ -31,8 +31,8 @@ confirm_default_yes() {{ return 0; }}
 prompt_with_default() {{
   case "$1" in
     "PostgreSQL host") printf 'localhost' ;;
-    "PostgreSQL user") printf 'lightrag' ;;
-    "PostgreSQL database") printf 'lightrag' ;;
+    "PostgreSQL user") printf 'ontorag' ;;
+    "PostgreSQL database") printf 'ontorag' ;;
     *) printf '%s' "$2" ;;
   esac
 }}
@@ -190,7 +190,7 @@ printf 'PROMPT_LOG=%s\\n' "$(paste -sd '|' "$PROMPT_LOG_FILE")\"
     assert values["POSTGRES_PASSWORD"] == "host-password"
     assert (
         values["PROMPT_LOG"]
-        == "PostgreSQL host[localhost]|PostgreSQL port[5432]|PostgreSQL user[rag]|PostgreSQL password: [rag]|PostgreSQL database[lightrag]"
+        == "PostgreSQL host[localhost]|PostgreSQL port[5432]|PostgreSQL user[rag]|PostgreSQL password: [rag]|PostgreSQL database[ontorag]"
     )
 
 
@@ -356,11 +356,11 @@ confirm_default_yes() {{ return 0; }}
 prompt_choice() {{ printf '%s' "$2"; }}
 prompt_with_default() {{
   case "$1" in
-    "PostgreSQL user") printf 'lightrag' ;;
-    "PostgreSQL database") printf 'lightrag' ;;
+    "PostgreSQL user") printf 'ontorag' ;;
+    "PostgreSQL database") printf 'ontorag' ;;
     "Neo4j database") printf 'neo4j' ;;
-    "MongoDB database") printf 'LightRAG' ;;
-    "Milvus database name") printf 'lightrag' ;;
+    "MongoDB database") printf 'OntoRAG' ;;
+    "Milvus database name") printf 'ontorag' ;;
     *) printf '%s' "$2" ;;
   esac
 }}
@@ -919,7 +919,7 @@ set -euo pipefail
 source "{REPO_ROOT}/scripts/setup/setup.sh"
 reset_state
 
-ENV_VALUES[LIGHTRAG_SETUP_RERANK_PROVIDER]="vllm"
+ENV_VALUES[ONTORAG_SETUP_RERANK_PROVIDER]="vllm"
 ENV_VALUES[RERANK_BINDING]="cohere"
 ENV_VALUES[RERANK_MODEL]="BAAI/bge-reranker-v2-m3"
 ENV_VALUES[RERANK_BINDING_HOST]="http://localhost:8000/rerank"
@@ -937,13 +937,13 @@ prompt_secret_until_valid_with_default() {{ printf 'cohere-secret-123'; }}
 collect_rerank_config
 
 printf 'RERANK_BINDING=%s\\n' "${{ENV_VALUES[RERANK_BINDING]}}"
-printf 'LIGHTRAG_SETUP_RERANK_PROVIDER=%s\\n' "${{ENV_VALUES[LIGHTRAG_SETUP_RERANK_PROVIDER]:-}}"
+printf 'ONTORAG_SETUP_RERANK_PROVIDER=%s\\n' "${{ENV_VALUES[ONTORAG_SETUP_RERANK_PROVIDER]:-}}"
 printf 'RERANK_MODEL=%s\\n' "${{ENV_VALUES[RERANK_MODEL]:-}}"
 printf 'RERANK_BINDING_HOST=%s\\n' "${{ENV_VALUES[RERANK_BINDING_HOST]:-}}\"
 """)
     values = parse_lines(output)
     assert values["RERANK_BINDING"] == "cohere"
-    assert values["LIGHTRAG_SETUP_RERANK_PROVIDER"] == ""
+    assert values["ONTORAG_SETUP_RERANK_PROVIDER"] == ""
     assert values["RERANK_MODEL"] != "BAAI/bge-reranker-v2-m3"
     assert values["RERANK_MODEL"] == "rerank-v3.5"
     assert "localhost:8000" not in values["RERANK_BINDING_HOST"]
@@ -957,7 +957,7 @@ set -euo pipefail
 source "{REPO_ROOT}/scripts/setup/setup.sh"
 reset_state
 
-ENV_VALUES[LIGHTRAG_SETUP_RERANK_PROVIDER]="vllm"
+ENV_VALUES[ONTORAG_SETUP_RERANK_PROVIDER]="vllm"
 ENV_VALUES[RERANK_BINDING]="cohere"
 
 prompt_choice() {{
@@ -1004,7 +1004,7 @@ collect_milvus_config no
 
 printf 'MILVUS_DB_NAME=%s\\n' "${{ENV_VALUES[MILVUS_DB_NAME]}}\"
 """)
-    assert values["MILVUS_DB_NAME"] == "lightrag"
+    assert values["MILVUS_DB_NAME"] == "ontorag"
 
 
 def test_collect_milvus_config_initializes_minio_credentials_for_local_docker(
@@ -1129,7 +1129,7 @@ confirm_default_yes() {{ return 0; }}
 prompt_until_valid() {{ printf '%s' "$2"; }}
 prompt_with_default() {{
   if [[ "$1" == "MongoDB database" ]]; then
-    printf 'LightRAG'
+    printf 'OntoRAG'
   else
     printf '%s' "$2"
   fi
@@ -1157,7 +1157,7 @@ set -euo pipefail
 source "{REPO_ROOT}/scripts/setup/setup.sh"
 reset_state
 
-ENV_VALUES[LIGHTRAG_VECTOR_STORAGE]="MongoVectorDBStorage"
+ENV_VALUES[ONTORAG_VECTOR_STORAGE]="MongoVectorDBStorage"
 ENV_VALUES[MONGO_URI]="mongodb://localhost:27017/?directConnection=true"
 
 confirm_default_yes() {{ return 1; }}
@@ -1182,8 +1182,8 @@ set -euo pipefail
 source "{REPO_ROOT}/scripts/setup/setup.sh"
 reset_state
 
-ENV_VALUES[LIGHTRAG_VECTOR_STORAGE]="MongoVectorDBStorage"
-ENV_VALUES[MONGO_URI]="mongodb://atlas-local.example.com:27017/LightRAG?replicaSet=rs0&directConnection=true"
+ENV_VALUES[ONTORAG_VECTOR_STORAGE]="MongoVectorDBStorage"
+ENV_VALUES[MONGO_URI]="mongodb://atlas-local.example.com:27017/OntoRAG?replicaSet=rs0&directConnection=true"
 
 confirm_default_yes() {{ return 1; }}
 prompt_until_valid() {{ printf '%s' "$2"; }}
@@ -1196,7 +1196,7 @@ printf 'COMPOSE_MONGO_URI=%s\\n' "${{COMPOSE_ENV_OVERRIDES[MONGO_URI]-}}\"
 """)
     assert (
         values["MONGO_URI"]
-        == "mongodb://atlas-local.example.com:27017/LightRAG?replicaSet=rs0&directConnection=true"
+        == "mongodb://atlas-local.example.com:27017/OntoRAG?replicaSet=rs0&directConnection=true"
     )
     assert values["COMPOSE_MONGO_URI"] == ""
 
@@ -1235,7 +1235,7 @@ def test_collect_security_config_can_clear_existing_values_on_rerun(
                 "AUTH_ACCOUNTS=admin:secret",
                 "TOKEN_SECRET=jwt-secret",
                 "TOKEN_EXPIRE_HOURS=72",
-                "LIGHTRAG_API_KEY=api-key",
+                "ONTORAG_API_KEY=api-key",
                 "WHITELIST_PATHS=/health,/api/*,/docs",
             ]
         )
@@ -1259,7 +1259,7 @@ generate_env_file "{REPO_ROOT}/env.example" "$REPO_ROOT/.env.generated"
 printf 'AUTH_ACCOUNTS_SET=%s\\n' "${{ENV_VALUES[AUTH_ACCOUNTS]+set}}"
 printf 'TOKEN_SECRET_SET=%s\\n' "${{ENV_VALUES[TOKEN_SECRET]+set}}"
 printf 'TOKEN_EXPIRE_HOURS_SET=%s\\n' "${{ENV_VALUES[TOKEN_EXPIRE_HOURS]+set}}"
-printf 'LIGHTRAG_API_KEY_SET=%s\\n' "${{ENV_VALUES[LIGHTRAG_API_KEY]+set}}"
+printf 'ONTORAG_API_KEY_SET=%s\\n' "${{ENV_VALUES[ONTORAG_API_KEY]+set}}"
 printf 'WHITELIST_PATHS_SET=%s\\n' "${{ENV_VALUES[WHITELIST_PATHS]+set}}\"
 """)
     values = parse_lines(output)
@@ -1269,12 +1269,12 @@ printf 'WHITELIST_PATHS_SET=%s\\n' "${{ENV_VALUES[WHITELIST_PATHS]+set}}\"
     assert values["AUTH_ACCOUNTS_SET"] == ""
     assert values["TOKEN_SECRET_SET"] == ""
     assert values["TOKEN_EXPIRE_HOURS_SET"] == ""
-    assert values["LIGHTRAG_API_KEY_SET"] == ""
+    assert values["ONTORAG_API_KEY_SET"] == ""
     assert values["WHITELIST_PATHS_SET"] == "set"
     assert not any(line.startswith("AUTH_ACCOUNTS=") for line in generated_lines)
     assert not any(line.startswith("TOKEN_SECRET=") for line in generated_lines)
     assert not any(line.startswith("TOKEN_EXPIRE_HOURS=") for line in generated_lines)
-    assert not any(line.startswith("LIGHTRAG_API_KEY=") for line in generated_lines)
+    assert not any(line.startswith("ONTORAG_API_KEY=") for line in generated_lines)
     assert "WHITELIST_PATHS=" in generated_lines
 
 
@@ -1362,8 +1362,8 @@ def test_collect_neo4j_config_bundled_service_keeps_username_editable(
         "\n".join(
             [
                 "services:",
-                "  lightrag:",
-                "    image: example/lightrag:test",
+                "  ontorag:",
+                "    image: example/ontorag:test",
                 "    env_file:",
                 "      - .env",
             ]

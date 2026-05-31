@@ -2,13 +2,13 @@
 Unit tests for workspace label sanitization in Memgraph and Neo4j implementations.
 
 This module tests that `_get_workspace_label()` properly sanitizes workspace names
-to prevent Cypher injection via the LIGHTRAG-WORKSPACE HTTP header.
+to prevent Cypher injection via the ONTORAG-WORKSPACE HTTP header.
 
 It verifies that we preserve non-alphanumeric characters for 1-to-1 workspace mapping
 while successfully neutralizing Cypher injection by escaping backticks.
 
 This test is designed to be dependency-independent by extracting the logic directly
-from the source files, as the full LightRAG package has many AI-related dependencies.
+from the source files, as the full OntoRAG package has many AI-related dependencies.
 
 References: GitHub Issue #2698
 """
@@ -25,8 +25,8 @@ def get_actual_sanitization_logic():
     """Extract the sanitization logic from the source files to ensure we test the real code."""
     base_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     files = [
-        os.path.join(base_path, "lightrag/kg/memgraph_impl.py"),
-        os.path.join(base_path, "lightrag/kg/neo4j_impl.py"),
+        os.path.join(base_path, "ontorag/kg/memgraph_impl.py"),
+        os.path.join(base_path, "ontorag/kg/neo4j_impl.py"),
     ]
 
     logics = []

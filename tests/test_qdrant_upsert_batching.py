@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 from qdrant_client import models
 
-from lightrag.kg.qdrant_impl import QdrantVectorDBStorage
+from ontorag.kg.qdrant_impl import QdrantVectorDBStorage
 
 
 def _make_point(point_id: str, content: str) -> models.PointStruct:

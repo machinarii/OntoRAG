@@ -15,9 +15,9 @@ import pytest
 import numpy as np
 from unittest.mock import AsyncMock
 
-from lightrag.kg.networkx_impl import NetworkXStorage
-from lightrag.kg.shared_storage import initialize_share_data
-from lightrag.utils import EmbeddingFunc, make_relation_vdb_ids
+from ontorag.kg.networkx_impl import NetworkXStorage
+from ontorag.kg.shared_storage import initialize_share_data
+from ontorag.utils import EmbeddingFunc, make_relation_vdb_ids
 
 
 # ---------------------------------------------------------------------------
@@ -349,10 +349,10 @@ class TestAinsertCustomKgBatchPath:
     @pytest.mark.asyncio
     async def test_ainsert_custom_kg_calls_batch_methods(self):
         """upsert_nodes_batch, has_nodes_batch, upsert_edges_batch must all be called."""
-        from lightrag import LightRAG
+        from ontorag import OntoRAG
 
         with tempfile.TemporaryDirectory() as tmp:
-            rag = LightRAG(
+            rag = OntoRAG(
                 working_dir=tmp,
                 llm_model_func=AsyncMock(return_value=""),
                 embedding_func=mock_embedding_func,
@@ -387,7 +387,7 @@ class TestAinsertCustomKgBatchPath:
     @pytest.mark.asyncio
     async def test_ainsert_custom_kg_canonicalizes_file_paths_before_upsert(self):
         """custom KG ingestion normalizes file names before touching storage."""
-        from lightrag import LightRAG
+        from ontorag import OntoRAG
 
         custom_kg = self._make_custom_kg()
         for section in ("chunks", "entities", "relationships"):
@@ -395,7 +395,7 @@ class TestAinsertCustomKgBatchPath:
                 item["file_path"] = "/tmp/uploads/test.[native-Fi].pdf"
 
         with tempfile.TemporaryDirectory() as tmp:
-            rag = LightRAG(
+            rag = OntoRAG(
                 working_dir=tmp,
                 llm_model_func=AsyncMock(return_value=""),
                 embedding_func=mock_embedding_func,
@@ -430,7 +430,7 @@ class TestAinsertCustomKgBatchPath:
         implementing only the abstract methods (no batch overrides) still
         works via the default serial fallback.
         """
-        from lightrag.base import BaseGraphStorage
+        from ontorag.base import BaseGraphStorage
 
         # All three batch methods should exist on the base class
         assert hasattr(BaseGraphStorage, "upsert_nodes_batch")
@@ -440,7 +440,7 @@ class TestAinsertCustomKgBatchPath:
     @pytest.mark.offline
     def test_neo4j_has_nodes_batch_uses_read_retry(self):
         pytest.importorskip("neo4j")
-        from lightrag.kg.neo4j_impl import Neo4JStorage
+        from ontorag.kg.neo4j_impl import Neo4JStorage
 
         assert hasattr(Neo4JStorage.has_nodes_batch, "retry")
         assert hasattr(Neo4JStorage.upsert_nodes_batch, "retry")
@@ -453,10 +453,10 @@ class TestAinsertCustomKgBatchPath:
         Nodes referenced in relationships but not in the entity list must
         be created as placeholder UNKNOWN nodes.
         """
-        from lightrag import LightRAG
+        from ontorag import OntoRAG
 
         with tempfile.TemporaryDirectory() as tmp:
-            rag = LightRAG(
+            rag = OntoRAG(
                 working_dir=tmp,
                 llm_model_func=AsyncMock(return_value=""),
                 embedding_func=mock_embedding_func,
@@ -502,10 +502,10 @@ class TestAinsertCustomKgBatchPath:
     @pytest.mark.offline
     @pytest.mark.asyncio
     async def test_ainsert_custom_kg_deduplicates_entities_and_undirected_edges(self):
-        from lightrag import LightRAG
+        from ontorag import OntoRAG
 
         with tempfile.TemporaryDirectory() as tmp:
-            rag = LightRAG(
+            rag = OntoRAG(
                 working_dir=tmp,
                 llm_model_func=AsyncMock(return_value=""),
                 embedding_func=mock_embedding_func,
@@ -610,10 +610,10 @@ class TestAinsertCustomKgBatchPath:
     @pytest.mark.offline
     @pytest.mark.asyncio
     async def test_ainsert_custom_kg_keeps_legacy_relation_rows_if_upsert_fails(self):
-        from lightrag import LightRAG
+        from ontorag import OntoRAG
 
         with tempfile.TemporaryDirectory() as tmp:
-            rag = LightRAG(
+            rag = OntoRAG(
                 working_dir=tmp,
                 llm_model_func=AsyncMock(return_value=""),
                 embedding_func=mock_embedding_func,
@@ -673,10 +673,10 @@ class TestAinsertCustomKgBatchPath:
     @pytest.mark.offline
     @pytest.mark.asyncio
     async def test_get_relation_info_falls_back_to_legacy_relation_vdb_id(self):
-        from lightrag import LightRAG
+        from ontorag import OntoRAG
 
         with tempfile.TemporaryDirectory() as tmp:
-            rag = LightRAG(
+            rag = OntoRAG(
                 working_dir=tmp,
                 llm_model_func=AsyncMock(return_value=""),
                 embedding_func=mock_embedding_func,
@@ -760,7 +760,7 @@ class TestPostgresBatchOrdering:
     @pytest.mark.offline
     @pytest.mark.asyncio
     async def test_upsert_nodes_batch_preserves_last_write_wins(self):
-        from lightrag.kg.postgres_impl import PGGraphStorage
+        from ontorag.kg.postgres_impl import PGGraphStorage
 
         storage = PGGraphStorage.__new__(PGGraphStorage)
         call_log: list[tuple[str, str]] = []
@@ -787,7 +787,7 @@ class TestPostgresBatchOrdering:
     @pytest.mark.offline
     @pytest.mark.asyncio
     async def test_upsert_edges_batch_preserves_last_write_wins(self):
-        from lightrag.kg.postgres_impl import PGGraphStorage
+        from ontorag.kg.postgres_impl import PGGraphStorage
 
         storage = PGGraphStorage.__new__(PGGraphStorage)
         call_log: list[tuple[str, str, float]] = []
@@ -814,7 +814,7 @@ class TestMongoBatchOrdering:
     @pytest.mark.asyncio
     async def test_upsert_nodes_batch_uses_ordered_bulk_write(self):
         pytest.importorskip("pymongo")
-        from lightrag.kg.mongo_impl import MongoGraphStorage
+        from ontorag.kg.mongo_impl import MongoGraphStorage
 
         storage = MongoGraphStorage.__new__(MongoGraphStorage)
         storage.collection = AsyncMock()
@@ -833,7 +833,7 @@ class TestMongoBatchOrdering:
     @pytest.mark.asyncio
     async def test_upsert_edges_batch_uses_ordered_bulk_write(self):
         pytest.importorskip("pymongo")
-        from lightrag.kg.mongo_impl import MongoGraphStorage
+        from ontorag.kg.mongo_impl import MongoGraphStorage
 
         storage = MongoGraphStorage.__new__(MongoGraphStorage)
         storage.collection = AsyncMock()
@@ -853,7 +853,7 @@ class TestMongoBatchOrdering:
     @pytest.mark.asyncio
     async def test_upsert_edges_batch_deduplicates_source_node_upserts(self):
         pytest.importorskip("pymongo")
-        from lightrag.kg.mongo_impl import MongoGraphStorage
+        from ontorag.kg.mongo_impl import MongoGraphStorage
 
         storage = MongoGraphStorage.__new__(MongoGraphStorage)
         storage.collection = AsyncMock()

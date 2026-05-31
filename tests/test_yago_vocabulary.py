@@ -1,4 +1,4 @@
-"""Tests for lightrag.taxonomy.vocabulary."""
+"""Tests for ontorag.taxonomy.vocabulary."""
 
 from __future__ import annotations
 
@@ -7,19 +7,19 @@ from pathlib import Path
 import numpy as np
 import pytest_asyncio
 
-from lightrag.kg.networkx_impl import NetworkXStorage
-from lightrag.kg.shared_storage import (
+from ontorag.kg.networkx_impl import NetworkXStorage
+from ontorag.kg.shared_storage import (
     finalize_share_data,
     initialize_share_data,
 )
-from lightrag.namespace import NameSpace
-from lightrag.taxonomy.graph_loader import load_taxonomy_to_graph
-from lightrag.taxonomy.parser import parse_ntriples_file
-from lightrag.taxonomy.vocabulary import (
+from ontorag.namespace import NameSpace
+from ontorag.taxonomy.graph_loader import load_taxonomy_to_graph
+from ontorag.taxonomy.parser import parse_ntriples_file
+from ontorag.taxonomy.vocabulary import (
     count_descendants,
     select_working_vocabulary,
 )
-from lightrag.utils import EmbeddingFunc
+from ontorag.utils import EmbeddingFunc
 
 FIXTURE = Path(__file__).parent / "fixtures" / "yago" / "mini_taxonomy.nt"
 

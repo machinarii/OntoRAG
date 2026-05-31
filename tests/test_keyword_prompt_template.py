@@ -1,6 +1,6 @@
 import pytest
 
-from lightrag.prompt import PROMPTS
+from ontorag.prompt import PROMPTS
 
 
 @pytest.mark.offline

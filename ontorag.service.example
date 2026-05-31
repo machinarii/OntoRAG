@@ -1,0 +1,30 @@
+[Unit]
+Description=OntoRAG XYJ Service
+After=network.target
+
+[Service]
+Type=simple
+User=netman
+# Memory settings
+MemoryHigh=8G
+MemoryMax=12G
+
+# Set the OntoRAG installation directory (change this to match your installation path)
+Environment="ONTORAG_HOME=/home/netman/ontorag-xyj"
+
+# Set Environment to your Python virtual environment
+Environment="PATH=${ONTORAG_HOME}/.venv/bin"
+WorkingDirectory=${ONTORAG_HOME}
+ExecStart=${ONTORAG_HOME}/.venv/bin/ontorag-server
+# ExecStart=${ONTORAG_HOME}/.venv/bin/ontorag-gunicorn
+
+# Kill mode require ExecStart must be gunicorn or unvicorn main process
+KillMode=process
+ExecStop=/bin/kill -s TERM $MAINPID
+TimeoutStopSec=60
+
+Restart=always
+RestartSec=30
+
+[Install]
+WantedBy=multi-user.target

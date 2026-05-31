@@ -1,5 +1,5 @@
 <!--
-Thanks for contributing to LightRAG!
+Thanks for contributing to OntoRAG!
 
 Please ensure your pull request is ready for review before submitting.
 

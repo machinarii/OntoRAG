@@ -7,7 +7,7 @@ from pathlib import Path
 
 import numpy as np
 
-from lightrag.utils import EmbeddingFunc
+from ontorag.utils import EmbeddingFunc
 
 ROOT = Path(__file__).resolve().parent.parent
 SCRIPT_PATH = ROOT / "scripts" / "yago" / "build_yago_taxonomy.py"

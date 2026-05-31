@@ -1,5 +1,5 @@
 """
-Pytest configuration for LightRAG tests.
+Pytest configuration for OntoRAG tests.
 
 This file provides command-line options and fixtures for test configuration.
 """
@@ -11,7 +11,7 @@ import pytest
 def _hermetic_mineru_env(monkeypatch):
     """Make every test start with parser-routing env vars in their unset state.
 
-    ``lightrag/api/{auth,config}.py`` call ``load_dotenv(override=False)``
+    ``ontorag/api/{auth,config}.py`` call ``load_dotenv(override=False)``
     at import time, leaking the developer's local ``.env`` into the test
     process. The MinerU test fixtures assume ``MINERU_API_MODE`` is unset
     (so it defaults to ``"local"`` per ``MinerURawClient.__init__`` /
@@ -24,7 +24,7 @@ def _hermetic_mineru_env(monkeypatch):
       ``"MINERU_API_TOKEN"`` instead of ``"MINERU_LOCAL_ENDPOINT"``,
       breaking the validation-error string match.
 
-    ``LIGHTRAG_PARSER`` is cleared for the same reason: a routing rule
+    ``ONTORAG_PARSER`` is cleared for the same reason: a routing rule
     like ``docx:mineru-iet`` in the developer's ``.env`` forces
     ``parser_routing.validate_parser_routing_config`` to require the
     corresponding endpoint (``MINERU_LOCAL_ENDPOINT`` /
@@ -40,12 +40,12 @@ def _hermetic_mineru_env(monkeypatch):
     monkeypatch.delenv("MINERU_API_TOKEN", raising=False)
     monkeypatch.delenv("MINERU_LOCAL_ENDPOINT", raising=False)
     monkeypatch.delenv("MINERU_OFFICIAL_ENDPOINT", raising=False)
-    monkeypatch.delenv("LIGHTRAG_PARSER", raising=False)
+    monkeypatch.delenv("ONTORAG_PARSER", raising=False)
     monkeypatch.delenv("DOCLING_ENDPOINT", raising=False)
 
 
 def pytest_configure(config):
-    """Register custom markers for LightRAG tests."""
+    """Register custom markers for OntoRAG tests."""
     config.addinivalue_line(
         "markers", "offline: marks tests as offline (no external dependencies)"
     )
@@ -55,12 +55,12 @@ def pytest_configure(config):
     )
     config.addinivalue_line("markers", "requires_db: marks tests requiring database")
     config.addinivalue_line(
-        "markers", "requires_api: marks tests requiring LightRAG API server"
+        "markers", "requires_api: marks tests requiring OntoRAG API server"
     )
 
 
 def pytest_addoption(parser):
-    """Add custom command-line options for LightRAG tests."""
+    """Add custom command-line options for OntoRAG tests."""
 
     parser.addoption(
         "--keep-artifacts",
@@ -125,7 +125,7 @@ def keep_test_artifacts(request):
         return True
 
     # Fall back to environment variable
-    return os.getenv("LIGHTRAG_KEEP_ARTIFACTS", "false").lower() == "true"
+    return os.getenv("ONTORAG_KEEP_ARTIFACTS", "false").lower() == "true"
 
 
 @pytest.fixture(scope="session")
@@ -142,7 +142,7 @@ def stress_test_mode(request):
         return True
 
     # Fall back to environment variable
-    return os.getenv("LIGHTRAG_STRESS_TEST", "false").lower() == "true"
+    return os.getenv("ONTORAG_STRESS_TEST", "false").lower() == "true"
 
 
 @pytest.fixture(scope="session")
@@ -160,7 +160,7 @@ def parallel_workers(request):
         return cli_workers
 
     # Fall back to environment variable
-    return int(os.getenv("LIGHTRAG_TEST_WORKERS", "3"))
+    return int(os.getenv("ONTORAG_TEST_WORKERS", "3"))
 
 
 @pytest.fixture(scope="session")
@@ -177,4 +177,4 @@ def run_integration_tests(request):
         return True
 
     # Fall back to environment variable
-    return os.getenv("LIGHTRAG_RUN_INTEGRATION", "false").lower() == "true"
+    return os.getenv("ONTORAG_RUN_INTEGRATION", "false").lower() == "true"

@@ -9,7 +9,7 @@ This test suite validates:
 import asyncio
 import pytest
 from unittest.mock import MagicMock, patch
-from lightrag.kg.milvus_impl import MilvusVectorDBStorage, MilvusIndexConfig
+from ontorag.kg.milvus_impl import MilvusVectorDBStorage, MilvusIndexConfig
 
 
 @pytest.mark.offline
@@ -234,7 +234,7 @@ class TestMilvusIndexCreation:
         mock_lock = AsyncMock()
 
         with patch(
-            "lightrag.kg.milvus_impl.get_data_init_lock", return_value=mock_lock
+            "ontorag.kg.milvus_impl.get_data_init_lock", return_value=mock_lock
         ):
             with patch.object(storage, "_create_collection_if_not_exist"):
                 asyncio.run(storage.initialize())
@@ -271,7 +271,7 @@ class TestMilvusIndexCreation:
         mock_lock = AsyncMock()
 
         with patch(
-            "lightrag.kg.milvus_impl.get_data_init_lock", return_value=mock_lock
+            "ontorag.kg.milvus_impl.get_data_init_lock", return_value=mock_lock
         ):
             with patch.object(storage, "_create_collection_if_not_exist"):
                 asyncio.run(storage.initialize())
@@ -291,7 +291,7 @@ class TestMilvusIndexCreation:
             workspace="space1",
             global_config={
                 "embedding_batch_num": 100,
-                "working_dir": "/tmp/lightrag",
+                "working_dir": "/tmp/ontorag",
                 "vector_db_storage_cls_kwargs": {
                     "cosine_better_than_threshold": 0.3,
                 },
@@ -308,15 +308,15 @@ class TestMilvusIndexCreation:
             "os.environ",
             {
                 "MILVUS_URI": "http://milvus:19530",
-                "MILVUS_DB_NAME": "lightrag",
+                "MILVUS_DB_NAME": "ontorag",
             },
             clear=False,
         ):
             with patch(
-                "lightrag.kg.milvus_impl.MilvusClient", return_value=bootstrap_client
+                "ontorag.kg.milvus_impl.MilvusClient", return_value=bootstrap_client
             ) as mock_client_cls:
                 with patch(
-                    "lightrag.kg.milvus_impl.get_data_init_lock",
+                    "ontorag.kg.milvus_impl.get_data_init_lock",
                     return_value=mock_lock,
                 ):
                     with patch.object(storage, "_create_collection_if_not_exist"):
@@ -329,8 +329,8 @@ class TestMilvusIndexCreation:
             token=None,
         )
         bootstrap_client.list_databases.assert_called_once_with()
-        bootstrap_client.create_database.assert_called_once_with("lightrag")
-        bootstrap_client.use_database.assert_called_once_with("lightrag")
+        bootstrap_client.create_database.assert_called_once_with("ontorag")
+        bootstrap_client.use_database.assert_called_once_with("ontorag")
 
     def test_initialize_uses_existing_database_without_recreating_it(self):
         """Test that initialize switches to an existing configured Milvus database."""
@@ -344,7 +344,7 @@ class TestMilvusIndexCreation:
             workspace="space1",
             global_config={
                 "embedding_batch_num": 100,
-                "working_dir": "/tmp/lightrag",
+                "working_dir": "/tmp/ontorag",
                 "vector_db_storage_cls_kwargs": {
                     "cosine_better_than_threshold": 0.3,
                 },
@@ -354,22 +354,22 @@ class TestMilvusIndexCreation:
         )
 
         bootstrap_client = MagicMock()
-        bootstrap_client.list_databases.return_value = ["default", "lightrag"]
+        bootstrap_client.list_databases.return_value = ["default", "ontorag"]
         mock_lock = AsyncMock()
 
         with patch.dict(
             "os.environ",
             {
                 "MILVUS_URI": "http://milvus:19530",
-                "MILVUS_DB_NAME": "lightrag",
+                "MILVUS_DB_NAME": "ontorag",
             },
             clear=False,
         ):
             with patch(
-                "lightrag.kg.milvus_impl.MilvusClient", return_value=bootstrap_client
+                "ontorag.kg.milvus_impl.MilvusClient", return_value=bootstrap_client
             ):
                 with patch(
-                    "lightrag.kg.milvus_impl.get_data_init_lock",
+                    "ontorag.kg.milvus_impl.get_data_init_lock",
                     return_value=mock_lock,
                 ):
                     with patch.object(storage, "_create_collection_if_not_exist"):
@@ -377,7 +377,7 @@ class TestMilvusIndexCreation:
 
         bootstrap_client.list_databases.assert_called_once_with()
         bootstrap_client.create_database.assert_not_called()
-        bootstrap_client.use_database.assert_called_once_with("lightrag")
+        bootstrap_client.use_database.assert_called_once_with("ontorag")
 
     def test_existing_collection_missing_vector_index_is_repaired(self):
         """Existing collections missing vector indexes should be repaired automatically."""
@@ -389,7 +389,7 @@ class TestMilvusIndexCreation:
             workspace="space1",
             global_config={
                 "embedding_batch_num": 100,
-                "working_dir": "/tmp/lightrag",
+                "working_dir": "/tmp/ontorag",
                 "vector_db_storage_cls_kwargs": {
                     "cosine_better_than_threshold": 0.3,
                 },
@@ -430,7 +430,7 @@ class TestMilvusIndexCreation:
             workspace="space1",
             global_config={
                 "embedding_batch_num": 100,
-                "working_dir": "/tmp/lightrag",
+                "working_dir": "/tmp/ontorag",
                 "vector_db_storage_cls_kwargs": {
                     "cosine_better_than_threshold": 0.3,
                 },
@@ -472,7 +472,7 @@ class TestMilvusIndexCreation:
             workspace="space1",
             global_config={
                 "embedding_batch_num": 100,
-                "working_dir": "/tmp/lightrag",
+                "working_dir": "/tmp/ontorag",
                 "vector_db_storage_cls_kwargs": {
                     "cosine_better_than_threshold": 0.3,
                 },

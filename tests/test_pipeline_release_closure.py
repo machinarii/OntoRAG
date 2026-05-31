@@ -5,19 +5,19 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from lightrag import LightRAG, ROLES, RoleLLMConfig
-from lightrag.base import DocStatus
-from lightrag.constants import (
+from ontorag import OntoRAG, ROLES, RoleLLMConfig
+from ontorag.base import DocStatus
+from ontorag.constants import (
     FULL_DOCS_FORMAT_PENDING_PARSE,
     PARSED_DIR_NAME,
     PARSER_ENGINE_MINERU,
     PARSER_ENGINE_NATIVE,
 )
-from lightrag.operate import (
+from ontorag.operate import (
     _get_relationship_vdb_timeout_seconds,
     _parse_mm_display_name,
 )
-from lightrag.parser_routing import (
+from ontorag.parser_routing import (
     FilenameParserHintError,
     ParserRoutingConfigError,
     canonicalize_parser_hinted_basename,
@@ -25,7 +25,7 @@ from lightrag.parser_routing import (
     resolve_stored_document_parser_engine,
     validate_parser_routing_config,
 )
-from lightrag.utils import (
+from ontorag.utils import (
     EmbeddingFunc,
     Tokenizer,
     compute_mdhash_id,
@@ -57,7 +57,7 @@ _ROLE_FIELD_SUFFIXES = (
 )
 
 
-def _new_rag(tmp_path: Path, **kwargs) -> LightRAG:
+def _new_rag(tmp_path: Path, **kwargs) -> OntoRAG:
     role_configs: dict[str, RoleLLMConfig] = {}
     for spec in ROLES:
         bucket = {}
@@ -74,7 +74,7 @@ def _new_rag(tmp_path: Path, **kwargs) -> LightRAG:
     # helper drives several VLM-specific tests, so default the switch ON.
     kwargs.setdefault("vlm_process_enable", True)
 
-    return LightRAG(
+    return OntoRAG(
         working_dir=str(tmp_path),
         workspace=f"test-release-closure-{tmp_path.name}",
         llm_model_func=_mock_llm,
@@ -96,7 +96,7 @@ def test_parse_engine_routing_by_filename_and_env(monkeypatch):
     )
 
     monkeypatch.setenv("MINERU_LOCAL_ENDPOINT", "http://fake-mineru")
-    monkeypatch.setenv("LIGHTRAG_PARSER", "pdf:mineru-iet,*:native")
+    monkeypatch.setenv("ONTORAG_PARSER", "pdf:mineru-iet,*:native")
     assert resolve_stored_document_parser_engine("paper.pdf", {}) == "mineru"
     assert (
         resolve_stored_document_parser_engine("paper.pdf", {"parse_engine": "native"})
@@ -106,14 +106,14 @@ def test_parse_engine_routing_by_filename_and_env(monkeypatch):
 
 @pytest.mark.offline
 def test_parse_engine_rule_fallback_and_default_legacy(monkeypatch):
-    monkeypatch.setenv("LIGHTRAG_PARSER", "pdf:native,*:legacy")
+    monkeypatch.setenv("ONTORAG_PARSER", "pdf:native,*:legacy")
     assert resolve_stored_document_parser_engine("paper.pdf", {}) == "legacy"
 
-    monkeypatch.setenv("LIGHTRAG_PARSER", "pptx:docling,*:legacy")
+    monkeypatch.setenv("ONTORAG_PARSER", "pptx:docling,*:legacy")
     monkeypatch.delenv("DOCLING_ENDPOINT", raising=False)
     assert resolve_stored_document_parser_engine("slides.pptx", {}) == "legacy"
 
-    monkeypatch.delenv("LIGHTRAG_PARSER", raising=False)
+    monkeypatch.delenv("ONTORAG_PARSER", raising=False)
     monkeypatch.delenv("MINERU_LOCAL_ENDPOINT", raising=False)
     assert resolve_stored_document_parser_engine("slides.pptx", {}) == "legacy"
 
@@ -153,7 +153,7 @@ def test_canonicalize_parser_hinted_basename():
 
 @pytest.mark.offline
 def test_filename_parser_directives_decodes_engine_and_options():
-    from lightrag.parser_routing import filename_parser_directives
+    from ontorag.parser_routing import filename_parser_directives
 
     assert filename_parser_directives("paper.[native-iet].docx") == ("native", "iet")
     assert filename_parser_directives("memo.[native-R!].md") == ("native", "R!")
@@ -171,7 +171,7 @@ def test_filename_hint_rejects_invalid_engine_qualified_options():
     during parser directive resolution instead of silently falling back to
     parser rules/defaults.
     """
-    from lightrag.parser_routing import (
+    from ontorag.parser_routing import (
         canonicalize_parser_hinted_basename,
         filename_parser_directives,
         resolve_file_parser_directives,
@@ -216,7 +216,7 @@ def test_filename_hint_rejects_invalid_engine_qualified_options():
 
 @pytest.mark.offline
 def test_filename_hint_missing_required_endpoint_rejects(monkeypatch):
-    from lightrag.parser_routing import resolve_file_parser_directives
+    from ontorag.parser_routing import resolve_file_parser_directives
 
     monkeypatch.delenv("DOCLING_ENDPOINT", raising=False)
 
@@ -226,7 +226,7 @@ def test_filename_hint_missing_required_endpoint_rejects(monkeypatch):
 
 @pytest.mark.offline
 def test_parse_process_options_decodes_flags():
-    from lightrag.parser_routing import parse_process_options
+    from ontorag.parser_routing import parse_process_options
 
     opts = parse_process_options("iet")
     assert opts.images and opts.tables and opts.equations
@@ -247,7 +247,7 @@ def test_parse_process_options_decodes_flags():
 
 @pytest.mark.offline
 def test_validate_process_options_rejects_invalid_combos():
-    from lightrag.parser_routing import validate_process_options
+    from ontorag.parser_routing import validate_process_options
 
     assert validate_process_options("iet") == []
     assert validate_process_options("R!") == []
@@ -263,7 +263,7 @@ def test_validate_process_options_rejects_invalid_combos():
 
 
 @pytest.mark.offline
-def test_lightrag_parser_rule_supports_options_suffix(monkeypatch):
+def test_ontorag_parser_rule_supports_options_suffix(monkeypatch):
     monkeypatch.setenv("MINERU_LOCAL_ENDPOINT", "http://fake-mineru")
     monkeypatch.delenv("DOCLING_ENDPOINT", raising=False)
     # Valid options suffix passes validation.
@@ -279,17 +279,17 @@ def test_lightrag_parser_rule_supports_options_suffix(monkeypatch):
 
 @pytest.mark.offline
 def test_resolve_file_parser_directives_priority(monkeypatch):
-    from lightrag.parser_routing import resolve_file_parser_directives
+    from ontorag.parser_routing import resolve_file_parser_directives
 
     monkeypatch.setenv("MINERU_LOCAL_ENDPOINT", "http://fake-mineru")
-    monkeypatch.setenv("LIGHTRAG_PARSER", "docx:native-iet,*:legacy")
+    monkeypatch.setenv("ONTORAG_PARSER", "docx:native-iet,*:legacy")
 
     # Filename hint takes precedence for engine and options.
     engine, options = resolve_file_parser_directives("paper.[native-R!].docx")
     assert engine == "native"
     assert options == "R!"
 
-    # No filename hint → fall through to LIGHTRAG_PARSER defaults for both.
+    # No filename hint → fall through to ONTORAG_PARSER defaults for both.
     engine, options = resolve_file_parser_directives("plain.docx")
     assert engine == "native"
     assert options == "iet"
@@ -306,7 +306,7 @@ def test_doc_status_metadata_carry_over_helper():
     and layers in any transition-specific extras passed via ``extra=``.
     Empty / missing carry-over fields are dropped, not written as null.
     """
-    from lightrag.utils_pipeline import doc_status_transition_metadata
+    from ontorag.utils_pipeline import doc_status_transition_metadata
 
     class _StubStatusDoc:
         def __init__(self, metadata):
@@ -433,7 +433,7 @@ def test_purge_doc_chunks_and_kg_is_noop_for_empty_chunks(tmp_path):
     """
 
     async def _run():
-        from lightrag.kg.shared_storage import (
+        from ontorag.kg.shared_storage import (
             get_namespace_data,
             get_namespace_lock,
         )
@@ -478,7 +478,7 @@ def test_purge_doc_chunks_and_kg_clears_chunks_for_unknown_doc(tmp_path):
     """
 
     async def _run():
-        from lightrag.kg.shared_storage import (
+        from ontorag.kg.shared_storage import (
             get_namespace_data,
             get_namespace_lock,
         )
@@ -713,7 +713,7 @@ def test_apipeline_enqueue_allows_concurrent_with_busy(tmp_path):
     """
 
     async def _run():
-        from lightrag.kg.shared_storage import (
+        from ontorag.kg.shared_storage import (
             get_namespace_data,
             get_namespace_lock,
         )
@@ -762,7 +762,7 @@ def test_apipeline_enqueue_rejects_when_scanning(tmp_path):
     """
 
     async def _run():
-        from lightrag.kg.shared_storage import (
+        from ontorag.kg.shared_storage import (
             get_namespace_data,
             get_namespace_lock,
         )
@@ -837,7 +837,7 @@ def test_enqueue_during_busy_sets_request_pending(tmp_path):
     """
 
     async def _run():
-        from lightrag.kg.shared_storage import (
+        from ontorag.kg.shared_storage import (
             get_namespace_data,
             get_namespace_lock,
         )
@@ -915,7 +915,7 @@ def test_atomic_release_busy_or_consume_pending(tmp_path):
     """
 
     async def _run():
-        from lightrag.kg.shared_storage import (
+        from ontorag.kg.shared_storage import (
             get_namespace_data,
             get_namespace_lock,
         )
@@ -975,7 +975,7 @@ def test_apipeline_enqueue_rejects_when_destructive_busy(tmp_path):
     """
 
     async def _run():
-        from lightrag.kg.shared_storage import (
+        from ontorag.kg.shared_storage import (
             get_namespace_data,
             get_namespace_lock,
         )
@@ -1043,7 +1043,7 @@ def test_concurrent_enqueue_dedupes_same_content_different_filenames(tmp_path):
     """
 
     async def _run():
-        import lightrag.pipeline as pipeline_module
+        import ontorag.pipeline as pipeline_module
 
         rag = _new_rag(tmp_path)
         await rag.initialize_storages()
@@ -1134,7 +1134,7 @@ def test_apipeline_enqueue_from_scan_bypasses_scanning_guard(tmp_path):
     """
 
     async def _run():
-        from lightrag.kg.shared_storage import (
+        from ontorag.kg.shared_storage import (
             get_namespace_data,
             get_namespace_lock,
         )
@@ -1603,7 +1603,7 @@ def test_content_hash_lookup_via_storage(tmp_path):
 
 
 @pytest.mark.offline
-def test_lightrag_format_uses_blocks_file_hash(tmp_path, monkeypatch):
+def test_ontorag_format_uses_blocks_file_hash(tmp_path, monkeypatch):
     async def _run():
         input_dir = tmp_path / "input"
         parsed_dir = input_dir / "__parsed__"
@@ -1625,24 +1625,24 @@ def test_lightrag_format_uses_blocks_file_hash(tmp_path, monkeypatch):
 
             # Enqueue twice with different filenames pointing at the same
             # blocks file: the second one must be rejected as content_hash dup.
-            # ``content`` arg is ignored on the LIGHTRAG path — the LightRAG
+            # ``content`` arg is ignored on the ONTORAG path — the OntoRAG
             # Document file is read to derive both content_hash and the
             # ``{{LRdoc}}`` summary — so any string here is fine.
             await rag.apipeline_enqueue_documents(
                 "",
-                file_paths="first.lightrag",
-                docs_format="lightrag",
-                lightrag_document_paths="__parsed__/doc.blocks.jsonl",
+                file_paths="first.ontorag",
+                docs_format="ontorag",
+                ontorag_document_paths="__parsed__/doc.blocks.jsonl",
                 track_id="track-a",
             )
             await rag.apipeline_enqueue_documents(
                 "",
-                file_paths="second.lightrag",
-                docs_format="lightrag",
-                lightrag_document_paths="__parsed__/doc.blocks.jsonl",
+                file_paths="second.ontorag",
+                docs_format="ontorag",
+                ontorag_document_paths="__parsed__/doc.blocks.jsonl",
                 track_id="track-b",
             )
-            second_id = compute_mdhash_id("second.lightrag", prefix="doc-")
+            second_id = compute_mdhash_id("second.ontorag", prefix="doc-")
             assert await rag.full_docs.get_by_id(second_id) is None
 
             failed = await rag.doc_status.get_docs_by_status(DocStatus.FAILED)
@@ -1821,7 +1821,7 @@ def test_pending_parse_duplicate_hash_fails_and_archives_source(tmp_path, monkey
     """Two PENDING_PARSE docx files with identical extracted bodies must be
     detected as content_hash duplicates and the loser archived.
 
-    ``content_hash`` for LIGHTRAG-format docs is the MD5 of the normalized
+    ``content_hash`` for ONTORAG-format docs is the MD5 of the normalized
     ``merged_text`` (sidecar item ids and ``<base>.blocks.assets/`` prefixes
     stripped via :func:`normalize_merged_text_for_hash`), so identical
     bodies under different filenames produce the same hash and
@@ -1837,15 +1837,15 @@ def test_pending_parse_duplicate_hash_fails_and_archives_source(tmp_path, monkey
         try:
             from datetime import datetime, timezone
 
-            import lightrag.lightrag as lightrag_module
-            import lightrag.pipeline as pipeline_module
+            import ontorag.ontorag as ontorag_module
+            import ontorag.pipeline as pipeline_module
 
             class _FrozenDateTime(datetime):
                 @classmethod
                 def now(cls, tz=None):  # noqa: D401
                     return datetime(2026, 1, 1, tzinfo=tz or timezone.utc)
 
-            monkeypatch.setattr(lightrag_module, "datetime", _FrozenDateTime)
+            monkeypatch.setattr(ontorag_module, "datetime", _FrozenDateTime)
             monkeypatch.setattr(pipeline_module, "datetime", _FrozenDateTime)
 
             # Both docx files emit the same blocks list, so combined with the
@@ -1861,7 +1861,7 @@ def test_pending_parse_duplicate_hash_fails_and_archives_source(tmp_path, monkey
                 "table_chunk_role": "none",
             }
             monkeypatch.setattr(
-                "lightrag.native_parser.docx.parse_document.extract_docx_blocks",
+                "ontorag.native_parser.docx.parse_document.extract_docx_blocks",
                 lambda *args, **kwargs: [dict(stable_block)],
             )
 
@@ -2001,7 +2001,7 @@ def test_three_phase_status_flow(tmp_path, monkeypatch):
             return parsed_data
 
         monkeypatch.setattr(rag, "_process_extract_entities", _fake_extract)
-        monkeypatch.setattr("lightrag.pipeline.merge_nodes_and_edges", _fake_merge)
+        monkeypatch.setattr("ontorag.pipeline.merge_nodes_and_edges", _fake_merge)
         monkeypatch.setattr(rag, "parse_native", _fake_parse_native)
         monkeypatch.setattr(rag, "analyze_multimodal", _fake_analyze)
 
@@ -2104,7 +2104,7 @@ def test_analyze_multimodal_invalid_json_hard_fails(tmp_path):
             "blocks_path": str(blocks),
             "content": "body",
         }
-        from lightrag.exceptions import MultimodalAnalysisError
+        from ontorag.exceptions import MultimodalAnalysisError
 
         with pytest.raises(MultimodalAnalysisError):
             await rag.analyze_multimodal(
@@ -2336,7 +2336,7 @@ def test_analyze_multimodal_skips_tiny_image_without_vlm_call(tmp_path):
 
 
 @pytest.mark.offline
-def test_write_lightrag_document_preserves_headings_and_table_dimensions(
+def test_write_ontorag_document_preserves_headings_and_table_dimensions(
     tmp_path, monkeypatch
 ):
     async def _run():
@@ -2369,7 +2369,7 @@ def test_write_lightrag_document_preserves_headings_and_table_dimensions(
             },
         ]
 
-        parsed = await rag._write_lightrag_document_from_content_list(
+        parsed = await rag._write_ontorag_document_from_content_list(
             doc_id="doc-1",
             file_path="demo.docx",
             content_list=content_list,
@@ -2428,7 +2428,7 @@ def test_write_lightrag_document_preserves_headings_and_table_dimensions(
 
 
 @pytest.mark.offline
-def test_write_lightrag_document_strips_parser_hint_from_artifact_names(
+def test_write_ontorag_document_strips_parser_hint_from_artifact_names(
     tmp_path, monkeypatch
 ):
     async def _run():
@@ -2439,7 +2439,7 @@ def test_write_lightrag_document_strips_parser_hint_from_artifact_names(
             source_path = tmp_path / "demo.[native].docx"
             source_path.write_bytes(b"docx bytes")
 
-            parsed = await rag._write_lightrag_document_from_content_list(
+            parsed = await rag._write_ontorag_document_from_content_list(
                 doc_id="doc-hinted",
                 file_path="demo.[native].docx",
                 content_list=[{"type": "text", "text": "body"}],
@@ -2582,7 +2582,7 @@ def test_parser_source_resolver_prefers_exact_canonical_file(tmp_path, monkeypat
 
 
 @pytest.mark.offline
-def test_parse_mineru_to_lightrag_document(tmp_path, monkeypatch):
+def test_parse_mineru_to_ontorag_document(tmp_path, monkeypatch):
     """End-to-end: parse_mineru routes through MinerURawClient + sidecar
     writer and produces spec-compliant *.parsed/ + *.mineru_raw/ artifacts.
 
@@ -2590,10 +2590,10 @@ def test_parse_mineru_to_lightrag_document(tmp_path, monkeypatch):
     cache), the MinerU download choreography happens inside
     :meth:`MinerURawClient.download_into`. We stub that method directly.
     """
-    from lightrag.external_parser.mineru import compute_size_and_hash
-    from lightrag.external_parser.mineru.cache import current_mineru_options_signature
-    from lightrag.external_parser.mineru.client import MinerURawClient
-    from lightrag.external_parser.mineru.manifest import (
+    from ontorag.external_parser.mineru import compute_size_and_hash
+    from ontorag.external_parser.mineru.cache import current_mineru_options_signature
+    from ontorag.external_parser.mineru.client import MinerURawClient
+    from ontorag.external_parser.mineru.manifest import (
         Manifest,
         ManifestFile,
         write_manifest,
@@ -2667,7 +2667,7 @@ def test_parse_mineru_to_lightrag_document(tmp_path, monkeypatch):
             content_data={"content": ""},
         )
 
-        assert parsed["parse_format"] == "lightrag"
+        assert parsed["parse_format"] == "ontorag"
         assert parsed["blocks_path"]
         blocks_path = Path(parsed["blocks_path"])
         assert blocks_path.exists()
@@ -2675,7 +2675,7 @@ def test_parse_mineru_to_lightrag_document(tmp_path, monkeypatch):
         lines = blocks_path.read_text(encoding="utf-8").splitlines()
         meta = json.loads(lines[0])
         assert meta["type"] == "meta"
-        assert meta["format"] == "lightrag"
+        assert meta["format"] == "ontorag"
         assert meta["drawing_file"] is True
         assert meta["table_file"] is True
         assert meta["equation_file"] is True
@@ -2691,7 +2691,7 @@ def test_parse_mineru_to_lightrag_document(tmp_path, monkeypatch):
         assert equations["equations"]
 
         full_doc = await rag.full_docs.get_by_id("doc-1")
-        assert full_doc["parse_format"] == "lightrag"
+        assert full_doc["parse_format"] == "ontorag"
         # Per docs/FileProcessingConfiguration-zh.md spec, ``content`` is now
         # ``{{LRdoc}}`` followed by a leading-text summary of the document.
         assert full_doc["content"].startswith("{{LRdoc}}")
@@ -2706,10 +2706,10 @@ def test_parse_mineru_to_lightrag_document(tmp_path, monkeypatch):
 
 @pytest.mark.offline
 def test_parse_mineru_uses_hint_source_and_canonical_upload_name(tmp_path, monkeypatch):
-    from lightrag.external_parser.mineru import compute_size_and_hash
-    from lightrag.external_parser.mineru.cache import current_mineru_options_signature
-    from lightrag.external_parser.mineru.client import MinerURawClient
-    from lightrag.external_parser.mineru.manifest import (
+    from ontorag.external_parser.mineru import compute_size_and_hash
+    from ontorag.external_parser.mineru.cache import current_mineru_options_signature
+    from ontorag.external_parser.mineru.client import MinerURawClient
+    from ontorag.external_parser.mineru.manifest import (
         Manifest,
         ManifestFile,
         write_manifest,
@@ -2724,8 +2724,8 @@ def test_parse_mineru_uses_hint_source_and_canonical_upload_name(tmp_path, monke
         rag = _new_rag(tmp_path / "work")
         await rag.initialize_storages()
 
-        hinted_name = "LightRAG - Simple and Fast RAG.[mineru].pdf"
-        canonical_name = "LightRAG - Simple and Fast RAG.pdf"
+        hinted_name = "OntoRAG - Simple and Fast RAG.[mineru].pdf"
+        canonical_name = "OntoRAG - Simple and Fast RAG.pdf"
         src_file = input_dir / hinted_name
         src_file.write_bytes(b"fake-pdf")
 
@@ -2790,7 +2790,7 @@ def test_parse_mineru_uses_hint_source_and_canonical_upload_name(tmp_path, monke
         expected_raw_dir = (
             input_dir
             / PARSED_DIR_NAME
-            / ("LightRAG - Simple and Fast RAG.pdf.mineru_raw")
+            / ("OntoRAG - Simple and Fast RAG.pdf.mineru_raw")
         )
         archived_source = input_dir / PARSED_DIR_NAME / hinted_name
 
@@ -2817,7 +2817,7 @@ def test_mm_chunks_and_modality_relations_from_sidecars(tmp_path):
                     json.dumps(
                         {
                             "type": "meta",
-                            "format": "lightrag",
+                            "format": "ontorag",
                             "version": "1.0",
                             "doc_id": "doc-1",
                         },
@@ -3057,7 +3057,7 @@ def test_parse_mineru_empty_service_result_raises_without_fallback(
     ``normalize_from_workdir`` raises :class:`FileNotFoundError` and the
     parse fails fast.
     """
-    from lightrag.external_parser.mineru.client import MinerURawClient
+    from ontorag.external_parser.mineru.client import MinerURawClient
 
     async def _run():
         rag = _new_rag(tmp_path)
@@ -3092,7 +3092,7 @@ def test_build_chunks_dict_preserves_existing_llm_cache_list():
     a chunk's pre-existing llm_cache_list — multimodal chunks arrive with
     analysis cache ids already attached so document deletion can clean
     them up via the per-chunk llm_cache_list."""
-    from lightrag.utils_pipeline import build_chunks_dict_from_chunking_result
+    from ontorag.utils_pipeline import build_chunks_dict_from_chunking_result
 
     chunking_result = [
         {
@@ -3240,7 +3240,7 @@ def test_strip_internal_multimodal_markup_cleans_table_id():
     their internal id stripped before the entity-extraction prompt sees
     them. ``format`` / ``caption`` and the row body stay verbatim so the
     extractor still recognizes the structured element."""
-    from lightrag.chunk_schema import (
+    from ontorag.chunk_schema import (
         strip_internal_multimodal_markup_for_extraction,
     )
 
@@ -3268,7 +3268,7 @@ def test_strip_internal_multimodal_markup_cite_default_unwraps():
     test pins the default to prevent regressions on the extraction
     path when callers refactor the function signature.
     """
-    from lightrag.chunk_schema import (
+    from ontorag.chunk_schema import (
         strip_internal_multimodal_markup_for_extraction,
     )
 
@@ -3293,7 +3293,7 @@ def test_strip_internal_multimodal_markup_cite_keep_tag_strips_refid_only():
     internal ``refid``.  Other identifier transformations
     (``<table id=…>`` / ``<drawing id=…/>`` / ``<equation id=…>``) are
     unaffected by the flag and still apply."""
-    from lightrag.chunk_schema import (
+    from ontorag.chunk_schema import (
         strip_internal_multimodal_markup_for_extraction,
     )
 

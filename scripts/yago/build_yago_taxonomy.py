@@ -1,16 +1,16 @@
-"""Bootstrap the YAGO taxonomy layer in a LightRAG working directory.
+"""Bootstrap the YAGO taxonomy layer in a OntoRAG working directory.
 
 Parses one or more YAGO N-Triples files, loads the class graph into the
 yago_taxonomy namespace, selects a working vocabulary by descendant count,
 and builds the YAGO class vector index against the working vocabulary.
 
 This script directly instantiates the storage backends rather than booting
-a full LightRAG instance — it doesn't need any of the LLM/embedding/role
+a full OntoRAG instance — it doesn't need any of the LLM/embedding/role
 machinery beyond `embedding_func`. The taxonomy lives in its own
 namespaces and is consumed at query/ingest time by Plan B's wiring.
 
 Defaults to parsing the YAGO 4.0 T-Box files pinned at
-/Users/jin/OntoRAG/yago/ (see lightrag.taxonomy.manifest). When invoked
+/Users/jin/OntoRAG/yago/ (see ontorag.taxonomy.manifest). When invoked
 through `main()` the SHA256 manifest is verified first; tests calling
 `build_taxonomy()` directly bypass the check and supply their own files.
 
@@ -38,26 +38,26 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from lightrag.kg.nano_vector_db_impl import NanoVectorDBStorage
-from lightrag.kg.networkx_impl import NetworkXStorage
-from lightrag.kg.shared_storage import (
+from ontorag.kg.nano_vector_db_impl import NanoVectorDBStorage
+from ontorag.kg.networkx_impl import NetworkXStorage
+from ontorag.kg.shared_storage import (
     finalize_share_data,
     initialize_share_data,
 )
-from lightrag.namespace import NameSpace
-from lightrag.taxonomy import (
+from ontorag.namespace import NameSpace
+from ontorag.taxonomy import (
     DEFAULT_WORKING_VOCABULARY_SIZE,
     build_class_index,
     load_taxonomy_to_graph,
     parse_ntriples_file,
     select_working_vocabulary,
 )
-from lightrag.taxonomy.manifest import (
+from ontorag.taxonomy.manifest import (
     YAGO_DATA_DIR,
     default_taxonomy_paths,
     verify_yago_files,
 )
-from lightrag.utils import EmbeddingFunc
+from ontorag.utils import EmbeddingFunc
 
 logger = logging.getLogger("yago.build")
 
@@ -156,7 +156,7 @@ def _resolve_embedding(binding: str, model: str | None) -> EmbeddingFunc:
     Mirrors how the API server resolves bindings — each binding exposes
     an `embed` callable wrapped with @wrap_embedding_func_with_attrs.
     """
-    module = importlib.import_module(f"lightrag.llm.{binding}")
+    module = importlib.import_module(f"ontorag.llm.{binding}")
     embed_func = getattr(module, "embed", None) or getattr(module, "openai_embed", None)
     if embed_func is None:
         raise SystemExit(
@@ -177,7 +177,7 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
                         "pinned YAGO 4.0 T-Box at /Users/jin/OntoRAG/yago/. "
                         "Overriding this disables SHA256 verification.")
     p.add_argument("--working-dir", required=True, type=Path,
-                   help="LightRAG working_dir to populate")
+                   help="OntoRAG working_dir to populate")
     p.add_argument("--workspace", default="default",
                    help="Workspace name (default: 'default')")
     p.add_argument("--vocabulary-size", type=int,
@@ -185,7 +185,7 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
                    help=f"Working vocabulary size "
                         f"(default {DEFAULT_WORKING_VOCABULARY_SIZE})")
     p.add_argument("--embedding-binding", default="openai",
-                   help="lightrag.llm.<binding> module to import")
+                   help="ontorag.llm.<binding> module to import")
     p.add_argument("--embedding-model", default=None,
                    help="Embedding model name (binding-specific)")
     p.add_argument("--exclude", action="append", default=[],
