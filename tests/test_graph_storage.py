@@ -2,7 +2,7 @@
 """
 General-purpose graph storage test program.
 
-This program selects the graph storage type to use based on the LIGHTRAG_GRAPH_STORAGE configuration in .env,
+This program selects the graph storage type to use based on the ONTORAG_GRAPH_STORAGE configuration in .env,
 and tests its basic and advanced operations.
 
 Supported graph storage types include:
@@ -25,15 +25,15 @@ from ascii_colors import ASCIIColors
 # Add the project root directory to the Python path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from lightrag.types import KnowledgeGraph
-from lightrag.kg import (
+from ontorag.types import KnowledgeGraph
+from ontorag.kg import (
     STORAGE_IMPLEMENTATIONS,
     STORAGE_ENV_REQUIREMENTS,
     STORAGES,
     verify_storage_implementation,
 )
-from lightrag.kg.shared_storage import initialize_share_data
-from lightrag.constants import GRAPH_FIELD_SEP
+from ontorag.kg.shared_storage import initialize_share_data
+from ontorag.constants import GRAPH_FIELD_SEP
 
 
 # Mock embedding function that returns random vectors
@@ -65,7 +65,7 @@ async def initialize_graph_storage():
     Returns the initialized storage instance.
     """
     # Get the graph storage type from environment variables
-    graph_storage_type = os.getenv("LIGHTRAG_GRAPH_STORAGE", "NetworkXStorage")
+    graph_storage_type = os.getenv("ONTORAG_GRAPH_STORAGE", "NetworkXStorage")
 
     # Validate the storage type
     try:
@@ -94,7 +94,7 @@ async def initialize_graph_storage():
         return None
 
     try:
-        module = importlib.import_module(module_path, package="lightrag")
+        module = importlib.import_module(module_path, package="ontorag")
         storage_class = getattr(module, graph_storage_type)
     except (ImportError, AttributeError) as e:
         ASCIIColors.red(f"Error: Failed to import {graph_storage_type}: {str(e)}")
@@ -1028,7 +1028,7 @@ async def test_graph_string_escaping_regressions(storage):
     edge retrieval, and delete/remove write paths.
     """
     center_id = 'Danh mục "bài toán lớn"'
-    backslash_id = r"C:\Program Files\LightRAG"
+    backslash_id = r"C:\Program Files\OntoRAG"
     mixed_id = 'Path "C:\\RAG\\docs"'
     single_quote_id = "Node with 'single quotes'"
 
@@ -1041,7 +1041,7 @@ async def test_graph_string_escaping_regressions(storage):
         },
         backslash_id: {
             "entity_id": backslash_id,
-            "description": r"Windows path C:\Program Files\LightRAG\bin",
+            "description": r"Windows path C:\Program Files\OntoRAG\bin",
             "keywords": r"paths,C:\temp,backslashes",
             "entity_type": "Regression Node",
         },
@@ -1066,7 +1066,7 @@ async def test_graph_string_escaping_regressions(storage):
         (center_id, backslash_id): {
             "relationship": r'contains "path"\edge',
             "weight": 1.0,
-            "description": r'Links "quoted" title to C:\Program Files\LightRAG',
+            "description": r'Links "quoted" title to C:\Program Files\OntoRAG',
         },
         (center_id, mixed_id): {
             "relationship": 'references "docs"',
@@ -1459,7 +1459,7 @@ async def main():
     load_dotenv(dotenv_path=".env", override=False)
 
     # Get graph storage type
-    graph_storage_type = os.getenv("LIGHTRAG_GRAPH_STORAGE", "NetworkXStorage")
+    graph_storage_type = os.getenv("ONTORAG_GRAPH_STORAGE", "NetworkXStorage")
     ASCIIColors.magenta(
         f"\nCurrently configured graph storage type: {graph_storage_type}"
     )

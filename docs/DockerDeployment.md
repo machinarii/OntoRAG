@@ -1,4 +1,4 @@
-# LightRAG Docker Deployment
+# OntoRAG Docker Deployment
 
 A lightweight Knowledge Graph Retrieval-Augmented Generation system with multiple LLM backend support.
 
@@ -8,13 +8,13 @@ A lightweight Knowledge Graph Retrieval-Augmented Generation system with multipl
 
 ```bash
 # Linux/MacOS
-git clone https://github.com/HKUDS/LightRAG.git
-cd LightRAG
+git clone https://github.com/machinarii/OntoRAG.git
+cd OntoRAG
 ```
 ```powershell
 # Windows PowerShell
-git clone https://github.com/HKUDS/LightRAG.git
-cd LightRAG
+git clone https://github.com/machinarii/OntoRAG.git
+cd OntoRAG
 ```
 
 ### Configure your environment:
@@ -30,7 +30,7 @@ Copy-Item .env.example .env
 # Edit .env with your preferred configuration
 ```
 
-LightRAG can be configured using environment variables in the `.env` file:
+OntoRAG can be configured using environment variables in the `.env` file:
 
 **Server Configuration**
 
@@ -74,7 +74,7 @@ The Dockerfile uses BuildKit cache mounts to significantly improve build perform
 - **Efficient package caching**: UV and Bun package downloads are cached across builds
 - **No manual configuration needed**: Works out of the box in Docker Compose and GitHub Actions
 
-### Start LightRAG  server:
+### Start OntoRAG  server:
 
 ```bash
 docker compose up -d
@@ -86,7 +86,7 @@ If you used the interactive setup, start the generated stack with:
 docker compose -f docker-compose.final.yml up -d
 ```
 
-The interactive setup keeps `.env` host-usable. Container-only hostnames such as `postgres` or `host.docker.internal`, along with staged SSL paths under `/app/data/certs/`, are injected into the generated `docker-compose.final.yml` for the `lightrag` service instead of being persisted back into `.env`.
+The interactive setup keeps `.env` host-usable. Container-only hostnames such as `postgres` or `host.docker.internal`, along with staged SSL paths under `/app/data/certs/`, are injected into the generated `docker-compose.final.yml` for the `ontorag` service instead of being persisted back into `.env`.
 On reruns, unchanged wizard-managed service blocks in `docker-compose.final.yml` are preserved by
 default. To repair or fully regenerate those managed blocks from the bundled templates, rerun the
 matching setup target with `make env-base-rewrite` or `make env-storage-rewrite`.
@@ -105,7 +105,7 @@ make env-security-check
 That command audits the current `.env` for missing authentication, unsafe whitelist settings, weak
 JWT secrets, and other setup-level security risks without rewriting any files.
 
-LightRAG Server uses the following paths for data storage:
+OntoRAG Server uses the following paths for data storage:
 
 ```
 data/
@@ -210,7 +210,7 @@ RERANK_BINDING_API_KEY=local-key
 VLLM_RERANK_DEVICE=cpu
 ```
 
-If LightRAG runs in Docker while vLLM runs on the host, the generated compose file rewrites those endpoints to:
+If OntoRAG runs in Docker while vLLM runs on the host, the generated compose file rewrites those endpoints to:
 
 ```bash
 EMBEDDING_BINDING_HOST=http://host.docker.internal:8001/v1
@@ -252,7 +252,7 @@ docker compose up
 
 ### Offline deployment
 
-Software packages requiring `transformers`, `torch`, or `cuda` will is not preinstalled in the dokcer images. Consequently, document extraction tools such as Docling, as well as local LLM models like Hugging Face and LMDeploy, can not be used in an off line enviroment. These high-compute-resource-demanding services should not be integrated into LightRAG. Docling will be decoupled and deployed as a standalone service.
+Software packages requiring `transformers`, `torch`, or `cuda` will is not preinstalled in the dokcer images. Consequently, document extraction tools such as Docling, as well as local LLM models like Hugging Face and LMDeploy, can not be used in an off line enviroment. These high-compute-resource-demanding services should not be integrated into OntoRAG. Docling will be decoupled and deployed as a standalone service.
 
 ## 📦 Build Docker Images
 
@@ -295,13 +295,13 @@ Before building multi-architecture images, ensure you have:
 
 ### Verify official GHCR images with Cosign
 
-Official LightRAG images published to GitHub Container Registry by GitHub Actions are signed with Sigstore Cosign using GitHub OIDC keyless signing.
+Official OntoRAG images published to GitHub Container Registry by GitHub Actions are signed with Sigstore Cosign using GitHub OIDC keyless signing.
 
 Install `cosign`, then verify the image tag you want to run:
 
 ```bash
-cosign verify ghcr.io/HKUDS/LightRAG:<tag> \
-  --certificate-identity-regexp '^https://github.com/HKUDS/LightRAG/.github/workflows/(docker-publish|docker-build-manual|docker-build-lite)\.yml@refs/.+$' \
+cosign verify ghcr.io/machinarii/OntoRAG:<tag> \
+  --certificate-identity-regexp '^https://github.com/machinarii/OntoRAG/.github/workflows/(docker-publish|docker-build-manual|docker-build-lite)\.yml@refs/.+$' \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com
 ```
 

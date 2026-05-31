@@ -1,4 +1,4 @@
-"""Tests for the unified parser debug CLI (``lightrag/parser_cli.py``).
+"""Tests for the unified parser debug CLI (``ontorag/parser_cli.py``).
 
 The CLI behaviour under test is engine-agnostic: argument parsing, the
 flat sidecar layout (no ``__parsed__/`` middle layer), the lenient raw
@@ -28,7 +28,7 @@ from typing import Any
 
 import pytest
 
-from lightrag.parser_cli import main
+from ontorag.parser_cli import main
 
 
 def _make_main_json(
@@ -105,7 +105,7 @@ def _clean_env(monkeypatch: pytest.MonkeyPatch) -> None:
     for name in (
         "DOCLING_BBOX_ATTRIBUTES",
         "DOCLING_ENGINE_VERSION",
-        "LIGHTRAG_FORCE_REPARSE_DOCLING",
+        "ONTORAG_FORCE_REPARSE_DOCLING",
     ):
         monkeypatch.delenv(name, raising=False)
 

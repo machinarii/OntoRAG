@@ -41,7 +41,7 @@ The P strategy is effective only for the `.blocks.jsonl` structured artifacts pr
 
 ### 1.4 Costs of the P Strategy
 
-- Must be paired with the `native` engine: explicitly declared in `LIGHTRAG_PARSER`, e.g., `docx:native-P`; otherwise, even if `P` is written, it falls back to R due to the missing `.blocks.jsonl`.
+- Must be paired with the `native` engine: explicitly declared in `ONTORAG_PARSER`, e.g., `docx:native-P`; otherwise, even if `P` is written, it falls back to R due to the missing `.blocks.jsonl`.
 - DOCX only: other formats have no `.blocks.jsonl` artifact.
 - Many algorithmic paths and thresholds: debugging requires first verifying the input sidecar, then inspecting the outputs of each stage.
 
@@ -77,10 +77,10 @@ Final chunk list
 | Parameter | Source | Description |
 |---|---|---|
 | `content` | `full_docs[doc_id].content` | Concatenated merged text, used for fallback when sidecar is missing |
-| `blocks_path` | `full_docs[doc_id].lightrag_document_path` | Path to `.blocks.jsonl`, the primary input for the P strategy |
+| `blocks_path` | `full_docs[doc_id].ontorag_document_path` | Path to `.blocks.jsonl`, the primary input for the P strategy |
 | `chunk_token_size` | `chunk_options.chunk_token_size` / `CHUNK_P_SIZE` | Target hard cap N; defaults to `2000` |
 | `chunk_overlap_token_size` | `CHUNK_P_OVERLAP_SIZE` / `chunk_overlap_token_size` | Upper bound for long-body fallback overlap within the same content line and for the table bridging budget; defaults to `100` |
-| `tokenizer` | The tokenizer already parsed by LightRAG | Basis for all token counting and text overlap truncation |
+| `tokenizer` | The tokenizer already parsed by OntoRAG | Basis for all token counting and text overlap truncation |
 
 The P strategy **does not accept** `split_by_character` / `split_by_character_only`, because the normal path is driven by heading and paragraph structure.
 
@@ -289,14 +289,14 @@ The P strategy has multiple layers of fallback protection:
 |---|---|---|
 | `CHUNK_P_SIZE` | `2000` (when unset, uses `DEFAULT_CHUNK_P_SIZE`; does **not** fall back to `CHUNK_SIZE`) | P-specific `chunk_token_size`; paragraph semantic merging requires a higher cap than the global default, hence an independent default rather than falling back to `CHUNK_SIZE` |
 | `CHUNK_P_OVERLAP_SIZE` | Unset (falls back to `CHUNK_OVERLAP_SIZE`) | P-specific overlap; only affects long-body fallback within the same content line and the table bridging budget. **Does not** cause table row-level slices to overlap |
-| `CHUNK_OVERLAP_SIZE` / `LightRAG(chunk_overlap_token_size=…)` | `100` | Global fallback when no P-specific overlap is set |
+| `CHUNK_OVERLAP_SIZE` / `OntoRAG(chunk_overlap_token_size=…)` | `100` | Global fallback when no P-specific overlap is set |
 
 For configuration syntax, the priority chain, and runtime overrides via `addon_params["chunker"]`, see [FileProcessingConfiguration-zh.md](FileProcessingConfiguration-zh.md) §3.
 
-A typical `LIGHTRAG_PARSER` setup that enables P:
+A typical `ONTORAG_PARSER` setup that enables P:
 
 ```bash
-LIGHTRAG_PARSER=docx:native-P,*:legacy-R
+ONTORAG_PARSER=docx:native-P,*:legacy-R
 CHUNK_P_SIZE=2000
 CHUNK_P_OVERLAP_SIZE=100
 ```
@@ -319,7 +319,7 @@ ls -l INPUT/__parsed__/<doc>.docx.parsed/<doc>.blocks.jsonl
 
 If the file is missing or empty, the P strategy falls back to R entirely and gains none of P's benefits. Common causes:
 
-- `LIGHTRAG_PARSER=docx:native-...` was not configured.
+- `ONTORAG_PARSER=docx:native-...` was not configured.
 - Parsing failed (see error entries in `pipeline_status`).
 - The document is not a DOCX (other formats do not support P).
 
@@ -365,8 +365,8 @@ If many tail chunks below `small_tail_threshold` appear, possible causes include
 Investigate in this order:
 
 1. Does `full_docs[doc_id].process_options` contain `P`?
-2. Is `full_docs[doc_id].parse_format` equal to `lightrag`? If `raw`, it is on the legacy path and P automatically falls back to R.
-3. Does the `.blocks.jsonl` pointed to by `lightrag_document_path` exist and is it non-empty?
+2. Is `full_docs[doc_id].parse_format` equal to `ontorag`? If `raw`, it is on the legacy path and P automatically falls back to R.
+3. Does the `.blocks.jsonl` pointed to by `ontorag_document_path` exist and is it non-empty?
 4. Are there `paragraph_semantic ... fallback to recursive_character` messages in the logs?
 
 ### 13.2 Tables Are Scattered; Preceding and Following Explanations Are Detached

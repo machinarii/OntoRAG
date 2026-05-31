@@ -41,7 +41,7 @@ P 策略仅对 `native` 抽取引擎生成的 `.blocks.jsonl` 结构化产物有
 
 ### 1.4 P 策略的代价
 
-- 必须搭配 `native` 引擎：在 `LIGHTRAG_PARSER` 中显式声明，例如 `docx:native-P`；否则即使写了 `P`，也会因为缺少 `.blocks.jsonl` 退化到 R。
+- 必须搭配 `native` 引擎：在 `ONTORAG_PARSER` 中显式声明，例如 `docx:native-P`；否则即使写了 `P`，也会因为缺少 `.blocks.jsonl` 退化到 R。
 - 仅支持 DOCX：其他格式没有 `.blocks.jsonl` 产物。
 - 算法路径多、阈值多：调试时需要先确认输入 sidecar 是否正确，再看各阶段输出。
 
@@ -77,10 +77,10 @@ DOCX
 | 参数 | 来源 | 说明 |
 |---|---|---|
 | `content` | `full_docs[doc_id].content` | 拼接后的合并文本，用于 sidecar 缺失时降级 |
-| `blocks_path` | `full_docs[doc_id].lightrag_document_path` | `.blocks.jsonl` 路径，是 P 策略的主输入 |
+| `blocks_path` | `full_docs[doc_id].ontorag_document_path` | `.blocks.jsonl` 路径，是 P 策略的主输入 |
 | `chunk_token_size` | `chunk_options.chunk_token_size` / `CHUNK_P_SIZE` | 目标硬上限 N，默认 `2000` |
 | `chunk_overlap_token_size` | `CHUNK_P_OVERLAP_SIZE` / `chunk_overlap_token_size` | 同一内容行内长正文 fallback 与表格桥接预算的上限，默认 `100` |
-| `tokenizer` | LightRAG 已解析好的 tokenizer | 所有 token 计数与文本 overlap 截取的基准 |
+| `tokenizer` | OntoRAG 已解析好的 tokenizer | 所有 token 计数与文本 overlap 截取的基准 |
 
 P 策略**不接收** `split_by_character` / `split_by_character_only`，因为正常路径由标题和段落结构驱动。
 
@@ -289,14 +289,14 @@ P 策略有多层降级保护：
 |---|---|---|
 | `CHUNK_P_SIZE` | `2000`（未设时使用 `DEFAULT_CHUNK_P_SIZE`，**不**沿用 `CHUNK_SIZE`） | P 专用 `chunk_token_size`；段落语义合并需要比全局默认更大的上限，因此独立默认而非回退到 `CHUNK_SIZE` |
 | `CHUNK_P_OVERLAP_SIZE` | 未设（沿用 `CHUNK_OVERLAP_SIZE`） | P 专用 overlap；只影响同一内容行内长正文 fallback 和表格桥接预算，**不**让表格行级切片互相重叠 |
-| `CHUNK_OVERLAP_SIZE` / `LightRAG(chunk_overlap_token_size=…)` | `100` | 未设 P 专用 overlap 时的全局兜底 |
+| `CHUNK_OVERLAP_SIZE` / `OntoRAG(chunk_overlap_token_size=…)` | `100` | 未设 P 专用 overlap 时的全局兜底 |
 
 配置语法、优先级链、`addon_params["chunker"]` 运行时改值等详见 [FileProcessingConfiguration-zh.md](FileProcessingConfiguration-zh.md) §3。
 
-启用 P 的典型 `LIGHTRAG_PARSER` 写法：
+启用 P 的典型 `ONTORAG_PARSER` 写法：
 
 ```bash
-LIGHTRAG_PARSER=docx:native-P,*:legacy-R
+ONTORAG_PARSER=docx:native-P,*:legacy-R
 CHUNK_P_SIZE=2000
 CHUNK_P_OVERLAP_SIZE=100
 ```
@@ -319,7 +319,7 @@ ls -l INPUT/__parsed__/<doc>.docx.parsed/<doc>.blocks.jsonl
 
 若文件不存在或为空，P 策略会整体降级为 R，不会获得 P 的任何收益。常见原因：
 
-- 未配置 `LIGHTRAG_PARSER=docx:native-...`。
+- 未配置 `ONTORAG_PARSER=docx:native-...`。
 - 解析失败（看 `pipeline_status` 错误条目）。
 - 文档不是 DOCX（其他格式不支持 P）。
 
@@ -365,8 +365,8 @@ jq '.[] | {heading, level, tokens, parent_headings}' \
 按以下顺序排查：
 
 1. `full_docs[doc_id].process_options` 是否包含 `P`？
-2. `full_docs[doc_id].parse_format` 是否为 `lightrag`？若为 `raw`，说明走的是 legacy 路径，P 会自动降级到 R。
-3. `lightrag_document_path` 指向的 `.blocks.jsonl` 是否存在、是否非空？
+2. `full_docs[doc_id].parse_format` 是否为 `ontorag`？若为 `raw`，说明走的是 legacy 路径，P 会自动降级到 R。
+3. `ontorag_document_path` 指向的 `.blocks.jsonl` 是否存在、是否非空？
 4. 日志中是否有 `paragraph_semantic ... fallback to recursive_character` 字样？
 
 ### 13.2 表格被切散、前后说明分离

@@ -3,7 +3,7 @@
 Covers:
 - entity_types_guidance injected into prompts (text mode and JSON mode)
 - custom entity_types_guidance via addon_params overrides default
-- ENTITY_TYPES env var raises SystemExit at LightRAG init
+- ENTITY_TYPES env var raises SystemExit at OntoRAG init
 - EntityExtractionResult Pydantic schema used in JSON mode (entity_extraction kwarg)
 - Default entity type guidance constant is present and non-empty
 """
@@ -15,7 +15,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from lightrag.utils import EmbeddingFunc, Tokenizer, TokenizerInterface
+from ontorag.utils import EmbeddingFunc, Tokenizer, TokenizerInterface
 
 
 class DummyTokenizer(TokenizerInterface):
@@ -110,7 +110,7 @@ def _dummy_embedding_func() -> EmbeddingFunc:
 
 
 def _patch_prompt_dir(path: Path):
-    return patch("lightrag.prompt.get_entity_type_prompt_dir", return_value=path)
+    return patch("ontorag.prompt.get_entity_type_prompt_dir", return_value=path)
 
 
 def _text_profile_example(label: str) -> str:
@@ -211,7 +211,7 @@ class _DummyTextChunksStorage:
 @pytest.mark.offline
 def test_default_entity_types_guidance_exists():
     """PROMPTS['default_entity_types_guidance'] must be a non-empty string."""
-    from lightrag.prompt import PROMPTS
+    from ontorag.prompt import PROMPTS
 
     guidance = PROMPTS["default_entity_types_guidance"]
     assert isinstance(guidance, str)
@@ -221,7 +221,7 @@ def test_default_entity_types_guidance_exists():
 @pytest.mark.offline
 def test_default_entity_types_guidance_covers_all_types():
     """Default guidance must mention all 11 canonical entity types."""
-    from lightrag.prompt import PROMPTS
+    from ontorag.prompt import PROMPTS
 
     guidance = PROMPTS["default_entity_types_guidance"]
     expected_types = [
@@ -246,7 +246,7 @@ def test_default_entity_types_guidance_covers_all_types():
 @pytest.mark.offline
 def test_json_examples_define_all_relationship_endpoints_as_entities():
     """JSON examples must define every relationship endpoint in the entities list."""
-    from lightrag.prompt import PROMPTS
+    from ontorag.prompt import PROMPTS
 
     for example in PROMPTS["entity_extraction_json_examples"]:
         if "<Output>" in example:
@@ -269,8 +269,8 @@ def test_json_examples_define_all_relationship_endpoints_as_entities():
 
 @pytest.mark.offline
 def test_default_entity_types_removed_from_constants():
-    """DEFAULT_ENTITY_TYPES must no longer exist in lightrag.constants."""
-    import lightrag.constants as constants
+    """DEFAULT_ENTITY_TYPES must no longer exist in ontorag.constants."""
+    import ontorag.constants as constants
 
     assert not hasattr(
         constants, "DEFAULT_ENTITY_TYPES"
@@ -284,12 +284,12 @@ def test_default_entity_types_removed_from_constants():
 
 @pytest.mark.offline
 def test_entity_types_env_var_raises_system_exit(tmp_path):
-    """LightRAG.__post_init__ must raise SystemExit when ENTITY_TYPES env var is set."""
-    from lightrag import LightRAG
+    """OntoRAG.__post_init__ must raise SystemExit when ENTITY_TYPES env var is set."""
+    from ontorag import OntoRAG
 
     with patch.dict(os.environ, {"ENTITY_TYPES": '["Person"]'}):
         with pytest.raises(SystemExit) as exc_info:
-            LightRAG(
+            OntoRAG(
                 working_dir=str(tmp_path),
                 llm_model_func=AsyncMock(),
                 embedding_func=None,
@@ -306,14 +306,14 @@ def test_entity_types_env_var_raises_system_exit(tmp_path):
 @pytest.mark.asyncio
 async def test_text_mode_default_guidance_injected_into_prompt():
     """Default entity_types_guidance is passed to LLM system prompt in text mode."""
-    from lightrag.operate import extract_entities
-    from lightrag.prompt import PROMPTS
+    from ontorag.operate import extract_entities
+    from ontorag.prompt import PROMPTS
 
     global_config = _make_global_config(use_json=False)
     llm_func = global_config["llm_model_func"]
     llm_func.return_value = _TEXT_MODE_RESPONSE
 
-    with patch("lightrag.operate.logger"):
+    with patch("ontorag.operate.logger"):
         await extract_entities(
             chunks=_make_chunks(),
             global_config=global_config,
@@ -334,7 +334,7 @@ async def test_text_mode_default_guidance_injected_into_prompt():
 @pytest.mark.asyncio
 async def test_text_mode_custom_guidance_overrides_default():
     """Custom entity_types_guidance in addon_params overrides default."""
-    from lightrag.operate import extract_entities
+    from ontorag.operate import extract_entities
 
     custom_guidance = "- Widget: A test widget type"
     global_config = _make_global_config(
@@ -344,7 +344,7 @@ async def test_text_mode_custom_guidance_overrides_default():
     llm_func = global_config["llm_model_func"]
     llm_func.return_value = _TEXT_MODE_RESPONSE
 
-    with patch("lightrag.operate.logger"):
+    with patch("ontorag.operate.logger"):
         await extract_entities(
             chunks=_make_chunks(),
             global_config=global_config,
@@ -357,7 +357,7 @@ async def test_text_mode_custom_guidance_overrides_default():
 
 @pytest.mark.offline
 def test_text_continue_prompt_requires_relation_prefix_for_corrections():
-    from lightrag.prompt import PROMPTS
+    from ontorag.prompt import PROMPTS
 
     prompt = PROMPTS["entity_continue_extraction_user_prompt"]
     assert (
@@ -380,7 +380,7 @@ def test_text_continue_prompt_requires_relation_prefix_for_corrections():
 
 @pytest.mark.offline
 def test_text_user_prompt_includes_quantity_limits():
-    from lightrag.prompt import PROMPTS
+    from ontorag.prompt import PROMPTS
 
     prompt = PROMPTS["entity_extraction_user_prompt"]
     assert (
@@ -402,12 +402,12 @@ def test_text_user_prompt_includes_quantity_limits():
 @pytest.mark.asyncio
 async def test_rebuild_from_cached_fenced_json_uses_json_parser():
     """Cached JSON wrapped in markdown fences must not fall back to text parsing."""
-    from lightrag import operate
+    from ontorag import operate
 
     fenced_json = f"```json\n{_JSON_MODE_RESPONSE}\n```"
 
     with patch(
-        "lightrag.operate._process_extraction_result",
+        "ontorag.operate._process_extraction_result",
         side_effect=AssertionError("text parser should not be used"),
     ):
         nodes, edges = await operate._rebuild_from_extraction_result(
@@ -426,14 +426,14 @@ async def test_rebuild_from_cached_fenced_json_uses_json_parser():
 @pytest.mark.asyncio
 async def test_json_mode_default_guidance_injected_into_prompt():
     """Default entity_types_guidance is passed to LLM system prompt in JSON mode."""
-    from lightrag.operate import extract_entities
-    from lightrag.prompt import PROMPTS
+    from ontorag.operate import extract_entities
+    from ontorag.prompt import PROMPTS
 
     global_config = _make_global_config(use_json=True)
     llm_func = global_config["llm_model_func"]
     llm_func.return_value = _JSON_MODE_RESPONSE
 
-    with patch("lightrag.operate.logger"):
+    with patch("ontorag.operate.logger"):
         await extract_entities(
             chunks=_make_chunks(),
             global_config=global_config,
@@ -451,13 +451,13 @@ async def test_json_mode_default_guidance_injected_into_prompt():
 @pytest.mark.asyncio
 async def test_json_mode_entity_extraction_kwarg_passed():
     """JSON mode must pass response_format={'type':'json_object'} to the LLM function."""
-    from lightrag.operate import extract_entities
+    from ontorag.operate import extract_entities
 
     global_config = _make_global_config(use_json=True)
     llm_func = global_config["llm_model_func"]
     llm_func.return_value = _JSON_MODE_RESPONSE
 
-    with patch("lightrag.operate.logger"):
+    with patch("ontorag.operate.logger"):
         await extract_entities(
             chunks=_make_chunks(),
             global_config=global_config,
@@ -473,7 +473,7 @@ async def test_json_mode_entity_extraction_kwarg_passed():
 @pytest.mark.asyncio
 async def test_json_mode_custom_guidance_overrides_default():
     """Custom entity_types_guidance in addon_params overrides default in JSON mode."""
-    from lightrag.operate import extract_entities
+    from ontorag.operate import extract_entities
 
     custom_guidance = "- Gadget: A test gadget type"
     global_config = _make_global_config(
@@ -483,7 +483,7 @@ async def test_json_mode_custom_guidance_overrides_default():
     llm_func = global_config["llm_model_func"]
     llm_func.return_value = _JSON_MODE_RESPONSE
 
-    with patch("lightrag.operate.logger"):
+    with patch("ontorag.operate.logger"):
         await extract_entities(
             chunks=_make_chunks(),
             global_config=global_config,
@@ -496,7 +496,7 @@ async def test_json_mode_custom_guidance_overrides_default():
 
 @pytest.mark.offline
 def test_json_user_prompt_includes_quantity_limits():
-    from lightrag.prompt import PROMPTS
+    from ontorag.prompt import PROMPTS
 
     prompt = PROMPTS["entity_extraction_json_user_prompt"]
     assert (
@@ -511,7 +511,7 @@ def test_json_user_prompt_includes_quantity_limits():
 
 @pytest.mark.offline
 def test_json_continue_prompt_includes_quantity_limits():
-    from lightrag.prompt import PROMPTS
+    from ontorag.prompt import PROMPTS
 
     prompt = PROMPTS["entity_continue_extraction_json_user_prompt"]
     assert (
@@ -533,13 +533,13 @@ def test_json_continue_prompt_includes_quantity_limits():
 @pytest.mark.asyncio
 async def test_text_mode_no_entity_extraction_kwarg():
     """Text mode must NOT pass entity_extraction=True to the LLM function."""
-    from lightrag.operate import extract_entities
+    from ontorag.operate import extract_entities
 
     global_config = _make_global_config(use_json=False)
     llm_func = global_config["llm_model_func"]
     llm_func.return_value = _TEXT_MODE_RESPONSE
 
-    with patch("lightrag.operate.logger"):
+    with patch("ontorag.operate.logger"):
         await extract_entities(
             chunks=_make_chunks(),
             global_config=global_config,
@@ -552,13 +552,13 @@ async def test_text_mode_no_entity_extraction_kwarg():
 @pytest.mark.offline
 @pytest.mark.asyncio
 async def test_text_mode_recovers_mis_prefixed_relationship_row():
-    from lightrag.operate import extract_entities
+    from ontorag.operate import extract_entities
 
     global_config = _make_global_config(use_json=False)
     llm_func = global_config["llm_model_func"]
     llm_func.return_value = _TEXT_MODE_MISPREFIXED_RELATION_RESPONSE
 
-    with patch("lightrag.operate.logger"):
+    with patch("ontorag.operate.logger"):
         chunk_results = await extract_entities(
             chunks=_make_chunks(),
             global_config=global_config,
@@ -573,13 +573,13 @@ async def test_text_mode_recovers_mis_prefixed_relationship_row():
 @pytest.mark.offline
 @pytest.mark.asyncio
 async def test_text_mode_gleaned_relation_merges_cleanly_after_recovery():
-    from lightrag.operate import extract_entities
+    from ontorag.operate import extract_entities
 
     global_config = _make_global_config(use_json=False, max_gleaning=1)
     llm_func = global_config["llm_model_func"]
     llm_func.side_effect = _TEXT_MODE_GLEANED_RELATION_RESPONSES
 
-    with patch("lightrag.operate.logger"):
+    with patch("ontorag.operate.logger"):
         chunk_results = await extract_entities(
             chunks=_make_chunks(),
             global_config=global_config,
@@ -596,13 +596,13 @@ async def test_text_mode_gleaned_relation_merges_cleanly_after_recovery():
 @pytest.mark.offline
 @pytest.mark.asyncio
 async def test_text_mode_gleaned_relation_can_reference_prior_entity():
-    from lightrag.operate import extract_entities
+    from ontorag.operate import extract_entities
 
     global_config = _make_global_config(use_json=False, max_gleaning=1)
     llm_func = global_config["llm_model_func"]
     llm_func.side_effect = _TEXT_MODE_CROSS_PASS_RELATION_RESPONSES
 
-    with patch("lightrag.operate.logger"):
+    with patch("ontorag.operate.logger"):
         chunk_results = await extract_entities(
             chunks=_make_chunks(),
             global_config=global_config,
@@ -620,7 +620,7 @@ async def test_text_mode_gleaned_relation_can_reference_prior_entity():
 def test_addon_params_default_includes_entity_type_prompt_file_env(tmp_path):
     _require_yaml()
 
-    from lightrag import LightRAG
+    from ontorag import OntoRAG
 
     prompt_dir = tmp_path / "entity_type"
     prompt_dir.mkdir()
@@ -637,7 +637,7 @@ def test_addon_params_default_includes_entity_type_prompt_file_env(tmp_path):
         },
     ):
         with _patch_prompt_dir(prompt_dir):
-            rag = LightRAG(
+            rag = OntoRAG(
                 working_dir=str(tmp_path / "rag-default-env"),
                 llm_model_func=AsyncMock(),
                 embedding_func=_dummy_embedding_func(),
@@ -654,7 +654,7 @@ def test_addon_params_default_includes_entity_type_prompt_file_env(tmp_path):
 async def test_text_mode_prompt_file_injects_examples_and_guidance():
     _require_yaml()
 
-    from lightrag.operate import extract_entities
+    from ontorag.operate import extract_entities
 
     guidance = "- ExampleType: Injected guidance"
     example_label = "Custom Text Example"
@@ -671,7 +671,7 @@ async def test_text_mode_prompt_file_injects_examples_and_guidance():
     llm_func = global_config["llm_model_func"]
     llm_func.return_value = _TEXT_MODE_RESPONSE
 
-    with patch("lightrag.operate.logger"):
+    with patch("ontorag.operate.logger"):
         await extract_entities(chunks=_make_chunks(), global_config=global_config)
 
     call_kwargs = llm_func.call_args_list[0][1]
@@ -685,7 +685,7 @@ async def test_text_mode_prompt_file_injects_examples_and_guidance():
 async def test_json_mode_prompt_file_injects_examples_and_guidance():
     _require_yaml()
 
-    from lightrag.operate import extract_entities
+    from ontorag.operate import extract_entities
 
     guidance = "- ExampleType: Injected JSON guidance"
     example_label = "Custom Json Example"
@@ -702,7 +702,7 @@ async def test_json_mode_prompt_file_injects_examples_and_guidance():
     llm_func = global_config["llm_model_func"]
     llm_func.return_value = _JSON_MODE_RESPONSE
 
-    with patch("lightrag.operate.logger"):
+    with patch("ontorag.operate.logger"):
         await extract_entities(chunks=_make_chunks(), global_config=global_config)
 
     call_kwargs = llm_func.call_args_list[0][1]
@@ -716,8 +716,8 @@ async def test_json_mode_prompt_file_injects_examples_and_guidance():
 async def test_prompt_file_guidance_falls_back_to_default_when_missing():
     _require_yaml()
 
-    from lightrag.operate import extract_entities
-    from lightrag.prompt import PROMPTS
+    from ontorag.operate import extract_entities
+    from ontorag.prompt import PROMPTS
 
     global_config = _make_global_config(
         prompt_profile={
@@ -732,7 +732,7 @@ async def test_prompt_file_guidance_falls_back_to_default_when_missing():
     llm_func = global_config["llm_model_func"]
     llm_func.return_value = _TEXT_MODE_RESPONSE
 
-    with patch("lightrag.operate.logger"):
+    with patch("ontorag.operate.logger"):
         await extract_entities(chunks=_make_chunks(), global_config=global_config)
 
     call_kwargs = llm_func.call_args_list[0][1]
@@ -743,7 +743,7 @@ async def test_prompt_file_guidance_falls_back_to_default_when_missing():
 @pytest.mark.offline
 @pytest.mark.asyncio
 async def test_cached_prompt_profile_supplies_merged_guidance():
-    from lightrag.operate import extract_entities
+    from ontorag.operate import extract_entities
 
     merged_guidance = "- ExampleType: Addon override"
 
@@ -758,7 +758,7 @@ async def test_cached_prompt_profile_supplies_merged_guidance():
     llm_func = global_config["llm_model_func"]
     llm_func.return_value = _TEXT_MODE_RESPONSE
 
-    with patch("lightrag.operate.logger"):
+    with patch("ontorag.operate.logger"):
         await extract_entities(chunks=_make_chunks(), global_config=global_config)
 
     call_kwargs = llm_func.call_args_list[0][1]
@@ -770,7 +770,7 @@ async def test_cached_prompt_profile_supplies_merged_guidance():
 def test_text_mode_prompt_file_can_omit_json_examples(tmp_path):
     _require_yaml()
 
-    from lightrag import LightRAG
+    from ontorag import OntoRAG
 
     prompt_dir = tmp_path / "entity_type"
     prompt_dir.mkdir()
@@ -780,7 +780,7 @@ def test_text_mode_prompt_file_can_omit_json_examples(tmp_path):
     )
 
     with _patch_prompt_dir(prompt_dir):
-        rag = LightRAG(
+        rag = OntoRAG(
             working_dir=str(tmp_path / "rag-text"),
             llm_model_func=AsyncMock(),
             embedding_func=_dummy_embedding_func(),
@@ -795,7 +795,7 @@ def test_text_mode_prompt_file_can_omit_json_examples(tmp_path):
 def test_json_mode_prompt_file_can_omit_text_examples(tmp_path):
     _require_yaml()
 
-    from lightrag import LightRAG
+    from ontorag import OntoRAG
 
     prompt_dir = tmp_path / "entity_type"
     prompt_dir.mkdir()
@@ -805,7 +805,7 @@ def test_json_mode_prompt_file_can_omit_text_examples(tmp_path):
     )
 
     with _patch_prompt_dir(prompt_dir):
-        rag = LightRAG(
+        rag = OntoRAG(
             working_dir=str(tmp_path / "rag-json"),
             llm_model_func=AsyncMock(),
             embedding_func=_dummy_embedding_func(),
@@ -820,7 +820,7 @@ def test_json_mode_prompt_file_can_omit_text_examples(tmp_path):
 def test_text_mode_prompt_file_requires_text_examples(tmp_path):
     _require_yaml()
 
-    from lightrag import LightRAG
+    from ontorag import OntoRAG
 
     prompt_dir = tmp_path / "entity_type"
     prompt_dir.mkdir()
@@ -831,7 +831,7 @@ def test_text_mode_prompt_file_requires_text_examples(tmp_path):
 
     with _patch_prompt_dir(prompt_dir):
         with pytest.raises(ValueError) as exc_info:
-            LightRAG(
+            OntoRAG(
                 working_dir=str(tmp_path / "rag-missing-text"),
                 llm_model_func=AsyncMock(),
                 embedding_func=None,
@@ -846,7 +846,7 @@ def test_text_mode_prompt_file_requires_text_examples(tmp_path):
 def test_json_mode_prompt_file_requires_json_examples(tmp_path):
     _require_yaml()
 
-    from lightrag import LightRAG
+    from ontorag import OntoRAG
 
     prompt_dir = tmp_path / "entity_type"
     prompt_dir.mkdir()
@@ -857,7 +857,7 @@ def test_json_mode_prompt_file_requires_json_examples(tmp_path):
 
     with _patch_prompt_dir(prompt_dir):
         with pytest.raises(ValueError) as exc_info:
-            LightRAG(
+            OntoRAG(
                 working_dir=str(tmp_path / "rag-missing-json"),
                 llm_model_func=AsyncMock(),
                 embedding_func=None,
@@ -872,10 +872,10 @@ def test_json_mode_prompt_file_requires_json_examples(tmp_path):
 def test_prompt_file_rejects_directory_segments(tmp_path):
     _require_yaml()
 
-    from lightrag import LightRAG
+    from ontorag import OntoRAG
 
     with pytest.raises(ValueError) as exc_info:
-        LightRAG(
+        OntoRAG(
             working_dir=str(tmp_path / "rag-bad-path"),
             llm_model_func=AsyncMock(),
             embedding_func=None,
@@ -889,10 +889,10 @@ def test_prompt_file_rejects_directory_segments(tmp_path):
 def test_prompt_file_rejects_absolute_paths(tmp_path):
     _require_yaml()
 
-    from lightrag import LightRAG
+    from ontorag import OntoRAG
 
     with pytest.raises(ValueError) as exc_info:
-        LightRAG(
+        OntoRAG(
             working_dir=str(tmp_path / "rag-abs-path"),
             llm_model_func=AsyncMock(),
             embedding_func=None,
@@ -905,7 +905,7 @@ def test_prompt_file_rejects_absolute_paths(tmp_path):
 @pytest.mark.offline
 @pytest.mark.asyncio
 async def test_extract_entities_uses_cached_prompt_profile_without_reloading():
-    from lightrag.operate import extract_entities
+    from ontorag.operate import extract_entities
 
     cached_profile = {
         "entity_types_guidance": "- ExampleType: Cached guidance",
@@ -917,10 +917,10 @@ async def test_extract_entities_uses_cached_prompt_profile_without_reloading():
     llm_func.return_value = _TEXT_MODE_RESPONSE
 
     with patch(
-        "lightrag.operate.resolve_entity_extraction_prompt_profile",
+        "ontorag.operate.resolve_entity_extraction_prompt_profile",
         side_effect=AssertionError("should not resolve profile when cache exists"),
     ):
-        with patch("lightrag.operate.logger"):
+        with patch("ontorag.operate.logger"):
             await extract_entities(chunks=_make_chunks(), global_config=global_config)
             await extract_entities(chunks=_make_chunks(), global_config=global_config)
 
@@ -933,7 +933,7 @@ async def test_extract_entities_uses_cached_prompt_profile_without_reloading():
 def test_sample_prompt_file_matches_builtin_prompt_data():
     _require_yaml()
 
-    from lightrag.prompt import (
+    from ontorag.prompt import (
         get_default_entity_extraction_prompt_profile,
         load_entity_extraction_prompt_profile,
     )
@@ -953,7 +953,7 @@ def test_sample_prompt_file_matches_builtin_prompt_data():
 def test_prompt_dir_env_var_overrides_default(tmp_path, monkeypatch):
     _require_yaml()
 
-    from lightrag.prompt import (
+    from ontorag.prompt import (
         get_entity_type_prompt_dir,
         resolve_entity_type_prompt_path,
     )
@@ -969,7 +969,7 @@ def test_prompt_dir_env_var_overrides_default(tmp_path, monkeypatch):
 def test_prompt_dir_defaults_to_cwd_relative(tmp_path, monkeypatch):
     _require_yaml()
 
-    from lightrag.prompt import get_entity_type_prompt_dir
+    from ontorag.prompt import get_entity_type_prompt_dir
 
     monkeypatch.delenv("PROMPT_DIR", raising=False)
     monkeypatch.chdir(tmp_path)
@@ -982,10 +982,10 @@ def test_prompt_dir_defaults_to_cwd_relative(tmp_path, monkeypatch):
 def test_prompt_file_rejects_unsupported_extension(tmp_path):
     _require_yaml()
 
-    from lightrag import LightRAG
+    from ontorag import OntoRAG
 
     with pytest.raises(ValueError, match="'.yml' or '.yaml'"):
-        LightRAG(
+        OntoRAG(
             working_dir=str(tmp_path / "rag-bad-ext"),
             llm_model_func=AsyncMock(),
             embedding_func=None,
@@ -997,7 +997,7 @@ def test_prompt_file_rejects_unsupported_extension(tmp_path):
 def test_prompt_file_malformed_yaml_raises_valueerror(tmp_path):
     _require_yaml()
 
-    from lightrag.prompt import load_entity_extraction_prompt_profile
+    from ontorag.prompt import load_entity_extraction_prompt_profile
 
     bad_file = tmp_path / "broken.yml"
     bad_file.write_text("entity_types_guidance: [unclosed", encoding="utf-8")
@@ -1010,7 +1010,7 @@ def test_prompt_file_malformed_yaml_raises_valueerror(tmp_path):
 def test_addon_guidance_overrides_file_profile(tmp_path):
     _require_yaml()
 
-    from lightrag.prompt import resolve_entity_extraction_prompt_profile
+    from ontorag.prompt import resolve_entity_extraction_prompt_profile
 
     prompt_dir = tmp_path / "entity_type"
     prompt_dir.mkdir()
@@ -1041,7 +1041,7 @@ def test_explicit_addon_params_still_picks_up_env_defaults(tmp_path, monkeypatch
     """Passing addon_params explicitly must not drop env-based defaults."""
     _require_yaml()
 
-    from lightrag import LightRAG
+    from ontorag import OntoRAG
 
     prompt_dir = tmp_path / "entity_type"
     prompt_dir.mkdir()
@@ -1053,7 +1053,7 @@ def test_explicit_addon_params_still_picks_up_env_defaults(tmp_path, monkeypatch
     monkeypatch.setenv("ENTITY_TYPE_PROMPT_FILE", "from_env.yml")
 
     with _patch_prompt_dir(prompt_dir):
-        rag = LightRAG(
+        rag = OntoRAG(
             working_dir=str(tmp_path / "rag-env-default"),
             llm_model_func=AsyncMock(),
             embedding_func=_dummy_embedding_func(),
@@ -1068,7 +1068,7 @@ def test_explicit_addon_params_still_picks_up_env_defaults(tmp_path, monkeypatch
 def test_runtime_addon_params_item_update_refreshes_cached_values(tmp_path):
     _require_yaml()
 
-    from lightrag import LightRAG
+    from ontorag import OntoRAG
 
     prompt_dir = tmp_path / "entity_type"
     prompt_dir.mkdir()
@@ -1083,7 +1083,7 @@ def test_runtime_addon_params_item_update_refreshes_cached_values(tmp_path):
     )
 
     with _patch_prompt_dir(prompt_dir):
-        rag = LightRAG(
+        rag = OntoRAG(
             working_dir=str(tmp_path / "rag-runtime-update"),
             llm_model_func=AsyncMock(),
             embedding_func=_dummy_embedding_func(),
@@ -1115,9 +1115,9 @@ def test_runtime_addon_params_item_update_refreshes_cached_values(tmp_path):
 def test_runtime_addon_params_replacement_refreshes_cached_values(tmp_path):
     _require_yaml()
 
-    from lightrag import LightRAG
+    from ontorag import OntoRAG
 
-    rag = LightRAG(
+    rag = OntoRAG(
         working_dir=str(tmp_path / "rag-runtime-replace"),
         llm_model_func=AsyncMock(),
         embedding_func=_dummy_embedding_func(),
@@ -1143,7 +1143,7 @@ def test_runtime_addon_params_replacement_refreshes_cached_values(tmp_path):
 def test_runtime_mode_flip_invalidates_cached_prompt_profile(tmp_path):
     _require_yaml()
 
-    from lightrag import LightRAG
+    from ontorag import OntoRAG
 
     prompt_dir = tmp_path / "entity_type"
     prompt_dir.mkdir()
@@ -1153,7 +1153,7 @@ def test_runtime_mode_flip_invalidates_cached_prompt_profile(tmp_path):
     )
 
     with _patch_prompt_dir(prompt_dir):
-        rag = LightRAG(
+        rag = OntoRAG(
             working_dir=str(tmp_path / "rag-mode-flip"),
             llm_model_func=AsyncMock(),
             embedding_func=_dummy_embedding_func(),

@@ -9,7 +9,7 @@ pytest.importorskip(
 
 from pymongo.errors import PyMongoError
 
-from lightrag.kg.mongo_impl import MongoDocStatusStorage, MongoGraphStorage
+from ontorag.kg.mongo_impl import MongoDocStatusStorage, MongoGraphStorage
 
 pytestmark = pytest.mark.offline
 

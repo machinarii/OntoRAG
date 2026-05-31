@@ -7,18 +7,18 @@ from argparse import Namespace
 import numpy as np
 import pytest
 
-from lightrag import LightRAG, ROLES, RoleLLMConfig
-from lightrag.llm.binding_options import OpenAILLMOptions
-from lightrag.utils import EmbeddingFunc, Tokenizer, priority_limit_async_func_call
+from ontorag import OntoRAG, ROLES, RoleLLMConfig
+from ontorag.llm.binding_options import OpenAILLMOptions
+from ontorag.utils import EmbeddingFunc, Tokenizer, priority_limit_async_func_call
 
 
 pytestmark = pytest.mark.offline
 
 
 @pytest.fixture
-def lightrag_logger_propagating(monkeypatch):
-    """Force the lightrag logger to propagate so caplog can capture records."""
-    monkeypatch.setattr(logging.getLogger("lightrag"), "propagate", True)
+def ontorag_logger_propagating(monkeypatch):
+    """Force the ontorag logger to propagate so caplog can capture records."""
+    monkeypatch.setattr(logging.getLogger("ontorag"), "propagate", True)
 
 
 class _SimpleTokenizerImpl:
@@ -45,8 +45,8 @@ _ROLE_FIELD_SUFFIXES = (
 )
 
 
-def _make_rag(tmp_path, **kwargs) -> LightRAG:
-    """Create a LightRAG for role tests.
+def _make_rag(tmp_path, **kwargs) -> OntoRAG:
+    """Create a OntoRAG for role tests.
 
     Accepts both the canonical ``role_llm_configs={...}`` style and shorthand
     ``{role}_llm_model_func`` / ``{role}_llm_model_kwargs`` etc. keyword
@@ -79,7 +79,7 @@ def _make_rag(tmp_path, **kwargs) -> LightRAG:
     if role_configs:
         kwargs["role_llm_configs"] = role_configs
 
-    return LightRAG(
+    return OntoRAG(
         working_dir=str(tmp_path / "role-runtime"),
         workspace="role-runtime",
         llm_model_func=_base_llm,
@@ -157,7 +157,7 @@ async def test_priority_queue_stats_track_running_and_queued():
 
 @pytest.mark.asyncio
 async def test_priority_queue_graceful_shutdown_timeout_falls_back_to_force(
-    caplog, lightrag_logger_propagating
+    caplog, ontorag_logger_propagating
 ):
     started = asyncio.Event()
 
@@ -171,7 +171,7 @@ async def test_priority_queue_graceful_shutdown_timeout_falls_back_to_force(
     in_flight = asyncio.create_task(wrapped("hold"))
     await started.wait()
 
-    with caplog.at_level("WARNING", logger="lightrag"):
+    with caplog.at_level("WARNING", logger="ontorag"):
         await wrapped.shutdown(graceful=True, timeout=0.1)
 
     assert any(
@@ -204,8 +204,8 @@ async def test_priority_queue_rejects_submissions_after_shutdown():
 
 def test_role_max_async_defaults_inherit_base(tmp_path, monkeypatch):
     # Use the literal "None" string rather than delenv: storage modules
-    # (e.g. lightrag.kg.networkx_impl) are imported lazily during
-    # LightRAG() and re-run load_dotenv(override=False), which would
+    # (e.g. ontorag.kg.networkx_impl) are imported lazily during
+    # OntoRAG() and re-run load_dotenv(override=False), which would
     # restore deleted vars from .env. Setting "None" keeps the variable
     # present so load_dotenv leaves it alone, and _optional_env_int
     # interprets the string as Python None via special_none=True.
@@ -295,7 +295,7 @@ async def test_role_llm_configs_accepts_dict_form(tmp_path):
     async def query_fn(*args, **kwargs):
         return "query-via-dict"
 
-    rag = LightRAG(
+    rag = OntoRAG(
         working_dir=str(tmp_path / "dict-form"),
         workspace="dict-form",
         llm_model_func=_base_llm,
@@ -319,9 +319,9 @@ def test_role_llm_configs_rejects_unknown_role_keys(tmp_path):
 
 
 def test_role_llm_config_logs_once_on_init_with_metadata(
-    tmp_path, caplog, lightrag_logger_propagating
+    tmp_path, caplog, ontorag_logger_propagating
 ):
-    with caplog.at_level("INFO", logger="lightrag"):
+    with caplog.at_level("INFO", logger="ontorag"):
         rag = _make_rag(
             tmp_path,
             role_llm_configs={
@@ -484,7 +484,7 @@ async def test_sync_update_tracks_retired_queue_cleanup(tmp_path):
 
 
 def test_sync_update_without_event_loop_skips_cleanup(
-    tmp_path, caplog, lightrag_logger_propagating
+    tmp_path, caplog, ontorag_logger_propagating
 ):
     async def query_func(*args, **kwargs):
         return "old"
@@ -494,7 +494,7 @@ def test_sync_update_without_event_loop_skips_cleanup(
 
     rag = _make_rag(tmp_path, query_llm_model_func=query_func)
 
-    with caplog.at_level("WARNING", logger="lightrag"):
+    with caplog.at_level("WARNING", logger="ontorag"):
         rag.update_llm_role_config("query", model_func=new_query_func)
 
     assert not rag._retired_llm_queue_cleanup_tasks
@@ -630,7 +630,7 @@ async def test_update_llm_role_config_with_builder_metadata(tmp_path):
 
 
 def test_update_llm_role_config_logs_after_success(
-    tmp_path, caplog, lightrag_logger_propagating
+    tmp_path, caplog, ontorag_logger_propagating
 ):
     async def built_func(*args, **kwargs):
         return "ok"
@@ -654,7 +654,7 @@ def test_update_llm_role_config_logs_after_success(
     rag.register_role_llm_builder(builder)
 
     caplog.clear()
-    with caplog.at_level("INFO", logger="lightrag"):
+    with caplog.at_level("INFO", logger="ontorag"):
         rag.update_llm_role_config(
             "query",
             binding="gemini",
@@ -677,7 +677,7 @@ def test_update_llm_role_config_logs_after_success(
 
 @pytest.mark.asyncio
 async def test_aupdate_llm_role_config_logs_after_success(
-    tmp_path, caplog, lightrag_logger_propagating
+    tmp_path, caplog, ontorag_logger_propagating
 ):
     async def new_query_func(*args, **kwargs):
         return "new-query"
@@ -696,7 +696,7 @@ async def test_aupdate_llm_role_config_logs_after_success(
     )
 
     caplog.clear()
-    with caplog.at_level("INFO", logger="lightrag"):
+    with caplog.at_level("INFO", logger="ontorag"):
         await rag.aupdate_llm_role_config(
             "query",
             model_func=new_query_func,
@@ -797,7 +797,7 @@ async def test_aupdate_llm_role_config_rolls_back_and_keeps_old_wrapped(tmp_path
 
 @pytest.mark.asyncio
 async def test_aupdate_llm_role_config_drain_timeout_does_not_propagate(
-    tmp_path, monkeypatch, caplog, lightrag_logger_propagating
+    tmp_path, monkeypatch, caplog, ontorag_logger_propagating
 ):
     """If the retired queue drain hits its timeout, the underlying
     shutdown falls through to forced cancellation. aupdate must absorb
@@ -820,12 +820,12 @@ async def test_aupdate_llm_role_config_drain_timeout_does_not_propagate(
         if callable(shutdown):
             await shutdown(graceful=True, timeout=0.05)
 
-    monkeypatch.setattr(LightRAG, "_shutdown_llm_wrapper", fast_shutdown)
+    monkeypatch.setattr(OntoRAG, "_shutdown_llm_wrapper", fast_shutdown)
 
     in_flight = asyncio.create_task(rag.role_llm_funcs["query"]("hold"))
     await started.wait()
 
-    with caplog.at_level("WARNING", logger="lightrag"):
+    with caplog.at_level("WARNING", logger="ontorag"):
         await rag.aupdate_llm_role_config("query", model_func=new_func)
 
     with pytest.raises(asyncio.CancelledError):
@@ -1006,7 +1006,7 @@ async def test_cross_provider_update_does_not_inherit_base_kwargs(tmp_path):
 
 @pytest.mark.asyncio
 async def test_update_llm_role_config_rolls_back_on_failure(
-    tmp_path, caplog, lightrag_logger_propagating
+    tmp_path, caplog, ontorag_logger_propagating
 ):
     rag = _make_rag(tmp_path, extract_llm_model_kwargs={"tag": "before"})
     original_raw = rag._role_llm_states["extract"].raw_func
@@ -1027,7 +1027,7 @@ async def test_update_llm_role_config_rolls_back_on_failure(
     )
 
     caplog.clear()
-    with caplog.at_level("INFO", logger="lightrag"):
+    with caplog.at_level("INFO", logger="ontorag"):
         with pytest.raises(RuntimeError, match="boom"):
             rag.update_llm_role_config(
                 "extract",

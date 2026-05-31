@@ -44,9 +44,9 @@ def _load_gemini_module(monkeypatch):
     monkeypatch.setitem(sys.modules, "google.genai", SimpleNamespace(types=fake_types))
     monkeypatch.setitem(sys.modules, "google.api_core", fake_google_api_core)
     monkeypatch.setitem(sys.modules, "google.api_core.exceptions", fake_api_exceptions)
-    sys.modules.pop("lightrag.llm.gemini", None)
+    sys.modules.pop("ontorag.llm.gemini", None)
 
-    return importlib.import_module("lightrag.llm.gemini")
+    return importlib.import_module("ontorag.llm.gemini")
 
 
 def _make_fake_gemini_response(regular_text="", thought_text=""):

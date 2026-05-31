@@ -2,7 +2,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from lightrag.utils import use_llm_func_with_cache
+from ontorag.utils import use_llm_func_with_cache
 
 
 class _FakeKVStorage:

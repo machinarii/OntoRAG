@@ -10,7 +10,7 @@ and post-parse dedup fires.
 
 from __future__ import annotations
 
-from lightrag.utils_pipeline import (
+from ontorag.utils_pipeline import (
     compute_text_content_hash,
     normalize_merged_text_for_hash,
 )

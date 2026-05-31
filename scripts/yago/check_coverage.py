@@ -1,7 +1,7 @@
 """Sample-based coverage check for the YAGO taxonomy layer.
 
 Run this against a representative sample of your corpus (~100 docs)
-before committing to Plan B (the LightRAG pipeline integration). If the
+before committing to Plan B (the OntoRAG pipeline integration). If the
 Uncategorized rate is >40-50%, the taxonomy needs domain-specific
 overlays or a domain ontology — see docs/GraphAndRagArchitecture.md §5.7.
 
@@ -24,14 +24,14 @@ import sys
 from collections import Counter
 from pathlib import Path
 
-from lightrag.kg.nano_vector_db_impl import NanoVectorDBStorage
-from lightrag.kg.shared_storage import (
+from ontorag.kg.nano_vector_db_impl import NanoVectorDBStorage
+from ontorag.kg.shared_storage import (
     finalize_share_data,
     initialize_share_data,
 )
-from lightrag.namespace import NameSpace
-from lightrag.taxonomy import UNCATEGORIZED_IRI, DocumentClassifier
-from lightrag.utils import EmbeddingFunc
+from ontorag.namespace import NameSpace
+from ontorag.taxonomy import UNCATEGORIZED_IRI, DocumentClassifier
+from ontorag.utils import EmbeddingFunc
 
 logger = logging.getLogger("yago.coverage")
 
@@ -101,12 +101,12 @@ async def _check(
 
 
 def _resolve_callable(binding: str, names: list[str]):
-    module = importlib.import_module(f"lightrag.llm.{binding}")
+    module = importlib.import_module(f"ontorag.llm.{binding}")
     for n in names:
         fn = getattr(module, n, None)
         if fn is not None:
             return fn
-    raise SystemExit(f"None of {names} found on lightrag.llm.{binding}")
+    raise SystemExit(f"None of {names} found on ontorag.llm.{binding}")
 
 
 def main(argv: list[str] | None = None) -> int:

@@ -5,9 +5,9 @@ from types import SimpleNamespace
 import bcrypt
 import pytest
 
-from lightrag.api.passwords import BCRYPT_PASSWORD_PREFIX, hash_password
-from lightrag.tools.hash_password import main as hash_password_main
-from lightrag.utils import logger as lightrag_logger
+from ontorag.api.passwords import BCRYPT_PASSWORD_PREFIX, hash_password
+from ontorag.tools.hash_password import main as hash_password_main
+from ontorag.utils import logger as ontorag_logger
 
 
 def import_real_api_module(module_name: str):
@@ -23,7 +23,7 @@ def import_real_api_module(module_name: str):
 
 @pytest.fixture
 def auth_module(monkeypatch):
-    config = import_real_api_module("lightrag.api.config")
+    config = import_real_api_module("ontorag.api.config")
 
     mock_global_args = SimpleNamespace(
         token_secret="test-jwt-secret",
@@ -35,10 +35,10 @@ def auth_module(monkeypatch):
 
     monkeypatch.setattr(config, "global_args", mock_global_args)
 
-    module = import_real_api_module("lightrag.api.auth")
+    module = import_real_api_module("ontorag.api.auth")
     module = importlib.reload(module)
     yield module
-    sys.modules.pop("lightrag.api.auth", None)
+    sys.modules.pop("ontorag.api.auth", None)
 
 
 def build_bcrypt_value(password: str) -> str:
@@ -71,7 +71,7 @@ def test_plaintext_password_with_bcrypt_prefix_stays_plaintext(auth_module):
 
 
 def test_invalid_auth_accounts_raises(monkeypatch):
-    config = import_real_api_module("lightrag.api.config")
+    config = import_real_api_module("ontorag.api.config")
 
     mock_global_args = SimpleNamespace(
         token_secret="test-jwt-secret",
@@ -84,13 +84,13 @@ def test_invalid_auth_accounts_raises(monkeypatch):
     monkeypatch.setattr(config, "global_args", mock_global_args)
 
     with pytest.raises(ValueError, match="AUTH_ACCOUNTS must use"):
-        import_real_api_module("lightrag.api.auth")
+        import_real_api_module("ontorag.api.auth")
 
-    sys.modules.pop("lightrag.api.auth", None)
+    sys.modules.pop("ontorag.api.auth", None)
 
 
 def test_initialize_config_rejects_default_token_secret_with_auth_accounts():
-    config = import_real_api_module("lightrag.api.config")
+    config = import_real_api_module("ontorag.api.config")
 
     insecure_args = SimpleNamespace(
         auth_accounts="admin:admin_pass",
@@ -102,7 +102,7 @@ def test_initialize_config_rejects_default_token_secret_with_auth_accounts():
 
 
 def test_initialize_config_allows_custom_token_secret_with_auth_accounts():
-    config = import_real_api_module("lightrag.api.config")
+    config = import_real_api_module("ontorag.api.config")
 
     secure_args = SimpleNamespace(
         auth_accounts="admin:admin_pass",
@@ -117,7 +117,7 @@ def test_initialize_config_allows_custom_token_secret_with_auth_accounts():
 def test_guest_tokens_fall_back_to_default_secret_when_token_secret_missing(
     monkeypatch,
 ):
-    config = import_real_api_module("lightrag.api.config")
+    config = import_real_api_module("ontorag.api.config")
 
     mock_global_args = SimpleNamespace(
         token_secret=None,
@@ -133,9 +133,9 @@ def test_guest_tokens_fall_back_to_default_secret_when_token_secret_missing(
     def capture_warning(message):
         warning_messages.append(message)
 
-    monkeypatch.setattr(lightrag_logger, "warning", capture_warning)
+    monkeypatch.setattr(ontorag_logger, "warning", capture_warning)
 
-    module = import_real_api_module("lightrag.api.auth")
+    module = import_real_api_module("ontorag.api.auth")
     module = importlib.reload(module)
     handler = module.AuthHandler()
 
@@ -150,7 +150,7 @@ def test_guest_tokens_fall_back_to_default_secret_when_token_secret_missing(
         for msg in warning_messages
     )
 
-    sys.modules.pop("lightrag.api.auth", None)
+    sys.modules.pop("ontorag.api.auth", None)
 
 
 def test_hash_password_returns_prefixed_value(auth_module):

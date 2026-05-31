@@ -1,4 +1,4 @@
-"""Tests for lightrag.taxonomy.classifier."""
+"""Tests for ontorag.taxonomy.classifier."""
 
 from __future__ import annotations
 
@@ -8,19 +8,19 @@ from pathlib import Path
 import numpy as np
 import pytest_asyncio
 
-from lightrag.kg.nano_vector_db_impl import NanoVectorDBStorage
-from lightrag.kg.networkx_impl import NetworkXStorage
-from lightrag.kg.shared_storage import (
+from ontorag.kg.nano_vector_db_impl import NanoVectorDBStorage
+from ontorag.kg.networkx_impl import NetworkXStorage
+from ontorag.kg.shared_storage import (
     finalize_share_data,
     initialize_share_data,
 )
-from lightrag.namespace import NameSpace
-from lightrag.taxonomy.class_index import build_class_index
-from lightrag.taxonomy.classifier import DocumentClassifier
-from lightrag.taxonomy.constants import UNCATEGORIZED_IRI
-from lightrag.taxonomy.graph_loader import load_taxonomy_to_graph
-from lightrag.taxonomy.parser import parse_ntriples_file
-from lightrag.utils import EmbeddingFunc
+from ontorag.namespace import NameSpace
+from ontorag.taxonomy.class_index import build_class_index
+from ontorag.taxonomy.classifier import DocumentClassifier
+from ontorag.taxonomy.constants import UNCATEGORIZED_IRI
+from ontorag.taxonomy.graph_loader import load_taxonomy_to_graph
+from ontorag.taxonomy.parser import parse_ntriples_file
+from ontorag.utils import EmbeddingFunc
 
 FIXTURE = Path(__file__).parent / "fixtures" / "yago" / "mini_taxonomy.nt"
 _DIM = 16

@@ -1,4 +1,4 @@
-# Podman-compatible compose file for LightRAG
+# Podman-compatible compose file for OntoRAG
 #
 # Usage:
 #   podman-compose -f docker-compose.podman.yml up -d
@@ -13,13 +13,13 @@
 #     in your .env binding host configuration
 
 services:
-  lightrag:
-    image: ghcr.io/hkuds/lightrag:latest
+  ontorag:
+    image: ghcr.io/hkuds/ontorag:latest
     build:
       context: .
       dockerfile: Dockerfile
       tags:
-        - ghcr.io/hkuds/lightrag:latest
+        - ghcr.io/hkuds/ontorag:latest
     ports:
       - "${HOST:-0.0.0.0}:${PORT:-9621}:9621"
     volumes:

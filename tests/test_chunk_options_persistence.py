@@ -5,9 +5,9 @@ Three properties under test:
 1. **env-driven snapshot**: env vars (CHUNK_R_OVERLAP_SIZE,
    CHUNK_V_BREAKPOINT_THRESHOLD_TYPE, …) flow into
    ``addon_params['chunker']`` via
-   :func:`lightrag.parser_routing.default_chunker_config`, then into
+   :func:`ontorag.parser_routing.default_chunker_config`, then into
    ``full_docs[doc_id]['chunk_options']`` at enqueue time via
-   :func:`lightrag.parser_routing.resolve_chunk_options`.
+   :func:`ontorag.parser_routing.resolve_chunk_options`.
 
 2. **caller-supplied chunk_options**: an explicit ``chunk_options``
    kwarg passed to ``apipeline_enqueue_documents`` is persisted
@@ -24,9 +24,9 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from lightrag import LightRAG, ROLES, RoleLLMConfig
-from lightrag.constants import DEFAULT_R_SEPARATORS
-from lightrag.utils import EmbeddingFunc, Tokenizer, TokenizerInterface
+from ontorag import OntoRAG, ROLES, RoleLLMConfig
+from ontorag.constants import DEFAULT_R_SEPARATORS
+from ontorag.utils import EmbeddingFunc, Tokenizer, TokenizerInterface
 
 
 class _SimpleTokenizerImpl(TokenizerInterface):
@@ -53,7 +53,7 @@ _ROLE_FIELD_SUFFIXES = (
 )
 
 
-def _new_rag(tmp_path: Path, **kwargs) -> LightRAG:
+def _new_rag(tmp_path: Path, **kwargs) -> OntoRAG:
     role_configs: dict[str, RoleLLMConfig] = {}
     for spec in ROLES:
         bucket = {}
@@ -66,7 +66,7 @@ def _new_rag(tmp_path: Path, **kwargs) -> LightRAG:
     if role_configs:
         kwargs["role_llm_configs"] = role_configs
 
-    return LightRAG(
+    return OntoRAG(
         working_dir=str(tmp_path),
         workspace=f"chunkopts-{tmp_path.name}",
         llm_model_func=_mock_llm,
@@ -93,12 +93,12 @@ def test_env_driven_snapshot_persisted_in_full_docs(tmp_path, monkeypatch):
     monkeypatch.setenv("CHUNK_V_BUFFER_SIZE", "3")
 
     async def _run():
-        from lightrag.parser_routing import resolve_chunk_options
+        from ontorag.parser_routing import resolve_chunk_options
 
         rag = _new_rag(tmp_path)
         await rag.initialize_storages()
         try:
-            # F slot — mirror what ``LightRAG.ainsert`` does: build the
+            # F slot — mirror what ``OntoRAG.ainsert`` does: build the
             # F-scoped chunk_options snapshot from addon_params plus
             # F-strategy runtime args, then hand it to enqueue.
             chunk_opts_f = resolve_chunk_options(
@@ -167,7 +167,7 @@ def test_caller_supplied_chunk_options_reach_chunker(tmp_path, monkeypatch):
     and the dispatcher splats it into the chunker call."""
     pytest.importorskip("langchain_text_splitters")
 
-    import lightrag.chunker as chunker_pkg
+    import ontorag.chunker as chunker_pkg
 
     custom_options = {
         "chunk_token_size": 100,
@@ -309,7 +309,7 @@ def test_per_file_chunk_options_list(tmp_path, monkeypatch):
 
 @pytest.mark.offline
 def test_constructor_chunk_size_overlays_addon_params(tmp_path, monkeypatch):
-    """``LightRAG(chunk_token_size=N, chunk_overlap_token_size=M)`` must
+    """``OntoRAG(chunk_token_size=N, chunk_overlap_token_size=M)`` must
     actually take effect — the per-doc snapshot is built from
     ``addon_params['chunker']``, so the constructor values have to be
     overlaid onto it (otherwise env-driven defaults would silently win).
@@ -421,7 +421,7 @@ def test_strategy_env_wins_over_legacy_ctor_field(tmp_path, monkeypatch):
     the strategy-agnostic legacy constructor field.
 
     Setup: ``CHUNK_R_OVERLAP_SIZE=42`` is strategy-specific for R.
-    ``LightRAG(chunk_overlap_token_size=2)`` is the legacy
+    ``OntoRAG(chunk_overlap_token_size=2)`` is the legacy
     strategy-agnostic field.  R must end up at 42 (env wins on its own
     strategy slot), F at 2 (no F-specific env, so legacy field fills).
     """
@@ -562,7 +562,7 @@ def test_p_strategy_uses_dedicated_chunk_size_env(tmp_path, monkeypatch):
     monkeypatch.setenv("CHUNK_SIZE", "1200")
     monkeypatch.setenv("CHUNK_P_SIZE", "999")
 
-    import lightrag.chunker as chunker_pkg
+    import ontorag.chunker as chunker_pkg
 
     captured: dict = {}
 
@@ -601,16 +601,16 @@ def test_p_strategy_uses_dedicated_chunk_size_env(tmp_path, monkeypatch):
 def test_p_strategy_defaults_to_dedicated_size_when_env_unset(tmp_path, monkeypatch):
     """When ``CHUNK_P_SIZE`` is unset, P uses ``DEFAULT_CHUNK_P_SIZE``
     rather than inheriting the global ``CHUNK_SIZE`` or
-    ``LightRAG(chunk_token_size=…)``.  Paragraph-semantic merging needs
+    ``OntoRAG(chunk_token_size=…)``.  Paragraph-semantic merging needs
     more headroom than the global default to keep related paragraphs
     together; silently inheriting the smaller global ceiling defeats
     the strategy's purpose."""
-    from lightrag.constants import DEFAULT_CHUNK_P_SIZE
+    from ontorag.constants import DEFAULT_CHUNK_P_SIZE
 
     monkeypatch.delenv("CHUNK_P_SIZE", raising=False)
     monkeypatch.delenv("CHUNK_SIZE", raising=False)
 
-    import lightrag.chunker as chunker_pkg
+    import ontorag.chunker as chunker_pkg
 
     captured: dict = {}
 
@@ -648,12 +648,12 @@ def test_p_strategy_default_size_survives_partial_addon_params(tmp_path, monkeyp
     so the slot would silently fall back to the top-level resolved
     chunk size in the pipeline.  ``_apply_chunk_size_overlay`` backfills
     ``DEFAULT_CHUNK_P_SIZE`` as the last guard."""
-    from lightrag.constants import DEFAULT_CHUNK_P_SIZE
+    from ontorag.constants import DEFAULT_CHUNK_P_SIZE
 
     monkeypatch.delenv("CHUNK_P_SIZE", raising=False)
     monkeypatch.delenv("CHUNK_SIZE", raising=False)
 
-    import lightrag.chunker as chunker_pkg
+    import ontorag.chunker as chunker_pkg
 
     captured: dict = {}
 
@@ -702,7 +702,7 @@ def test_p_strategy_partial_addon_params_still_picks_up_env(tmp_path, monkeypatc
     monkeypatch.setenv("CHUNK_P_SIZE", "4096")
     monkeypatch.delenv("CHUNK_SIZE", raising=False)
 
-    import lightrag.chunker as chunker_pkg
+    import ontorag.chunker as chunker_pkg
 
     captured: dict = {}
 
@@ -753,7 +753,7 @@ def test_p_strategy_runtime_chunker_mutation_picks_up_env(tmp_path, monkeypatch)
     monkeypatch.setenv("CHUNK_P_SIZE", "4096")
     monkeypatch.delenv("CHUNK_SIZE", raising=False)
 
-    import lightrag.chunker as chunker_pkg
+    import ontorag.chunker as chunker_pkg
 
     captured: dict = {}
 
@@ -793,12 +793,12 @@ def test_p_strategy_runtime_chunker_mutation_uses_default_when_env_unset(
     """Sibling of the env-aware case: with ``CHUNK_P_SIZE`` unset,
     runtime-mutation enqueue still gets ``DEFAULT_CHUNK_P_SIZE``
     rather than the top-level ``chunk_token_size``."""
-    from lightrag.constants import DEFAULT_CHUNK_P_SIZE
+    from ontorag.constants import DEFAULT_CHUNK_P_SIZE
 
     monkeypatch.delenv("CHUNK_P_SIZE", raising=False)
     monkeypatch.delenv("CHUNK_SIZE", raising=False)
 
-    import lightrag.chunker as chunker_pkg
+    import ontorag.chunker as chunker_pkg
 
     captured: dict = {}
 
@@ -837,7 +837,7 @@ def test_p_strategy_caller_chunk_options_picks_up_env(tmp_path, monkeypatch):
     monkeypatch.setenv("CHUNK_P_SIZE", "4096")
     monkeypatch.delenv("CHUNK_SIZE", raising=False)
 
-    import lightrag.chunker as chunker_pkg
+    import ontorag.chunker as chunker_pkg
 
     captured: dict = {}
 
@@ -883,12 +883,12 @@ def test_p_strategy_caller_chunk_options_uses_default_when_env_unset(
     a caller-supplied ``chunk_options`` that omits the P slot, the
     P backfill resolves to ``DEFAULT_CHUNK_P_SIZE`` — not the
     caller's top-level ``chunk_token_size``."""
-    from lightrag.constants import DEFAULT_CHUNK_P_SIZE
+    from ontorag.constants import DEFAULT_CHUNK_P_SIZE
 
     monkeypatch.delenv("CHUNK_P_SIZE", raising=False)
     monkeypatch.delenv("CHUNK_SIZE", raising=False)
 
-    import lightrag.chunker as chunker_pkg
+    import ontorag.chunker as chunker_pkg
 
     captured: dict = {}
 
@@ -930,7 +930,7 @@ def test_p_strategy_caller_chunk_options_respects_explicit_p_size(
     monkeypatch.setenv("CHUNK_P_SIZE", "4096")
     monkeypatch.delenv("CHUNK_SIZE", raising=False)
 
-    import lightrag.chunker as chunker_pkg
+    import ontorag.chunker as chunker_pkg
 
     captured: dict = {}
 
@@ -968,7 +968,7 @@ def test_p_strategy_respects_explicit_addon_params_chunk_size(tmp_path, monkeypa
     monkeypatch.delenv("CHUNK_P_SIZE", raising=False)
     monkeypatch.delenv("CHUNK_SIZE", raising=False)
 
-    import lightrag.chunker as chunker_pkg
+    import ontorag.chunker as chunker_pkg
 
     captured: dict = {}
 
@@ -1006,7 +1006,7 @@ def test_p_strategy_uses_dedicated_overlap_env(tmp_path, monkeypatch):
     monkeypatch.setenv("CHUNK_OVERLAP_SIZE", "11")
     monkeypatch.setenv("CHUNK_P_OVERLAP_SIZE", "66")
 
-    import lightrag.chunker as chunker_pkg
+    import ontorag.chunker as chunker_pkg
 
     captured: dict = {}
 
@@ -1140,7 +1140,7 @@ def test_r_strategy_uses_dedicated_chunk_size_env(tmp_path, monkeypatch):
     monkeypatch.setenv("CHUNK_SIZE", "1200")
     monkeypatch.setenv("CHUNK_R_SIZE", "777")
 
-    import lightrag.chunker as chunker_pkg
+    import ontorag.chunker as chunker_pkg
 
     captured: dict = {}
 
@@ -1178,11 +1178,11 @@ def test_r_strategy_uses_dedicated_chunk_size_env(tmp_path, monkeypatch):
 def test_r_strategy_falls_back_to_global_chunk_size(tmp_path, monkeypatch):
     """When ``CHUNK_R_SIZE`` is unset and no per-doc R override is
     supplied, R inherits the top-level ``chunk_token_size`` resolved
-    from the standard chain (here: ``LightRAG(chunk_token_size=…)``)."""
+    from the standard chain (here: ``OntoRAG(chunk_token_size=…)``)."""
     monkeypatch.delenv("CHUNK_R_SIZE", raising=False)
     monkeypatch.delenv("CHUNK_SIZE", raising=False)
 
-    import lightrag.chunker as chunker_pkg
+    import ontorag.chunker as chunker_pkg
 
     captured: dict = {}
 
@@ -1217,7 +1217,7 @@ def test_v_strategy_uses_dedicated_chunk_size_env(tmp_path, monkeypatch):
     monkeypatch.setenv("CHUNK_SIZE", "1200")
     monkeypatch.setenv("CHUNK_V_SIZE", "2500")
 
-    import lightrag.chunker as chunker_pkg
+    import ontorag.chunker as chunker_pkg
 
     captured: dict = {}
 
@@ -1257,11 +1257,11 @@ def test_v_strategy_uses_dedicated_chunk_size_env(tmp_path, monkeypatch):
 def test_v_strategy_falls_back_to_global_chunk_size(tmp_path, monkeypatch):
     """When ``CHUNK_V_SIZE`` is unset and no per-doc V override is
     supplied, V inherits the top-level ``chunk_token_size`` resolved
-    from the standard chain (here: ``LightRAG(chunk_token_size=…)``)."""
+    from the standard chain (here: ``OntoRAG(chunk_token_size=…)``)."""
     monkeypatch.delenv("CHUNK_V_SIZE", raising=False)
     monkeypatch.delenv("CHUNK_SIZE", raising=False)
 
-    import lightrag.chunker as chunker_pkg
+    import ontorag.chunker as chunker_pkg
 
     captured: dict = {}
 

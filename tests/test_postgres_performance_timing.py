@@ -3,9 +3,9 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-import lightrag.utils as utils_module
-from lightrag.kg.postgres_impl import PGGraphStorage, PostgreSQLDB
-from lightrag.namespace import NameSpace
+import ontorag.utils as utils_module
+from ontorag.kg.postgres_impl import PGGraphStorage, PostgreSQLDB
+from ontorag.namespace import NameSpace
 
 
 def make_db() -> PostgreSQLDB:
@@ -37,7 +37,7 @@ async def test_execute_timing_logs_success():
 
     db._run_with_retry = AsyncMock(side_effect=fake_run_with_retry)
 
-    with patch("lightrag.kg.postgres_impl.performance_timing_log") as timing_log:
+    with patch("ontorag.kg.postgres_impl.performance_timing_log") as timing_log:
         await db.execute("SELECT 1", timing_label="test label")
 
     assert any(
@@ -57,7 +57,7 @@ async def test_execute_timing_logs_failure():
 
     db._run_with_retry = AsyncMock(side_effect=fake_run_with_retry)
 
-    with patch("lightrag.kg.postgres_impl.performance_timing_log") as timing_log:
+    with patch("ontorag.kg.postgres_impl.performance_timing_log") as timing_log:
         with pytest.raises(RuntimeError, match="boom"):
             await db.execute("SELECT 1", timing_label="test label")
 
@@ -118,8 +118,8 @@ async def test_graph_upsert_edge_passes_timing_label():
 
 def test_performance_timing_logs_reads_new_env_only(monkeypatch):
     with monkeypatch.context() as m:
-        m.setenv("LIGHTRAG_DOC_QUERY_TIMING_LOGS", "false")
-        m.setenv("LIGHTRAG_PERFORMANCE_TIMING_LOGS", "true")
+        m.setenv("ONTORAG_DOC_QUERY_TIMING_LOGS", "false")
+        m.setenv("ONTORAG_PERFORMANCE_TIMING_LOGS", "true")
         reloaded = importlib.reload(utils_module)
         assert reloaded.PERFORMANCE_TIMING_LOGS is True
 
@@ -128,8 +128,8 @@ def test_performance_timing_logs_reads_new_env_only(monkeypatch):
 
 def test_performance_timing_logs_ignores_old_env(monkeypatch):
     with monkeypatch.context() as m:
-        m.setenv("LIGHTRAG_DOC_QUERY_TIMING_LOGS", "true")
-        m.setenv("LIGHTRAG_PERFORMANCE_TIMING_LOGS", "false")
+        m.setenv("ONTORAG_DOC_QUERY_TIMING_LOGS", "true")
+        m.setenv("ONTORAG_PERFORMANCE_TIMING_LOGS", "false")
         reloaded = importlib.reload(utils_module)
         assert reloaded.PERFORMANCE_TIMING_LOGS is False
 

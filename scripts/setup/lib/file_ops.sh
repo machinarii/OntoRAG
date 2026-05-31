@@ -170,7 +170,7 @@ append_preserved_non_template_env_lines() {
   local -a template_preserved_payload=()
   local -a effective_preserved_payload=()
   local -A ignored_keys=(
-    ["LIGHTRAG_SETUP_PROFILE"]=1
+    ["ONTORAG_SETUP_PROFILE"]=1
   )
   local -A template_keys=()
 
@@ -405,10 +405,10 @@ generate_env_file() {
   mv "$tmp_file" "$output_file"
 }
 
-# All environment keys the wizard may inject into the lightrag service via
+# All environment keys the wizard may inject into the ontorag service via
 # COMPOSE_ENV_OVERRIDES.  Used to remove stale entries before re-injection so
 # keys no longer needed are not left behind in the compose file.
-_WIZARD_COMPOSE_LIGHTRAG_KEYS=(
+_WIZARD_COMPOSE_ONTORAG_KEYS=(
   "EMBEDDING_BINDING_HOST" "RERANK_BINDING_HOST" "LLM_BINDING_HOST"
   "REDIS_URI" "MONGO_URI" "NEO4J_URI" "MILVUS_URI" "QDRANT_URL" "MEMGRAPH_URI" "OPENSEARCH_HOSTS"
   "POSTGRES_HOST" "POSTGRES_PORT" "PORT" "HOST" "SSL_CERTFILE" "SSL_KEYFILE"
@@ -550,37 +550,37 @@ _is_wizard_managed_volume_name() {
   [[ -n "$(_managed_volume_root_name "$volume_name")" ]]
 }
 
-# Remove wizard-managed keys from the lightrag service's environment block,
+# Remove wizard-managed keys from the ontorag service's environment block,
 # leaving any user-added keys intact.
-_strip_lightrag_wizard_environment_keys() {
+_strip_ontorag_wizard_environment_keys() {
   local compose_file="$1"
   local tmp_file="${compose_file}.strip-wizard-keys"
   _FILE_OPS_CLEANUP_TMP+=("$tmp_file")
   local line key wk list_entry
-  local in_lightrag="no"
+  local in_ontorag="no"
   local in_environment="no"
 
   : > "$tmp_file"
 
   while IFS= read -r line || [[ -n "$line" ]]; do
-    if [[ "$line" == "  lightrag:" ]]; then
-      in_lightrag="yes"
+    if [[ "$line" == "  ontorag:" ]]; then
+      in_ontorag="yes"
       in_environment="no"
-    elif [[ "$in_lightrag" == "yes" && "$line" =~ ^[[:space:]]{2}[^[:space:]] && "$line" != "  lightrag:" ]]; then
-      in_lightrag="no"
+    elif [[ "$in_ontorag" == "yes" && "$line" =~ ^[[:space:]]{2}[^[:space:]] && "$line" != "  ontorag:" ]]; then
+      in_ontorag="no"
       in_environment="no"
     fi
 
-    if [[ "$in_lightrag" == "yes" && "$line" == "    environment:" ]]; then
+    if [[ "$in_ontorag" == "yes" && "$line" == "    environment:" ]]; then
       in_environment="yes"
       printf '%s\n' "$line" >> "$tmp_file"
       continue
     fi
 
-    if [[ "$in_lightrag" == "yes" && "$in_environment" == "yes" ]]; then
+    if [[ "$in_ontorag" == "yes" && "$in_environment" == "yes" ]]; then
       if [[ "$line" =~ ^[[:space:]]{6}([A-Z0-9_]+): ]]; then
         key="${BASH_REMATCH[1]}"
-        for wk in "${_WIZARD_COMPOSE_LIGHTRAG_KEYS[@]}"; do
+        for wk in "${_WIZARD_COMPOSE_ONTORAG_KEYS[@]}"; do
           if [[ "$key" == "$wk" ]]; then
             continue 2  # skip this wizard-managed key
           fi
@@ -589,7 +589,7 @@ _strip_lightrag_wizard_environment_keys() {
         list_entry="$(_strip_wrapping_quotes "${BASH_REMATCH[1]}")"
         key="${list_entry%%=*}"
         if [[ "$key" =~ ^[A-Z0-9_]+$ ]]; then
-          for wk in "${_WIZARD_COMPOSE_LIGHTRAG_KEYS[@]}"; do
+          for wk in "${_WIZARD_COMPOSE_ONTORAG_KEYS[@]}"; do
             if [[ "$key" == "$wk" ]]; then
               continue 2  # skip this wizard-managed key
             fi
@@ -742,9 +742,9 @@ _strip_wizard_managed_services_and_top_level_volumes() {
     fi
 
     # Skip managed services that are being removed or regenerated. Preserve
-    # lightrag, user-added services, and unchanged managed service groups.
+    # ontorag, user-added services, and unchanged managed service groups.
     if [[ "$in_services" == "yes" && -n "$current_service" ]] && \
-      [[ "$current_service" != "lightrag" ]] && \
+      [[ "$current_service" != "ontorag" ]] && \
       [[ -n "$current_root_service" ]] && \
       _should_rewrite_wizard_managed_root_service "$current_root_service"; then
       continue
@@ -1165,13 +1165,13 @@ generate_docker_compose() {
   _FILE_OPS_CLEANUP_TMP+=("$tmp_file")
   _FILE_OPS_CLEANUP_TMP+=("$service_blocks_file")
   local template_file
-  local lightrag_mounts=()
-  local lightrag_env_entries=()
+  local ontorag_mounts=()
+  local ontorag_env_entries=()
   local key
   local root_service
 
   # Prefer the existing generated compose as the starting point to preserve
-  # any user customisations to the lightrag service.  Fall back to the base
+  # any user customisations to the ontorag service.  Fall back to the base
   # docker-compose.yml when the output file doesn't exist yet.
   if [[ -f "$output_file" && "$output_file" != "$base_file" ]]; then
     _refresh_existing_managed_root_service_set_from_compose "$output_file"
@@ -1193,43 +1193,43 @@ generate_docker_compose() {
     printf 'services:\n' > "$tmp_file"
   fi
 
-  prepare_lightrag_service_for_generated_compose "$tmp_file"
-  normalize_lightrag_restart_policy "$tmp_file"
-  # Remove stale wizard-managed keys from lightrag's environment so that
+  prepare_ontorag_service_for_generated_compose "$tmp_file"
+  normalize_ontorag_restart_policy "$tmp_file"
+  # Remove stale wizard-managed keys from ontorag's environment so that
   # keys no longer in COMPOSE_ENV_OVERRIDES are not left behind.
-  _strip_lightrag_wizard_environment_keys "$tmp_file"
+  _strip_ontorag_wizard_environment_keys "$tmp_file"
 
-  # Remove stale wizard-managed bind mounts from lightrag's volumes so that
+  # Remove stale wizard-managed bind mounts from ontorag's volumes so that
   # mounts no longer needed (e.g. after SSL removal) are not left behind.
-  _strip_lightrag_wizard_bind_mounts "$tmp_file"
+  _strip_ontorag_wizard_bind_mounts "$tmp_file"
 
-  if [[ -n "${LIGHTRAG_COMPOSE_SERVER_PORT_MAPPING:-}" ]]; then
-    _strip_lightrag_wizard_ports "$tmp_file"
-    inject_lightrag_port_mapping "$tmp_file" "$LIGHTRAG_COMPOSE_SERVER_PORT_MAPPING"
+  if [[ -n "${ONTORAG_COMPOSE_SERVER_PORT_MAPPING:-}" ]]; then
+    _strip_ontorag_wizard_ports "$tmp_file"
+    inject_ontorag_port_mapping "$tmp_file" "$ONTORAG_COMPOSE_SERVER_PORT_MAPPING"
   fi
 
   # Ensure the optional prompts directory mount exists so users can supply
   # custom entity-type prompt profiles without rebuilding the image. Mirrors
   # the ./data/inputs and ./data/rag_storage bind layout.
-  if ! _lightrag_volumes_have_container_target "$tmp_file" "/app/data/prompts"; then
-    lightrag_mounts+=("./data/prompts:/app/data/prompts")
+  if ! _ontorag_volumes_have_container_target "$tmp_file" "/app/data/prompts"; then
+    ontorag_mounts+=("./data/prompts:/app/data/prompts")
   fi
 
-  append_lightrag_ssl_mount lightrag_mounts "${COMPOSE_ENV_OVERRIDES[SSL_CERTFILE]:-}" || return 1
-  append_lightrag_ssl_mount lightrag_mounts "${COMPOSE_ENV_OVERRIDES[SSL_KEYFILE]:-}" || return 1
-  if ((${#lightrag_mounts[@]} > 0)); then
-    inject_lightrag_bind_mounts "$tmp_file" "${lightrag_mounts[@]}"
+  append_ontorag_ssl_mount ontorag_mounts "${COMPOSE_ENV_OVERRIDES[SSL_CERTFILE]:-}" || return 1
+  append_ontorag_ssl_mount ontorag_mounts "${COMPOSE_ENV_OVERRIDES[SSL_KEYFILE]:-}" || return 1
+  if ((${#ontorag_mounts[@]} > 0)); then
+    inject_ontorag_bind_mounts "$tmp_file" "${ontorag_mounts[@]}"
   fi
 
   for key in "${!COMPOSE_ENV_OVERRIDES[@]}"; do
-    lightrag_env_entries+=("${key}=${COMPOSE_ENV_OVERRIDES[$key]}")
+    ontorag_env_entries+=("${key}=${COMPOSE_ENV_OVERRIDES[$key]}")
   done
-  if ((${#lightrag_env_entries[@]} > 0)); then
-    inject_lightrag_environment_overrides "$tmp_file" "${lightrag_env_entries[@]}"
+  if ((${#ontorag_env_entries[@]} > 0)); then
+    inject_ontorag_environment_overrides "$tmp_file" "${ontorag_env_entries[@]}"
   fi
 
-  repair_misplaced_lightrag_depends_on "$tmp_file"
-  inject_lightrag_depends_on "$tmp_file" "${DOCKER_SERVICES[@]}"
+  repair_misplaced_ontorag_depends_on "$tmp_file"
+  inject_ontorag_depends_on "$tmp_file" "${DOCKER_SERVICES[@]}"
 
   : > "$service_blocks_file"
   for service in "${DOCKER_SERVICES[@]}"; do
@@ -1321,14 +1321,14 @@ generate_docker_compose() {
   mv "$tmp_file" "$output_file"
 }
 
-prepare_lightrag_service_for_generated_compose() {
+prepare_ontorag_service_for_generated_compose() {
   # Let the containerized app read the mounted .env itself. Keeping env_file
   # here would make Docker Compose re-parse the same secrets and expand '$'.
   local compose_file="$1"
   local tmp_file="${compose_file}.strip-env-file"
   _FILE_OPS_CLEANUP_TMP+=("$tmp_file")
   local line
-  local in_lightrag="no"
+  local in_ontorag="no"
   local in_env_file="no"
 
   : > "$tmp_file"
@@ -1341,23 +1341,23 @@ prepare_lightrag_service_for_generated_compose() {
       in_env_file="no"
     fi
 
-    if [[ "$in_lightrag" == "yes" && "$line" =~ ^[[:space:]]{2}[^[:space:]] && "$line" != "  lightrag:" ]]; then
-      in_lightrag="no"
+    if [[ "$in_ontorag" == "yes" && "$line" =~ ^[[:space:]]{2}[^[:space:]] && "$line" != "  ontorag:" ]]; then
+      in_ontorag="no"
     fi
 
-    if [[ "$in_lightrag" == "yes" && "$line" == "    env_file:" ]]; then
+    if [[ "$in_ontorag" == "yes" && "$line" == "    env_file:" ]]; then
       in_env_file="yes"
       continue
     fi
 
-    if [[ "$in_lightrag" == "yes" && "$line" =~ ^[[:space:]]{4}container_name: ]]; then
+    if [[ "$in_ontorag" == "yes" && "$line" =~ ^[[:space:]]{4}container_name: ]]; then
       continue
     fi
 
     printf '%s\n' "$line" >> "$tmp_file"
 
-    if [[ "$line" == "  lightrag:" ]]; then
-      in_lightrag="yes"
+    if [[ "$line" == "  ontorag:" ]]; then
+      in_ontorag="yes"
       in_env_file="no"
     fi
   done < "$compose_file"
@@ -1365,12 +1365,12 @@ prepare_lightrag_service_for_generated_compose() {
   mv "$tmp_file" "$compose_file"
 }
 
-normalize_lightrag_restart_policy() {
+normalize_ontorag_restart_policy() {
   local compose_file="$1"
-  local tmp_file="${compose_file}.normalize-lightrag-restart"
+  local tmp_file="${compose_file}.normalize-ontorag-restart"
   _FILE_OPS_CLEANUP_TMP+=("$tmp_file")
   local line
-  local in_lightrag="no"
+  local in_ontorag="no"
   local in_deploy="no"
   local deploy_seen="no"
   local insert_blank_after_deploy="no"
@@ -1398,7 +1398,7 @@ normalize_lightrag_restart_policy() {
     mv "$trim_file" "$file"
   }
 
-  _write_normalized_lightrag_deploy_block() {
+  _write_normalized_ontorag_deploy_block() {
     local deploy_line
     local skipping_restart_policy="no"
 
@@ -1438,7 +1438,7 @@ normalize_lightrag_restart_policy() {
       fi
 
       _trim_trailing_blank_lines "$tmp_file"
-      _write_normalized_lightrag_deploy_block
+      _write_normalized_ontorag_deploy_block
       deploy_lines=()
       in_deploy="no"
       if [[ "$line" =~ ^[[:space:]]{2}[^[:space:]] || "$line" =~ ^[^[:space:]] ]]; then
@@ -1446,31 +1446,31 @@ normalize_lightrag_restart_policy() {
       fi
     fi
 
-    if [[ "$in_lightrag" == "yes" && "$line" =~ ^[[:space:]]{2}[^[:space:]] && "$line" != "  lightrag:" ]] || \
-      [[ "$in_lightrag" == "yes" && "$line" =~ ^[^[:space:]] ]]; then
+    if [[ "$in_ontorag" == "yes" && "$line" =~ ^[[:space:]]{2}[^[:space:]] && "$line" != "  ontorag:" ]] || \
+      [[ "$in_ontorag" == "yes" && "$line" =~ ^[^[:space:]] ]]; then
       if [[ "$deploy_seen" != "yes" ]]; then
         _trim_trailing_blank_lines "$tmp_file"
-        _write_normalized_lightrag_deploy_block
+        _write_normalized_ontorag_deploy_block
         insert_blank_after_deploy="yes"
       fi
-      in_lightrag="no"
+      in_ontorag="no"
       deploy_seen="no"
       skip_blank_after_removed_restart="no"
     fi
 
-    if [[ "$in_lightrag" == "yes" && "$line" == "    deploy:" ]]; then
+    if [[ "$in_ontorag" == "yes" && "$line" == "    deploy:" ]]; then
       in_deploy="yes"
       deploy_seen="yes"
       deploy_lines=()
       continue
     fi
 
-    if [[ "$in_lightrag" == "yes" && "$line" =~ ^[[:space:]]{4}restart: ]]; then
+    if [[ "$in_ontorag" == "yes" && "$line" =~ ^[[:space:]]{4}restart: ]]; then
       skip_blank_after_removed_restart="yes"
       continue
     fi
 
-    if [[ "$skip_blank_after_removed_restart" == "yes" && "$in_lightrag" == "yes" ]]; then
+    if [[ "$skip_blank_after_removed_restart" == "yes" && "$in_ontorag" == "yes" ]]; then
       if [[ -z "$line" ]]; then
         continue
       fi
@@ -1484,8 +1484,8 @@ normalize_lightrag_restart_policy() {
 
     printf '%s\n' "$line" >> "$tmp_file"
 
-    if [[ "$line" == "  lightrag:" ]]; then
-      in_lightrag="yes"
+    if [[ "$line" == "  ontorag:" ]]; then
+      in_ontorag="yes"
       in_deploy="no"
       deploy_seen="no"
       insert_blank_after_deploy="no"
@@ -1496,19 +1496,19 @@ normalize_lightrag_restart_policy() {
 
   if [[ "$in_deploy" == "yes" ]]; then
     _trim_trailing_blank_lines "$tmp_file"
-    _write_normalized_lightrag_deploy_block
+    _write_normalized_ontorag_deploy_block
     deploy_seen="yes"
   fi
 
-  if [[ "$in_lightrag" == "yes" && "$deploy_seen" != "yes" ]]; then
+  if [[ "$in_ontorag" == "yes" && "$deploy_seen" != "yes" ]]; then
     _trim_trailing_blank_lines "$tmp_file"
-    _write_normalized_lightrag_deploy_block
+    _write_normalized_ontorag_deploy_block
   fi
 
   mv "$tmp_file" "$compose_file"
 }
 
-append_lightrag_ssl_mount() {
+append_ontorag_ssl_mount() {
   local array_name="$1"
   local container_path="$2"
   local relative_host_path=""
@@ -1538,7 +1538,7 @@ format_yaml_value() {
   printf '"%s"' "$escaped"
 }
 
-_COMPOSE_RAW_VALUE_PREFIX="__LIGHTRAG_RAW_COMPOSE__:"
+_COMPOSE_RAW_VALUE_PREFIX="__ONTORAG_RAW_COMPOSE__:"
 
 format_compose_environment_value() {
   local value="$1"
@@ -1678,14 +1678,14 @@ inject_service_image_override() {
   mv "$tmp_file" "$compose_file"
 }
 
-# Return success when the lightrag service already has a volume mount whose
+# Return success when the ontorag service already has a volume mount whose
 # container target matches the supplied path. Used to make idempotent mount
 # injections that should not duplicate existing user/wizard entries.
-_lightrag_volumes_have_container_target() {
+_ontorag_volumes_have_container_target() {
   local compose_file="$1"
   local target_path="$2"
   local line
-  local in_lightrag="no"
+  local in_ontorag="no"
   local in_volumes="no"
   local mount_spec=""
   local remainder=""
@@ -1696,10 +1696,10 @@ _lightrag_volumes_have_container_target() {
   fi
 
   while IFS= read -r line || [[ -n "$line" ]]; do
-    if [[ "$in_lightrag" == "yes" ]]; then
-      if [[ "$line" =~ ^[[:space:]]{2}[^[:space:]] && "$line" != "  lightrag:" ]] || \
+    if [[ "$in_ontorag" == "yes" ]]; then
+      if [[ "$line" =~ ^[[:space:]]{2}[^[:space:]] && "$line" != "  ontorag:" ]] || \
          [[ "$line" =~ ^[^[:space:]] ]]; then
-        in_lightrag="no"
+        in_ontorag="no"
         in_volumes="no"
       elif [[ "$line" == "    volumes:" ]]; then
         in_volumes="yes"
@@ -1718,8 +1718,8 @@ _lightrag_volumes_have_container_target() {
       fi
     fi
 
-    if [[ "$line" == "  lightrag:" ]]; then
-      in_lightrag="yes"
+    if [[ "$line" == "  ontorag:" ]]; then
+      in_ontorag="yes"
       in_volumes="no"
     fi
   done < "$compose_file"
@@ -1770,23 +1770,23 @@ _is_wizard_ssl_bind_mount() {
   [[ "$host_suffix" == "$container_suffix" ]]
 }
 
-# Remove wizard-managed SSL bind mounts from the lightrag service's volumes
+# Remove wizard-managed SSL bind mounts from the ontorag service's volumes
 # block, leaving persistent and user-added /app/data/* mounts intact.
-_strip_lightrag_wizard_bind_mounts() {
+_strip_ontorag_wizard_bind_mounts() {
   local compose_file="$1"
   local tmp_file="${compose_file}.strip-mounts"
   _FILE_OPS_CLEANUP_TMP+=("$tmp_file")
   local line
   local mount_spec
-  local in_lightrag="no"
+  local in_ontorag="no"
   local in_volumes="no"
 
   : > "$tmp_file"
 
   while IFS= read -r line || [[ -n "$line" ]]; do
-    if [[ "$in_lightrag" == "yes" ]]; then
-      if [[ "$line" =~ ^[[:space:]]{2}[^[:space:]] && "$line" != "  lightrag:" ]]; then
-        in_lightrag="no"
+    if [[ "$in_ontorag" == "yes" ]]; then
+      if [[ "$line" =~ ^[[:space:]]{2}[^[:space:]] && "$line" != "  ontorag:" ]]; then
+        in_ontorag="no"
         in_volumes="no"
       elif [[ "$line" == "    volumes:" ]]; then
         in_volumes="yes"
@@ -1808,8 +1808,8 @@ _strip_lightrag_wizard_bind_mounts() {
 
     printf '%s\n' "$line" >> "$tmp_file"
 
-    if [[ "$line" == "  lightrag:" ]]; then
-      in_lightrag="yes"
+    if [[ "$line" == "  ontorag:" ]]; then
+      in_ontorag="yes"
       in_volumes="no"
     fi
   done < "$compose_file"
@@ -1817,7 +1817,7 @@ _strip_lightrag_wizard_bind_mounts() {
   mv "$tmp_file" "$compose_file"
 }
 
-_is_wizard_lightrag_port_mapping() {
+_is_wizard_ontorag_port_mapping() {
   local port_spec="$(_strip_wrapping_quotes "$1")"
 
   if [[ "$port_spec" == '${HOST:-0.0.0.0}:${PORT:-9621}:9621' || \
@@ -1834,37 +1834,37 @@ _is_wizard_lightrag_port_mapping() {
   return 1
 }
 
-_strip_lightrag_wizard_ports() {
+_strip_ontorag_wizard_ports() {
   local compose_file="$1"
-  local tmp_file="${compose_file}.strip-lightrag-ports"
+  local tmp_file="${compose_file}.strip-ontorag-ports"
   _FILE_OPS_CLEANUP_TMP+=("$tmp_file")
   local line
   local port_spec=""
-  local in_lightrag="no"
+  local in_ontorag="no"
   local in_ports="no"
 
   : > "$tmp_file"
 
   while IFS= read -r line || [[ -n "$line" ]]; do
-    if [[ "$in_lightrag" == "yes" && "$in_ports" == "yes" ]]; then
+    if [[ "$in_ontorag" == "yes" && "$in_ports" == "yes" ]]; then
       if [[ "$line" =~ ^[[:space:]]{6}-[[:space:]](.+)$ ]]; then
         port_spec="${BASH_REMATCH[1]}"
-        if _is_wizard_lightrag_port_mapping "$port_spec"; then
+        if _is_wizard_ontorag_port_mapping "$port_spec"; then
           continue
         fi
       elif [[ ! "$line" =~ ^[[:space:]]{6} ]]; then
         in_ports="no"
       fi
-    elif [[ "$in_lightrag" == "yes" && "$line" =~ ^[[:space:]]{2}[^[:space:]] && "$line" != "  lightrag:" ]]; then
-      in_lightrag="no"
+    elif [[ "$in_ontorag" == "yes" && "$line" =~ ^[[:space:]]{2}[^[:space:]] && "$line" != "  ontorag:" ]]; then
+      in_ontorag="no"
     fi
 
     printf '%s\n' "$line" >> "$tmp_file"
 
-    if [[ "$line" == "  lightrag:" ]]; then
-      in_lightrag="yes"
+    if [[ "$line" == "  ontorag:" ]]; then
+      in_ontorag="yes"
       in_ports="no"
-    elif [[ "$in_lightrag" == "yes" && "$line" == "    ports:" ]]; then
+    elif [[ "$in_ontorag" == "yes" && "$line" == "    ports:" ]]; then
       in_ports="yes"
     fi
   done < "$compose_file"
@@ -1872,14 +1872,14 @@ _strip_lightrag_wizard_ports() {
   mv "$tmp_file" "$compose_file"
 }
 
-inject_lightrag_bind_mounts() {
+inject_ontorag_bind_mounts() {
   local compose_file="$1"
   shift
   local mounts=("$@")
   local tmp_file="${compose_file}.mounts"
   _FILE_OPS_CLEANUP_TMP+=("$tmp_file")
   local line
-  local in_lightrag="no"
+  local in_ontorag="no"
   local in_volumes="no"
   local inserted="no"
 
@@ -1890,7 +1890,7 @@ inject_lightrag_bind_mounts() {
   : > "$tmp_file"
 
   while IFS= read -r line || [[ -n "$line" ]]; do
-    if [[ "$in_lightrag" == "yes" && "$in_volumes" == "yes" ]]; then
+    if [[ "$in_ontorag" == "yes" && "$in_volumes" == "yes" ]]; then
       if [[ "$line" =~ ^[[:space:]]{4}[^[:space:]-] || "$line" =~ ^[[:space:]]{2}[^[:space:]] || "$line" =~ ^(volumes|networks): ]]; then
         if [[ "$inserted" == "no" ]]; then
           for mount in "${mounts[@]}"; do
@@ -1900,7 +1900,7 @@ inject_lightrag_bind_mounts() {
         fi
         in_volumes="no"
       fi
-    elif [[ "$in_lightrag" == "yes" && "$line" =~ ^[[:space:]]{2}[^[:space:]] && "$line" != "  lightrag:" ]]; then
+    elif [[ "$in_ontorag" == "yes" && "$line" =~ ^[[:space:]]{2}[^[:space:]] && "$line" != "  ontorag:" ]]; then
       if [[ "$inserted" == "no" ]]; then
         printf '    volumes:\n' >> "$tmp_file"
         for mount in "${mounts[@]}"; do
@@ -1908,20 +1908,20 @@ inject_lightrag_bind_mounts() {
         done
         inserted="yes"
       fi
-      in_lightrag="no"
+      in_ontorag="no"
     fi
 
     printf '%s\n' "$line" >> "$tmp_file"
 
-    if [[ "$line" == "  lightrag:" ]]; then
-      in_lightrag="yes"
+    if [[ "$line" == "  ontorag:" ]]; then
+      in_ontorag="yes"
       in_volumes="no"
-    elif [[ "$in_lightrag" == "yes" && "$line" == "    volumes:" ]]; then
+    elif [[ "$in_ontorag" == "yes" && "$line" == "    volumes:" ]]; then
       in_volumes="yes"
     fi
   done < "$compose_file"
 
-  if [[ "$in_lightrag" == "yes" && "$inserted" == "no" ]]; then
+  if [[ "$in_ontorag" == "yes" && "$inserted" == "no" ]]; then
     if [[ "$in_volumes" != "yes" ]]; then
       printf '    volumes:\n' >> "$tmp_file"
     fi
@@ -1933,13 +1933,13 @@ inject_lightrag_bind_mounts() {
   mv "$tmp_file" "$compose_file"
 }
 
-inject_lightrag_port_mapping() {
+inject_ontorag_port_mapping() {
   local compose_file="$1"
   local port_mapping="$2"
   local tmp_file="${compose_file}.ports"
   _FILE_OPS_CLEANUP_TMP+=("$tmp_file")
   local line
-  local in_lightrag="no"
+  local in_ontorag="no"
   local in_ports="no"
   local inserted="no"
 
@@ -1950,7 +1950,7 @@ inject_lightrag_port_mapping() {
   : > "$tmp_file"
 
   while IFS= read -r line || [[ -n "$line" ]]; do
-    if [[ "$in_lightrag" == "yes" && "$in_ports" == "yes" ]]; then
+    if [[ "$in_ontorag" == "yes" && "$in_ports" == "yes" ]]; then
       if [[ "$line" =~ ^[[:space:]]{4}[^[:space:]-] || "$line" =~ ^[[:space:]]{2}[^[:space:]] || "$line" =~ ^(volumes|networks): ]]; then
         if [[ "$inserted" == "no" ]]; then
           printf '      - "%s"\n' "$port_mapping" >> "$tmp_file"
@@ -1958,26 +1958,26 @@ inject_lightrag_port_mapping() {
         fi
         in_ports="no"
       fi
-    elif [[ "$in_lightrag" == "yes" && "$line" =~ ^[[:space:]]{2}[^[:space:]] && "$line" != "  lightrag:" ]]; then
+    elif [[ "$in_ontorag" == "yes" && "$line" =~ ^[[:space:]]{2}[^[:space:]] && "$line" != "  ontorag:" ]]; then
       if [[ "$inserted" == "no" ]]; then
         printf '    ports:\n' >> "$tmp_file"
         printf '      - "%s"\n' "$port_mapping" >> "$tmp_file"
         inserted="yes"
       fi
-      in_lightrag="no"
+      in_ontorag="no"
     fi
 
     printf '%s\n' "$line" >> "$tmp_file"
 
-    if [[ "$line" == "  lightrag:" ]]; then
-      in_lightrag="yes"
+    if [[ "$line" == "  ontorag:" ]]; then
+      in_ontorag="yes"
       in_ports="no"
-    elif [[ "$in_lightrag" == "yes" && "$line" == "    ports:" ]]; then
+    elif [[ "$in_ontorag" == "yes" && "$line" == "    ports:" ]]; then
       in_ports="yes"
     fi
   done < "$compose_file"
 
-  if [[ "$in_lightrag" == "yes" && "$inserted" == "no" ]]; then
+  if [[ "$in_ontorag" == "yes" && "$inserted" == "no" ]]; then
     if [[ "$in_ports" != "yes" ]]; then
       printf '    ports:\n' >> "$tmp_file"
     fi
@@ -1987,14 +1987,14 @@ inject_lightrag_port_mapping() {
   mv "$tmp_file" "$compose_file"
 }
 
-repair_misplaced_lightrag_depends_on() {
+repair_misplaced_ontorag_depends_on() {
   local compose_file="$1"
-  local tmp_file="${compose_file}.repair-lightrag-depends-on"
+  local tmp_file="${compose_file}.repair-ontorag-depends-on"
   _FILE_OPS_CLEANUP_TMP+=("$tmp_file")
   local line
   local in_services="no"
-  local in_lightrag="no"
-  local lightrag_has_depends_on="no"
+  local in_ontorag="no"
+  local ontorag_has_depends_on="no"
   local candidate_service=""
   local candidate_root_service=""
   local captured_block=""
@@ -2017,26 +2017,26 @@ repair_misplaced_lightrag_depends_on() {
       continue
     fi
 
-    if [[ "$in_lightrag" == "yes" ]]; then
+    if [[ "$in_ontorag" == "yes" ]]; then
       if [[ "$line" == "    depends_on:" ]]; then
-        lightrag_has_depends_on="yes"
+        ontorag_has_depends_on="yes"
         break
       fi
 
       if [[ "$line" =~ ^[[:space:]]{2}([A-Za-z0-9_-]+):[[:space:]]*$ ]] && \
-        [[ "${BASH_REMATCH[1]}" != "lightrag" ]]; then
+        [[ "${BASH_REMATCH[1]}" != "ontorag" ]]; then
         candidate_service="${BASH_REMATCH[1]}"
         candidate_root_service="$(_managed_service_root_name "$candidate_service")"
         if [[ -z "$candidate_root_service" || "$candidate_root_service" == "milvus" ]]; then
           break
         fi
-        in_lightrag="no"
+        in_ontorag="no"
       fi
       continue
     fi
 
-    if [[ "$line" == "  lightrag:" ]]; then
-      in_lightrag="yes"
+    if [[ "$line" == "  ontorag:" ]]; then
+      in_ontorag="yes"
       continue
     fi
 
@@ -2064,13 +2064,13 @@ repair_misplaced_lightrag_depends_on() {
     fi
   done < "$compose_file"
 
-  if [[ "$lightrag_has_depends_on" == "yes" || -z "$captured_block" || -z "$candidate_service" ]]; then
+  if [[ "$ontorag_has_depends_on" == "yes" || -z "$captured_block" || -z "$candidate_service" ]]; then
     return 0
   fi
 
   candidate_header="  ${candidate_service}:"
   : > "$tmp_file"
-  in_lightrag="no"
+  in_ontorag="no"
 
   while IFS= read -r line || [[ -n "$line" ]]; do
     if [[ "$skipping_candidate_depends_on" == "yes" ]]; then
@@ -2080,11 +2080,11 @@ repair_misplaced_lightrag_depends_on() {
       skipping_candidate_depends_on="no"
     fi
 
-    if [[ "$in_lightrag" == "yes" && "$inserted" == "no" ]] && \
-      [[ ( "$line" =~ ^[[:space:]]{2}[^[:space:]] && "$line" != "  lightrag:" ) || "$line" =~ ^[^[:space:]] ]]; then
+    if [[ "$in_ontorag" == "yes" && "$inserted" == "no" ]] && \
+      [[ ( "$line" =~ ^[[:space:]]{2}[^[:space:]] && "$line" != "  ontorag:" ) || "$line" =~ ^[^[:space:]] ]]; then
       printf '%s' "$captured_block" >> "$tmp_file"
       inserted="yes"
-      in_lightrag="no"
+      in_ontorag="no"
     fi
 
     if [[ "$line" == "$candidate_header" ]]; then
@@ -2101,25 +2101,25 @@ repair_misplaced_lightrag_depends_on() {
 
     printf '%s\n' "$line" >> "$tmp_file"
 
-    if [[ "$line" == "  lightrag:" ]]; then
-      in_lightrag="yes"
+    if [[ "$line" == "  ontorag:" ]]; then
+      in_ontorag="yes"
     fi
   done < "$compose_file"
 
-  if [[ "$in_lightrag" == "yes" && "$inserted" == "no" ]]; then
+  if [[ "$in_ontorag" == "yes" && "$inserted" == "no" ]]; then
     printf '%s' "$captured_block" >> "$tmp_file"
   fi
 
   mv "$tmp_file" "$compose_file"
 }
 
-inject_lightrag_environment_overrides() {
+inject_ontorag_environment_overrides() {
   local compose_file="$1"
   shift
-  inject_service_environment_overrides "$compose_file" "lightrag" "$@"
+  inject_service_environment_overrides "$compose_file" "ontorag" "$@"
 }
 
-inject_lightrag_depends_on() {
+inject_ontorag_depends_on() {
   local compose_file="$1"
   shift
   local candidate_service
@@ -2127,7 +2127,7 @@ inject_lightrag_depends_on() {
   local tmp_file="${compose_file}.depends-on"
   _FILE_OPS_CLEANUP_TMP+=("$tmp_file")
   local line
-  local in_lightrag="no"
+  local in_ontorag="no"
   local in_depends_on="no"
   local inserted="no"
   local insert_blank_after_depends_on="no"
@@ -2194,7 +2194,7 @@ inject_lightrag_depends_on() {
     mv "$trim_file" "$file"
   }
 
-  _write_lightrag_depends_on_block() {
+  _write_ontorag_depends_on_block() {
     local managed_service
     local preserved_service
 
@@ -2251,25 +2251,25 @@ inject_lightrag_depends_on() {
       _flush_current_depends_on_entry
       if [[ "$inserted" == "no" ]]; then
         _trim_trailing_blank_lines "$tmp_file"
-        _write_lightrag_depends_on_block
+        _write_ontorag_depends_on_block
       fi
       in_depends_on="no"
     fi
 
-    if [[ "$in_lightrag" == "yes" && "$line" == "    depends_on:" ]]; then
+    if [[ "$in_ontorag" == "yes" && "$line" == "    depends_on:" ]]; then
       in_depends_on="yes"
       continue
     fi
 
-    if [[ "$in_lightrag" == "yes" && \
+    if [[ "$in_ontorag" == "yes" && \
           ( "$line" =~ ^[[:space:]]{2}[^[:space:]] || "$line" =~ ^[^[:space:]] ) && \
-          "$line" != "  lightrag:" ]]; then
+          "$line" != "  ontorag:" ]]; then
       if [[ "$inserted" == "no" ]]; then
         _trim_trailing_blank_lines "$tmp_file"
-        _write_lightrag_depends_on_block
+        _write_ontorag_depends_on_block
         insert_blank_after_depends_on="yes"
       fi
-      in_lightrag="no"
+      in_ontorag="no"
     fi
 
     if [[ "$insert_blank_after_depends_on" == "yes" ]]; then
@@ -2279,8 +2279,8 @@ inject_lightrag_depends_on() {
 
     printf '%s\n' "$line" >> "$tmp_file"
 
-    if [[ "$line" == "  lightrag:" ]]; then
-      in_lightrag="yes"
+    if [[ "$line" == "  ontorag:" ]]; then
+      in_ontorag="yes"
       inserted="no"
       insert_blank_after_depends_on="no"
       in_depends_on="no"
@@ -2296,11 +2296,11 @@ inject_lightrag_depends_on() {
     _flush_current_depends_on_entry
     if [[ "$inserted" == "no" ]]; then
       _trim_trailing_blank_lines "$tmp_file"
-      _write_lightrag_depends_on_block
+      _write_ontorag_depends_on_block
     fi
-  elif [[ "$in_lightrag" == "yes" && "$inserted" == "no" ]]; then
+  elif [[ "$in_ontorag" == "yes" && "$inserted" == "no" ]]; then
     _trim_trailing_blank_lines "$tmp_file"
-    _write_lightrag_depends_on_block
+    _write_ontorag_depends_on_block
   fi
 
   mv "$tmp_file" "$compose_file"
@@ -2329,7 +2329,7 @@ find_generated_compose_file() {
   printf ''
 }
 
-# Detect service names in a compose file's services: block (excluding lightrag).
+# Detect service names in a compose file's services: block (excluding ontorag).
 # Prints one service name per line.
 detect_compose_services() {
   local compose_file="$1"
@@ -2352,7 +2352,7 @@ detect_compose_services() {
       fi
       if [[ "$line" =~ ^[[:space:]]{2}([A-Za-z0-9_-]+):[[:space:]]*$ ]]; then
         local svc_name="${BASH_REMATCH[1]}"
-        if [[ "$svc_name" != "lightrag" ]]; then
+        if [[ "$svc_name" != "ontorag" ]]; then
           printf '%s\n' "$svc_name"
         fi
       fi

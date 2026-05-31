@@ -1,0 +1,10 @@
+apiVersion: v2
+name: ontorag
+description: A Helm chart for OntoRAG, an efficient and lightweight RAG system
+type: application
+version: 0.1.1
+appVersion: "1.0.0"
+maintainers:
+  - name: LightRAG Team
+  - name: earayu
+    email: earayu@gmail.com

@@ -16,7 +16,7 @@ import pytest
 
 
 # Env vars that the project's `.env` may have populated (via load_dotenv at
-# import time of lightrag.api.config). Tests must be hermetic and not depend
+# import time of ontorag.api.config). Tests must be hermetic and not depend
 # on developer-local .env values, so we clear/override anything that affects
 # parse_args() / create_app().
 _ENV_VARS_TO_ISOLATE = (
@@ -28,11 +28,11 @@ _ENV_VARS_TO_ISOLATE = (
     "EMBEDDING_BINDING_HOST",
     "EMBEDDING_BINDING_API_KEY",
     "EMBEDDING_MODEL",
-    "LIGHTRAG_API_PREFIX",
-    "LIGHTRAG_KV_STORAGE",
-    "LIGHTRAG_VECTOR_STORAGE",
-    "LIGHTRAG_GRAPH_STORAGE",
-    "LIGHTRAG_DOC_STATUS_STORAGE",
+    "ONTORAG_API_PREFIX",
+    "ONTORAG_KV_STORAGE",
+    "ONTORAG_VECTOR_STORAGE",
+    "ONTORAG_GRAPH_STORAGE",
+    "ONTORAG_DOC_STATUS_STORAGE",
 )
 
 
@@ -40,7 +40,7 @@ _ENV_VARS_TO_ISOLATE = (
 def _isolate_env(monkeypatch):
     """Isolate tests from developer-local .env pollution.
 
-    The lightrag.api.config module loads .env at import time, which can leave
+    The ontorag.api.config module loads .env at import time, which can leave
     bindings/hosts/keys in os.environ that mismatch what these tests assume.
     Clear them, then set the minimal viable defaults (ollama bindings) so
     create_app's binding validation passes without touching real services.
@@ -54,11 +54,11 @@ def _isolate_env(monkeypatch):
 @pytest.fixture
 def mock_args_api_prefix():
     """Create mock args with API prefix."""
-    from lightrag.api.config import parse_args
+    from ontorag.api.config import parse_args
 
     original_argv = sys.argv.copy()
     try:
-        sys.argv = ["lightrag-server", "--api-prefix", "/test-api"]
+        sys.argv = ["ontorag-server", "--api-prefix", "/test-api"]
         args = parse_args()
         yield args
     finally:
@@ -68,11 +68,11 @@ def mock_args_api_prefix():
 @pytest.fixture
 def mock_args_no_prefix():
     """Create mock args without API prefix."""
-    from lightrag.api.config import parse_args
+    from ontorag.api.config import parse_args
 
     original_argv = sys.argv.copy()
     try:
-        sys.argv = ["lightrag-server"]
+        sys.argv = ["ontorag-server"]
         args = parse_args()
         yield args
     finally:
@@ -84,18 +84,18 @@ class TestRootPathConfiguration:
 
     def test_root_path_set_when_prefix_provided(self, mock_args_api_prefix):
         """Test app.root_path reflects api_prefix."""
-        with patch("lightrag.api.lightrag_server.LightRAG") as mock_rag:
+        with patch("ontorag.api.ontorag_server.OntoRAG") as mock_rag:
             mock_rag.return_value = MagicMock()
-            from lightrag.api.lightrag_server import create_app
+            from ontorag.api.ontorag_server import create_app
 
             app = create_app(mock_args_api_prefix)
             assert app.root_path == "/test-api"
 
     def test_root_path_none_when_no_prefix(self, mock_args_no_prefix):
         """Test app.root_path is not set when no prefix is configured."""
-        with patch("lightrag.api.lightrag_server.LightRAG") as mock_rag:
+        with patch("ontorag.api.ontorag_server.OntoRAG") as mock_rag:
             mock_rag.return_value = MagicMock()
-            from lightrag.api.lightrag_server import create_app
+            from ontorag.api.ontorag_server import create_app
 
             app = create_app(mock_args_no_prefix)
             # When no prefix, root_path is None (not passed to FastAPI)
@@ -112,9 +112,9 @@ class TestRoutesAtNaturalPaths:
         FastAPI injects root_path into the ASGI scope, and Starlette strips
         it from the path before matching. So /test-api/docs and /docs both work.
         """
-        with patch("lightrag.api.lightrag_server.LightRAG") as mock_rag:
+        with patch("ontorag.api.ontorag_server.OntoRAG") as mock_rag:
             mock_rag.return_value = MagicMock()
-            from lightrag.api.lightrag_server import create_app
+            from ontorag.api.ontorag_server import create_app
 
             app = create_app(mock_args_api_prefix)
             client = TestClient(app)
@@ -135,9 +135,9 @@ class TestRoutesAtNaturalPaths:
 
     def test_document_routes_at_natural_path(self, mock_args_api_prefix):
         """Test document routes are at /documents/ (their router-level prefix)."""
-        with patch("lightrag.api.lightrag_server.LightRAG") as mock_rag:
+        with patch("ontorag.api.ontorag_server.OntoRAG") as mock_rag:
             mock_rag.return_value = MagicMock()
-            from lightrag.api.lightrag_server import create_app
+            from ontorag.api.ontorag_server import create_app
 
             app = create_app(mock_args_api_prefix)
             client = TestClient(app)
@@ -147,16 +147,16 @@ class TestRoutesAtNaturalPaths:
                 json={},
                 headers={"Authorization": "Bearer test"},
             )
-            # The route is mounted; the mocked LightRAG may cause 401/422/500,
+            # The route is mounted; the mocked OntoRAG may cause 401/422/500,
             # but a missing route (404) or wrong method (405) means routing
             # itself broke and is what we want to catch here.
             assert response.status_code not in (404, 405)
 
     def test_routes_accessible_at_root_no_prefix(self, mock_args_no_prefix):
         """Test routes are at root when no prefix is set (default)."""
-        with patch("lightrag.api.lightrag_server.LightRAG") as mock_rag:
+        with patch("ontorag.api.ontorag_server.OntoRAG") as mock_rag:
             mock_rag.return_value = MagicMock()
-            from lightrag.api.lightrag_server import create_app
+            from ontorag.api.ontorag_server import create_app
 
             app = create_app(mock_args_no_prefix)
             client = TestClient(app)
@@ -179,9 +179,9 @@ class TestOpenAPISpecIntegration:
 
     def test_openapi_spec_has_servers_url_with_prefix(self, mock_args_api_prefix):
         """Test OpenAPI spec servers URL includes the prefix via root_path."""
-        with patch("lightrag.api.lightrag_server.LightRAG") as mock_rag:
+        with patch("ontorag.api.ontorag_server.OntoRAG") as mock_rag:
             mock_rag.return_value = MagicMock()
-            from lightrag.api.lightrag_server import create_app
+            from ontorag.api.ontorag_server import create_app
 
             app = create_app(mock_args_api_prefix)
             client = TestClient(app)
@@ -202,9 +202,9 @@ class TestOpenAPISpecIntegration:
 
     def test_openapi_spec_no_servers_without_prefix(self, mock_args_no_prefix):
         """Test OpenAPI spec has no servers entry when no root_path."""
-        with patch("lightrag.api.lightrag_server.LightRAG") as mock_rag:
+        with patch("ontorag.api.ontorag_server.OntoRAG") as mock_rag:
             mock_rag.return_value = MagicMock()
-            from lightrag.api.lightrag_server import create_app
+            from ontorag.api.ontorag_server import create_app
 
             app = create_app(mock_args_no_prefix)
             client = TestClient(app)
@@ -218,9 +218,9 @@ class TestOpenAPISpecIntegration:
 
     def test_openapi_spec_paths_at_natural_paths(self, mock_args_api_prefix):
         """Test OpenAPI spec paths are at natural paths (not prefixed)."""
-        with patch("lightrag.api.lightrag_server.LightRAG") as mock_rag:
+        with patch("ontorag.api.ontorag_server.OntoRAG") as mock_rag:
             mock_rag.return_value = MagicMock()
-            from lightrag.api.lightrag_server import create_app
+            from ontorag.api.ontorag_server import create_app
 
             app = create_app(mock_args_api_prefix)
             client = TestClient(app)
@@ -246,9 +246,9 @@ class TestWebUIPrefixIntegration:
     def test_webui_at_prefixed_path(self, mock_args_api_prefix):
         """With root_path="/test-api" the WebUI lives at /test-api/webui/
         because FastAPI injects root_path into the ASGI scope."""
-        with patch("lightrag.api.lightrag_server.LightRAG") as mock_rag:
+        with patch("ontorag.api.ontorag_server.OntoRAG") as mock_rag:
             mock_rag.return_value = MagicMock()
-            from lightrag.api.lightrag_server import create_app
+            from ontorag.api.ontorag_server import create_app
 
             app = create_app(mock_args_api_prefix)
             client = TestClient(app)
@@ -258,9 +258,9 @@ class TestWebUIPrefixIntegration:
 
     def test_webui_without_api_prefix(self, mock_args_no_prefix):
         """Without an API prefix the WebUI is served at /webui/."""
-        with patch("lightrag.api.lightrag_server.LightRAG") as mock_rag:
+        with patch("ontorag.api.ontorag_server.OntoRAG") as mock_rag:
             mock_rag.return_value = MagicMock()
-            from lightrag.api.lightrag_server import create_app
+            from ontorag.api.ontorag_server import create_app
 
             app = create_app(mock_args_no_prefix)
             client = TestClient(app)
@@ -273,15 +273,15 @@ class TestEnvironmentVariables:
     """Test that environment variables are read correctly."""
 
     def test_env_api_prefix(self):
-        """Test LIGHTRAG_API_PREFIX environment variable."""
-        from lightrag.api.config import get_env_value
+        """Test ONTORAG_API_PREFIX environment variable."""
+        from ontorag.api.config import get_env_value
 
-        os.environ["LIGHTRAG_API_PREFIX"] = "unit-test-back/api"
+        os.environ["ONTORAG_API_PREFIX"] = "unit-test-back/api"
         try:
-            value = get_env_value("LIGHTRAG_API_PREFIX", "")
+            value = get_env_value("ONTORAG_API_PREFIX", "")
             assert value == "unit-test-back/api"
         finally:
-            del os.environ["LIGHTRAG_API_PREFIX"]
+            del os.environ["ONTORAG_API_PREFIX"]
 
 
 class TestPathNormalization:
@@ -290,18 +290,18 @@ class TestPathNormalization:
     passing to FastAPI's `root_path`, which doesn't accept arbitrary strings."""
 
     def _build(self, *cli_args):
-        # sys.argv must be the lightrag-server form *before* lightrag_server is
-        # imported, because importing lightrag.api.utils_api evaluates
+        # sys.argv must be the ontorag-server form *before* ontorag_server is
+        # imported, because importing ontorag.api.utils_api evaluates
         # `global_args.whitelist_paths` at module top level, which triggers
         # parse_args() against whatever sys.argv currently holds.
         original_argv = sys.argv.copy()
         try:
-            sys.argv = ["lightrag-server", *cli_args]
-            from lightrag.api.config import parse_args
-            from lightrag.api.lightrag_server import create_app
+            sys.argv = ["ontorag-server", *cli_args]
+            from ontorag.api.config import parse_args
+            from ontorag.api.ontorag_server import create_app
 
             args = parse_args()
-            with patch("lightrag.api.lightrag_server.LightRAG") as mock_rag:
+            with patch("ontorag.api.ontorag_server.OntoRAG") as mock_rag:
                 mock_rag.return_value = MagicMock()
                 return create_app(args)
         finally:
@@ -328,16 +328,16 @@ class TestRuntimeConfigInjection:
 
     The browser-visible URL prefixes are no longer baked into the bundle.
     Instead, the server replaces a placeholder comment in index.html with
-    a `<script>window.__LIGHTRAG_CONFIG__ = {...}</script>` snippet on
+    a `<script>window.__ONTORAG_CONFIG__ = {...}</script>` snippet on
     every HTML response, so one build can serve any reverse-proxy mount.
 
     These tests stage a minimal index.html in a tmp dir, patch
-    `lightrag_server.__file__` so both `check_frontend_build()` and the
+    `ontorag_server.__file__` so both `check_frontend_build()` and the
     static-files mount resolve to it, then drive the app via TestClient
     and assert that the body contains the expected injected JSON.
     """
 
-    PLACEHOLDER = "<!-- __LIGHTRAG_RUNTIME_CONFIG__ -->"
+    PLACEHOLDER = "<!-- __ONTORAG_RUNTIME_CONFIG__ -->"
 
     def _stage_index_html(self, tmp_path, *, with_placeholder=True):
         """Mirror what Vite emits: a tiny index.html with the runtime-config
@@ -361,19 +361,19 @@ class TestRuntimeConfigInjection:
     def _build_app(self, tmp_path, monkeypatch, *cli_args):
         # Force benign argv before the (potentially fresh) module import —
         # see TestPathNormalization._build for the rationale.
-        monkeypatch.setattr(sys, "argv", ["lightrag-server", *cli_args])
-        from lightrag.api.config import parse_args
-        from lightrag.api import lightrag_server
-        from lightrag.api.lightrag_server import create_app
+        monkeypatch.setattr(sys, "argv", ["ontorag-server", *cli_args])
+        from ontorag.api.config import parse_args
+        from ontorag.api import ontorag_server
+        from ontorag.api.ontorag_server import create_app
 
         # Redirect both check_frontend_build() and the StaticFiles mount to
         # our staged tmp directory.
         monkeypatch.setattr(
-            lightrag_server, "__file__", str(tmp_path / "lightrag_server.py")
+            ontorag_server, "__file__", str(tmp_path / "ontorag_server.py")
         )
 
         args = parse_args()
-        with patch("lightrag.api.lightrag_server.LightRAG") as mock_rag:
+        with patch("ontorag.api.ontorag_server.OntoRAG") as mock_rag:
             mock_rag.return_value = MagicMock()
             return create_app(args)
 
@@ -390,7 +390,7 @@ class TestRuntimeConfigInjection:
 
         # Placeholder must be gone and replaced with the runtime config.
         assert self.PLACEHOLDER not in body
-        assert "window.__LIGHTRAG_CONFIG__" in body
+        assert "window.__ONTORAG_CONFIG__" in body
         assert '"apiPrefix": "/site01"' in body or '"apiPrefix":"/site01"' in body
         assert (
             '"webuiPrefix": "/site01/webui/"' in body
@@ -423,7 +423,7 @@ class TestRuntimeConfigInjection:
         response = client.get("/webui/")
         assert response.status_code == 200
         # No placeholder was present, so no injected script either.
-        assert "window.__LIGHTRAG_CONFIG__" not in response.text
+        assert "window.__ONTORAG_CONFIG__" not in response.text
 
     def test_injection_idempotent_across_requests(self, tmp_path, monkeypatch):
         """Each request reads the file fresh; the placeholder must be

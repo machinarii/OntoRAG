@@ -1,6 +1,6 @@
 # Parser CLI Debuger使用指南
 
-本工具用于本地调试 LightRAG 的三个内容解析引擎（`native` / `mineru` / `docling`），针对**单个文件**触发 `LightRAG.parse_<engine>` 生产代码路径，并把解析产物（sidecar 与 raw 缓存）输出到一个**扁平目录布局**——与生产入库目录相比，区别仅在于：
+本工具用于本地调试 OntoRAG 的三个内容解析引擎（`native` / `mineru` / `docling`），针对**单个文件**触发 `OntoRAG.parse_<engine>` 生产代码路径，并把解析产物（sidecar 与 raw 缓存）输出到一个**扁平目录布局**——与生产入库目录相比，区别仅在于：
 
 - **无 `__parsed__/` 中间层**：产物直接落在指定父目录下，便于查看；
 - **源文件不会被归档**：源文件保留在原位置（生产路径会把源文件移到 `<INPUT_DIR>/__parsed__/`）；
@@ -11,7 +11,7 @@
 ## 命令格式
 
 ```bash
-python -m lightrag.parser_cli <input_file> \
+python -m ontorag.parser_cli <input_file> \
     --engine {native|mineru|docling} \
     [-o <sidecar_parent_dir>] \
     [--doc-id <doc-id>] \
@@ -53,7 +53,7 @@ python -m lightrag.parser_cli <input_file> \
 ### A. 本地解析 `.docx`（零网络依赖）
 
 ```bash
-python -m lightrag.parser_cli ./inputs/workspace/sample.docx --engine native
+python -m ontorag.parser_cli ./inputs/workspace/sample.docx --engine native
 # 产出：./inputs/workspace/sample.docx.parsed/  （含 blocks.jsonl + assets）
 ```
 
@@ -61,9 +61,9 @@ python -m lightrag.parser_cli ./inputs/workspace/sample.docx --engine native
 
 ```bash
 # 第一次：下载 raw bundle + 生成 sidecar
-python -m lightrag.parser_cli ./inputs/workspace/sample.pdf --engine mineru
+python -m ontorag.parser_cli ./inputs/workspace/sample.pdf --engine mineru
 # 第二次（无任何修改）：raw 目录非空 → 直接复用 → 仅重建 sidecar，速度快
-python -m lightrag.parser_cli ./inputs/workspace/sample.pdf --engine mineru
+python -m ontorag.parser_cli ./inputs/workspace/sample.pdf --engine mineru
 # 日志会显示： [parse_mineru] raw cache hit doc_id=... raw_dir=.../sample.pdf.mineru_raw
 ```
 
@@ -71,16 +71,16 @@ python -m lightrag.parser_cli ./inputs/workspace/sample.pdf --engine mineru
 
 ```bash
 # 已有 ./inputs/workspace/sample.pdf.docling_raw/ （含 docling 产物的 JSON 等文件）
-python -m lightrag.parser_cli ./inputs/workspace/sample.pdf --engine docling
+python -m ontorag.parser_cli ./inputs/workspace/sample.pdf --engine docling
 # CLI 不查 manifest，只要 raw 目录非空就跳过 docling-serve 调用
 ```
 
-> 注：这是旧 `python -m lightrag.external_parser.docling` 调试入口「从已有 raw 重建 sidecar」场景的等价替代——只需把 raw 目录放到约定位置（`<sidecar_parent>/<source>.docling_raw/`）即可触发缓存命中分支。
+> 注：这是旧 `python -m ontorag.external_parser.docling` 调试入口「从已有 raw 重建 sidecar」场景的等价替代——只需把 raw 目录放到约定位置（`<sidecar_parent>/<source>.docling_raw/`）即可触发缓存命中分支。
 
 ### D. 输出到自定义目录
 
 ```bash
-python -m lightrag.parser_cli ./inputs/workspace/sample.docx \
+python -m ontorag.parser_cli ./inputs/workspace/sample.docx \
     --engine native -o /tmp/debug_sidecar
 # 产出：/tmp/debug_sidecar/sample.docx.parsed/
 # 原文件 ./inputs/workspace/sample.docx 不会被移动
@@ -89,7 +89,7 @@ python -m lightrag.parser_cli ./inputs/workspace/sample.docx \
 ### E. 强制重新解析（清空 raw 后重新下载）
 
 ```bash
-python -m lightrag.parser_cli ./inputs/workspace/sample.pdf \
+python -m ontorag.parser_cli ./inputs/workspace/sample.pdf \
     --engine docling --force-reparse
 # raw 目录被清空 → 重新调 docling-serve 下载 → 重新生成 sidecar
 ```
@@ -115,9 +115,9 @@ python -m lightrag.parser_cli ./inputs/workspace/sample.pdf \
 | 源文件被意外移动 | 不应发生：CLI 已 mock 归档函数。若复现请提 issue（可能是 pipeline 内增加了新的归档调用点）。 |
 | `parse_docling` 报 `produced zero blocks` | docling raw 中的主 JSON 内容不可解析或为空。检查 raw 目录的 `*.json` 是否合法。 |
 
-## 与 `LightRAG.parse_*` 生产路径的等价性
+## 与 `OntoRAG.parse_*` 生产路径的等价性
 
-本 CLI 直接调用生产代码路径 `LightRAG.parse_native` / `parse_mineru` / `parse_docling`（通过 `lightrag/parser_debug.py` 的轻量 RAG 替身），因此：
+本 CLI 直接调用生产代码路径 `OntoRAG.parse_native` / `parse_mineru` / `parse_docling`（通过 `ontorag/parser_debug.py` 的轻量 RAG 替身），因此：
 
 - sidecar 字段、命名、内容格式与生产入库完全一致；
 - IR 构建器、`write_sidecar` 调用、`_persist_parsed_full_docs` 行为完全一致；

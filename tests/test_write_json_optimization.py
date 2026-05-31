@@ -12,7 +12,7 @@ import os
 import json
 import tempfile
 import pytest
-from lightrag.utils import (
+from ontorag.utils import (
     write_json,
     load_json,
     SanitizingJSONEncoder,

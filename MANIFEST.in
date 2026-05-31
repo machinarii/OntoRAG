@@ -1,5 +1,5 @@
 include requirements.txt
-include lightrag/api/requirements.txt
-recursive-include lightrag/api/webui *
-recursive-include lightrag/api/static *
+include ontorag/api/requirements.txt
+recursive-include ontorag/api/webui *
+recursive-include ontorag/api/static *
 recursive-include prompts/samples *

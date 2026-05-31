@@ -11,7 +11,7 @@ import json
 import pytest
 from unittest.mock import MagicMock, patch
 
-from lightrag.kg.postgres_impl import PGGraphStorage
+from ontorag.kg.postgres_impl import PGGraphStorage
 
 
 # ---------------------------------------------------------------------------

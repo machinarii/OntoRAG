@@ -5,7 +5,7 @@ This test validates the fix for the bug where overlap_tokens >= max_tokens
 causes an infinite loop in the chunking function.
 """
 
-from lightrag.rerank import chunk_documents_for_rerank
+from ontorag.rerank import chunk_documents_for_rerank
 
 
 class TestOverlapValidation:

@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from lightrag.external_parser.mineru import MinerUIRBuilder
+from ontorag.external_parser.mineru import MinerUIRBuilder
 
 
 def _write_bundle(tmp_path: Path, content_list: list[dict]) -> Path:

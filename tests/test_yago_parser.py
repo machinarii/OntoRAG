@@ -1,4 +1,4 @@
-"""Tests for lightrag.taxonomy.parser."""
+"""Tests for ontorag.taxonomy.parser."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from lightrag.taxonomy.parser import YagoClass, parse_ntriples_file
+from ontorag.taxonomy.parser import YagoClass, parse_ntriples_file
 
 FIXTURE = Path(__file__).parent / "fixtures" / "yago" / "mini_taxonomy.nt"
 

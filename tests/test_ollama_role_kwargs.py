@@ -19,9 +19,9 @@ class _FakeRag:
         self.llm_model_kwargs = {"route": "base"}
         self._query_kwargs = {"route": "query"}
         self.ollama_server_infos = SimpleNamespace(
-            LIGHTRAG_MODEL="lightrag:latest",
-            LIGHTRAG_CREATED_AT="2026-03-14T00:00:00Z",
-            LIGHTRAG_SIZE=0,
+            ONTORAG_MODEL="ontorag:latest",
+            ONTORAG_CREATED_AT="2026-03-14T00:00:00Z",
+            ONTORAG_SIZE=0,
         )
 
         async def base_func(*args, **kwargs):
@@ -45,14 +45,14 @@ class _FakeRag:
 def _make_client(monkeypatch) -> tuple[TestClient, _FakeRag]:
     monkeypatch.setattr(sys, "argv", [sys.argv[0]])
     for module_name in [
-        "lightrag.api.config",
-        "lightrag.api.auth",
-        "lightrag.api.utils_api",
-        "lightrag.api.routers",
-        "lightrag.api.routers.ollama_api",
+        "ontorag.api.config",
+        "ontorag.api.auth",
+        "ontorag.api.utils_api",
+        "ontorag.api.routers",
+        "ontorag.api.routers.ollama_api",
     ]:
         sys.modules.pop(module_name, None)
-    ollama_api_module = importlib.import_module("lightrag.api.routers.ollama_api")
+    ollama_api_module = importlib.import_module("ontorag.api.routers.ollama_api")
     OllamaAPI = ollama_api_module.OllamaAPI
     rag = _FakeRag()
     api = OllamaAPI(rag, top_k=20, api_key=None)
@@ -67,7 +67,7 @@ def test_generate_non_stream_uses_query_role_kwargs_without_mutating_base(monkey
     response = client.post(
         "/api/generate",
         json={
-            "model": "lightrag:latest",
+            "model": "ontorag:latest",
             "prompt": "Summarize this",
             "stream": False,
             "system": "custom system",
@@ -89,7 +89,7 @@ def test_chat_bypass_stream_uses_query_role_kwargs_without_mutating_base(monkeyp
         "POST",
         "/api/chat",
         json={
-            "model": "lightrag:latest",
+            "model": "ontorag:latest",
             "stream": True,
             "system": "chat system",
             "messages": [

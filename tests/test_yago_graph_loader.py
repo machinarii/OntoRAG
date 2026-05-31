@@ -1,4 +1,4 @@
-"""Tests for lightrag.taxonomy.graph_loader."""
+"""Tests for ontorag.taxonomy.graph_loader."""
 
 from __future__ import annotations
 
@@ -7,20 +7,20 @@ from pathlib import Path
 import numpy as np
 import pytest_asyncio
 
-from lightrag.kg.networkx_impl import NetworkXStorage
-from lightrag.kg.shared_storage import (
+from ontorag.kg.networkx_impl import NetworkXStorage
+from ontorag.kg.shared_storage import (
     finalize_share_data,
     initialize_share_data,
 )
-from lightrag.namespace import NameSpace
-from lightrag.taxonomy.constants import YAGO_NODE_ENTITY_TYPE
-from lightrag.taxonomy.graph_loader import (
+from ontorag.namespace import NameSpace
+from ontorag.taxonomy.constants import YAGO_NODE_ENTITY_TYPE
+from ontorag.taxonomy.graph_loader import (
     SUBCLASS_OF_EDGE_TYPE,
     load_taxonomy_to_graph,
     walk_ancestors,
 )
-from lightrag.taxonomy.parser import parse_ntriples_file
-from lightrag.utils import EmbeddingFunc
+from ontorag.taxonomy.parser import parse_ntriples_file
+from ontorag.utils import EmbeddingFunc
 
 FIXTURE = Path(__file__).parent / "fixtures" / "yago" / "mini_taxonomy.nt"
 

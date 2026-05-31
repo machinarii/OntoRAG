@@ -14,7 +14,7 @@ Each scenario describes:
 
 The captured outputs (``blocks.jsonl`` + per-modality JSONs + assets) live
 under ``tests/native_parser/docx/golden/native_docx/<scenario>/``. The
-production path (``LightRAG.parse_native``) must produce byte-identical
+production path (``OntoRAG.parse_native``) must produce byte-identical
 bytes vs those fixtures; the regen script under ``scripts/`` rewrites
 them when the format intentionally changes.
 """

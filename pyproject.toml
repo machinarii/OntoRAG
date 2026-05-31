@@ -3,12 +3,12 @@ requires = ["setuptools>=64", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "lightrag-hku"
+name = "ontorag-hku"
 dynamic = ["version"]
 authors = [
     {name = "Zirui Guo"}
 ]
-description = "LightRAG: Simple and Fast Retrieval-Augmented Generation"
+description = "OntoRAG: Simple and Fast Retrieval-Augmented Generation"
 readme = "README.md"
 license = {text = "MIT"}
 requires-python = ">=3.10"
@@ -95,7 +95,7 @@ api = [
     "python-docx>=0.8.11,<2.0.0",  # DOCX processing
     "python-pptx>=0.6.21,<2.0.0",  # PPTX processing
     "defusedxml>=0.7.0,<1.0.0",    # Safer XML parser used by native_parser/docx
-    # Chunking strategies (process_options=R / V); lazy-imported by lightrag.chunker
+    # Chunking strategies (process_options=R / V); lazy-imported by ontorag.chunker
     "langchain-text-splitters>=0.3,<2",
     "langchain-experimental>=0.3,<1",
 ]
@@ -129,11 +129,11 @@ offline-llm = [
 
 offline = [
     # Complete offline package (includes api for document processing, plus storage and LLM)
-    "lightrag-hku[api,offline-storage,offline-llm]",
+    "ontorag-hku[api,offline-storage,offline-llm]",
 ]
 
 test = [
-    "lightrag-hku[api]",
+    "ontorag-hku[api]",
     "pytest>=8.4.2",
     "pytest-asyncio>=1.2.0",
     "pre-commit",
@@ -141,7 +141,7 @@ test = [
 ]
 
 evaluation = [
-    "lightrag-hku[api]",
+    "ontorag-hku[api]",
     "ragas>=0.3.7",
     "datasets>=4.3.0",
 ]
@@ -152,30 +152,30 @@ observability = [
 ]
 
 [project.scripts]
-lightrag-server = "lightrag.api.lightrag_server:main"
-lightrag-gunicorn = "lightrag.api.run_with_gunicorn:main"
-lightrag-hash-password = "lightrag.tools.hash_password:main"
-lightrag-download-cache = "lightrag.tools.download_cache:main"
-lightrag-clean-llmqc = "lightrag.tools.clean_llm_query_cache:main"
+ontorag-server = "ontorag.api.ontorag_server:main"
+ontorag-gunicorn = "ontorag.api.run_with_gunicorn:main"
+ontorag-hash-password = "ontorag.tools.hash_password:main"
+ontorag-download-cache = "ontorag.tools.download_cache:main"
+ontorag-clean-llmqc = "ontorag.tools.clean_llm_query_cache:main"
 
 [project.urls]
-Homepage = "https://github.com/HKUDS/LightRAG"
-Documentation = "https://github.com/HKUDS/LightRAG"
-Repository = "https://github.com/HKUDS/LightRAG"
-"Bug Tracker" = "https://github.com/HKUDS/LightRAG/issues"
+Homepage = "https://github.com/machinarii/OntoRAG"
+Documentation = "https://github.com/machinarii/OntoRAG"
+Repository = "https://github.com/machinarii/OntoRAG"
+"Bug Tracker" = "https://github.com/machinarii/OntoRAG/issues"
 
 [tool.setuptools.packages.find]
-include = ["lightrag*"]
+include = ["ontorag*"]
 exclude = ["data*", "tests*", "scripts*", "examples*", "dickens*", "reproduce*", "output_complete*", "rag_storage*", "inputs*"]
 
 [tool.setuptools]
 include-package-data = true
 
 [tool.setuptools.dynamic]
-version = {attr = "lightrag._version.__version__"}
+version = {attr = "ontorag._version.__version__"}
 
 [tool.setuptools.package-data]
-lightrag = ["api/webui/**/*", "api/static/**/*"]
+ontorag = ["api/webui/**/*", "api/static/**/*"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

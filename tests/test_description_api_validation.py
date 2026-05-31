@@ -1,14 +1,14 @@
 import pytest
 
-from lightrag.constants import SOURCE_IDS_LIMIT_METHOD_KEEP
-from lightrag.constants import GRAPH_FIELD_SEP
-from lightrag.operate import (
+from ontorag.constants import SOURCE_IDS_LIMIT_METHOD_KEEP
+from ontorag.constants import GRAPH_FIELD_SEP
+from ontorag.operate import (
     _handle_single_entity_extraction,
     _merge_nodes_then_upsert,
     _normalize_text_extraction_record_attributes,
     _handle_single_relationship_extraction,
 )
-from lightrag import utils_graph
+from ontorag import utils_graph
 
 
 class DummyGraphStorage:

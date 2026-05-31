@@ -24,7 +24,7 @@ from typing import Any
 
 import pytest
 
-from lightrag.external_parser.docling.client import (
+from ontorag.external_parser.docling.client import (
     CONVERT_PATH,
     POLL_PATH,
     RESULT_PATH,
@@ -200,11 +200,11 @@ def _install_fake_httpx(monkeypatch: pytest.MonkeyPatch) -> None:
     """Replace ``httpx.AsyncClient`` and ``httpx.Timeout`` references in
     the docling client module with no-arg fakes."""
     monkeypatch.setattr(
-        "lightrag.external_parser.docling.client.httpx.AsyncClient",
+        "ontorag.external_parser.docling.client.httpx.AsyncClient",
         _FakeAsyncClient,
     )
     monkeypatch.setattr(
-        "lightrag.external_parser.docling.client.httpx.Timeout",
+        "ontorag.external_parser.docling.client.httpx.Timeout",
         lambda *a, **kw: None,
     )
 

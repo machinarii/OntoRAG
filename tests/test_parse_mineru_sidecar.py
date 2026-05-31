@@ -7,7 +7,7 @@ service is contacted; the focus is on:
   files in the spec-compliant locations
 - cache hit: a pre-existing valid ``*.mineru_raw/`` + manifest causes
   ``MinerURawClient.download_into`` NOT to be called
-- ``LIGHTRAG_FORCE_REPARSE_MINERU=true`` forces a re-download even when
+- ``ONTORAG_FORCE_REPARSE_MINERU=true`` forces a re-download even when
   the manifest is valid
 """
 
@@ -21,18 +21,18 @@ from typing import Any
 import numpy as np
 import pytest
 
-from lightrag import LightRAG
-from lightrag.constants import (
-    FULL_DOCS_FORMAT_LIGHTRAG,
+from ontorag import OntoRAG
+from ontorag.constants import (
+    FULL_DOCS_FORMAT_ONTORAG,
 )
-from lightrag.external_parser.mineru import compute_size_and_hash
-from lightrag.external_parser.mineru.cache import current_mineru_options_signature
-from lightrag.external_parser.mineru.manifest import (
+from ontorag.external_parser.mineru import compute_size_and_hash
+from ontorag.external_parser.mineru.cache import current_mineru_options_signature
+from ontorag.external_parser.mineru.manifest import (
     Manifest,
     ManifestFile,
     write_manifest,
 )
-from lightrag.utils import EmbeddingFunc, Tokenizer
+from ontorag.utils import EmbeddingFunc, Tokenizer
 
 
 class _SimpleTokenizerImpl:
@@ -51,8 +51,8 @@ async def _mock_llm(prompt: Any, **kwargs: Any) -> str:
     return '{"name":"x","summary":"s","detail_description":"d"}'
 
 
-def _new_rag(tmp_path: Path) -> LightRAG:
-    return LightRAG(
+def _new_rag(tmp_path: Path) -> OntoRAG:
+    return OntoRAG(
         working_dir=str(tmp_path),
         workspace=f"test-mineru-sidecar-{tmp_path.name}",
         llm_model_func=_mock_llm,
@@ -93,7 +93,7 @@ def _install_fake_download(monkeypatch: pytest.MonkeyPatch) -> dict[str, int]:
     """Replace :meth:`MinerURawClient.download_into` with a recorder that
     writes a synthetic bundle (content_list.json + one image + manifest).
     """
-    import lightrag.external_parser.mineru.client as client_mod
+    import ontorag.external_parser.mineru.client as client_mod
 
     counters = {"calls": 0, "upload_names": []}
 
@@ -158,7 +158,7 @@ def test_parse_mineru_emits_compliant_sidecar(
         async def _noop_archive(_p: str) -> None:
             return None
 
-        import lightrag.pipeline as pipeline_module
+        import ontorag.pipeline as pipeline_module
 
         monkeypatch.setattr(
             pipeline_module,
@@ -207,7 +207,7 @@ def test_parse_mineru_emits_compliant_sidecar(
             assert counters["calls"] == 1, "download_into should run once on miss"
 
             parsed_dir = Path(parsed["blocks_path"]).parent
-            assert parsed["parse_format"] == FULL_DOCS_FORMAT_LIGHTRAG
+            assert parsed["parse_format"] == FULL_DOCS_FORMAT_ONTORAG
             assert parsed_dir.name == "demo.pdf.parsed"
 
             # Sidecar files present
@@ -293,7 +293,7 @@ def test_parse_mineru_cache_hit_skips_download(
         async def _noop_archive(_p: str) -> None:
             return None
 
-        import lightrag.pipeline as pipeline_module
+        import ontorag.pipeline as pipeline_module
 
         monkeypatch.setattr(
             pipeline_module,
@@ -351,7 +351,7 @@ def test_parse_mineru_cache_hit_skips_download(
             assert counters["calls"] == 1, "cache hit must not re-download"
 
             # Third call with force-reparse: cache invalidated.
-            monkeypatch.setenv("LIGHTRAG_FORCE_REPARSE_MINERU", "true")
+            monkeypatch.setenv("ONTORAG_FORCE_REPARSE_MINERU", "true")
             await rag.parse_mineru(
                 doc_id=doc_id,
                 file_path="demo.pdf",
@@ -444,7 +444,7 @@ def test_parse_mineru_cache_invalidates_on_source_change(
         async def _noop_archive(_p: str) -> None:
             return None
 
-        import lightrag.pipeline as pipeline_module
+        import ontorag.pipeline as pipeline_module
 
         monkeypatch.setattr(
             pipeline_module,
