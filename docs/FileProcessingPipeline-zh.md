@@ -545,6 +545,8 @@ ONTORAG_PARSER=pdf:mineru(language=en);*:legacy-R                       # 规则
 - **分析可以不重新解析就重跑。** 抽取阶段不受 `i` / `t` / `e` 影响——引擎按文档实际内容产出 sidecar——所以事后再启用某个模态，只会补做 VLM 工作，不会重新碰原始文件（§9.3）。
 - **没有对应 sidecar 的模态是静默空操作**，仅记一条 INFO 日志。这不是错误，它意味着文档没有该类内容，或该引擎不产出它。
 
+**图片分析返回什么。** 对每张图，VLM 生成一个 JSON 对象：`name`（简短且有辨识度的名称）、`type`（呈现**媒介**，取值为 `Photo / Illustration / Screenshot / Icon / Chart / Table / Infographic / Flowchart / Chat Log / Wireframe / Texture / Other` 之一）、`subject`（图片的**主题**——它讲的是什么，如 `Acme 公司 2025 财年季度营收`）、`ocr_text`（图片像素中逐字可见的文字：标题、坐标轴标签、图例、节点标签；无文字时为 `""`）以及 `description`（解释性描述）。与枚举外的 `type` 被规整为 `Other` 一样，缺失的 `subject` 会存为 `""` 并记录 warning，而不会让文档失败。五个字段都写入 sidecar 的 `llm_analyze_result`；多模态 chunk 渲染为 `[Image Name]…` / `[Image Type]…` / `[Image Subject]…`、description，以及 `[Image Text]…` 段（为空时省略），因此实体抽取能看到 OCR 出的名称和标签。图片自身的知识图谱节点按 `type` 定型（`chart`、`flowchart` 等），不再是笼统的 `drawing`。`subject` + `ocr_text` 就是分类体系层（见 `docs/GraphAndRagArchitecture.md` §5.4）计划消费的可分类输入。
+
 ### 4.2 每个选项实际需要什么
 
 `VLM_PROCESS_ENABLE` 常被读成三种模态的总开关。它不是——它只闸控图片：

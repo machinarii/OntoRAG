@@ -45,6 +45,15 @@ class MyParser(BaseParser):
 
 `ParseResult` 字段:`doc_id` / `file_path` / `parse_format`(`"raw"` 或 `"ontorag"`)/ `content` / `blocks_path`(无 sidecar 则 `""`)/ `parse_engine` / `parse_stage_skipped`(缓存命中等跳过场景)/ `parse_warnings`(非致命警告,会落到 `doc_status.metadata`)。
 
+**转换器引擎**（生成一个新的源文件、并希望*该文件*成为文档记录的引擎——内置的 `pdf2md` 引擎是参考实现）还可以设置：
+
+| 字段 | 解析阶段的效果 |
+|---|---|
+| `canonical_source` | 生成文件的基础名（如 `book.textpack`）。`doc_status.file_path` 与 `metadata.source_file` 会重新指向它，入队时的文件名保留在 `metadata.source_file_original`，`full_docs` 同步镜像这两个字段。此后源文件解析器、归档步骤、引用与 `DELETE /documents/{id}` 看到的都是生成文件；原文件不再被引用，也不会被移动。 |
+| `document_metadata` | 合并进 `doc_status.metadata` 的字典（内置引擎使用 `bibliographic`、`doc_type`、`doc_scores`、`ocr`、`converter`）。需要在后续每个状态中保留的键，还必须加入 `ontorag/utils_pipeline.py` 的 `_DOC_STATUS_METADATA_CARRY_OVER_KEYS`（`tests/pipeline/test_pipeline_release_closure.py` 中的顺序测试锁定了该元组）。 |
+
+把生成文件写在源文件旁边，然后把真正的解析委托给能理解它的引擎（pdf2md 用一个 `file_path` 指向包、`content_data["parse_engine"]` 写明委托引擎的 `ParseContext` 委托给 `NativeMarkdownParser`）——委托引擎自己的 `ctx.archive_source(...)` 会归档生成文件。由于原文件的规范键会从 `doc_status` 消失，扫描分类器有对应规则：若某文件的 `<stem>.textpack` 文档存在、状态不是 FAILED、且其 `source_file_original` 记录的是该文件的基础名，则该文件被归类为 `CONVERTED_SOURCE`（计数，但既不入队也不归档）。这次查找只针对 `pdf2md` spec 声明的后缀；生成其他包后缀的引擎需要在 `document_routes._converted_source_owner` 中添加自己的规则。
+
 > 注:`parse_warnings → doc_status.metadata` 是对所有 parser 的通用契约——pipeline 会原样镜像 parser 返回的内容,不检查键名。内置 native DOCX smart-heading 引擎是唯一例外:它把**自身** `smart_`/`title_block_` 前缀的诊断改写进 sidecar `<base>.smart_audit.json`(挂在 `parse_warnings` 键下)而非 doc_status,只返回剩余的非 smart 警告。这是该引擎的私有策略,不是全局前缀规则——第三方 parser 返回的 `smart_*` 警告仍会照常写入 `doc_status.metadata`。
 
 ### 2.2 三条实现路径(按引擎形态选基类)

@@ -211,7 +211,7 @@ OntoRAG provides additional capabilities including token usage tracking, knowled
 
 ### Multimodal Document Processing
 
-OntoRAG Server includes a multimodal document pipeline for PDFs, Office documents, images, tables, and formulas. Parsing is handled through external MinerU or Docling services, while multimodal indexing runs in the OntoRAG pipeline. For setup details, see **[docs/AdvancedFeatures.md](./docs/AdvancedFeatures.md)**.
+OntoRAG Server includes a multimodal document pipeline for PDFs, Office documents, EPUBs, images, tables, and formulas. Parsing runs through the built-in `native` engine (DOCX, Markdown, `.textpack`), the `pdf2md` engine (PDF / EPUB / DOC → Markdown-canonical `.textpack`, see above), or external MinerU / Docling services; multimodal indexing runs in the OntoRAG pipeline. Every embedded image is analysed by the VLM into `type` (medium), `subject` (what it is about) and `ocr_text` (text baked into the pixels), and becomes a typed knowledge-graph node — so charts, diagrams and scanned tables contribute subject matter and labels to the ontology, not just a caption. For setup details, see **[docs/FileProcessingPipeline.md](./docs/FileProcessingPipeline.md)** and **[docs/AdvancedFeatures.md](./docs/AdvancedFeatures.md)**.
 
 ## OntoRAG Contributors
 
@@ -230,3 +230,9 @@ OntoRAG Server includes a multimodal document pipeline for PDFs, Office document
 - **YAGO 4.0** (release 2020-02-24) — the T-Box files (`yago-wd-class.nt`, `yago-wd-schema.nt`, `yago-wd-shapes.nt`) committed at `yago/` originate from [yago-knowledge.org/data/yago4/full/2020-02-24/](https://yago-knowledge.org/data/yago4/full/2020-02-24/). YAGO is licensed under [CC BY-SA 3.0](https://creativecommons.org/licenses/by-sa/3.0/). Project page: [yago-knowledge.org](https://yago-knowledge.org/).
 
 **License:** Single [MIT](LICENSE) covering both the upstream LightRAG code (© 2025 LightRAG Team) and the OntoRAG fork additions (© 2026 Jinsoo An, contributor). Same MIT terms as upstream.
+
+**Bundled and optional components (OntoRAG-fork additions):**
+- **pdf2md** — the structure-aware PDF / EPUB / DOCX → Markdown converter vendored at `ontorag/parser/pdf2md/_pdf2md.py` (its README ships alongside as `README.pdf2md.md`). Written by this repository's author; used unchanged except for two documented edits.
+- [PyMuPDF](https://pymupdf.readthedocs.io/) — PDF rendering for pdf2md. **AGPL-3.0** (or a commercial licence from Artifex); installed only through the optional `ontorag[pdf2md]` extra, never by the base install.
+- [OCRmyPDF](https://ocrmypdf.readthedocs.io/) — in-place OCR of scanned PDFs (MPL-2.0), driving [Tesseract](https://github.com/tesseract-ocr/tesseract) (Apache-2.0) by default; optional recognizer plugins (`ocrmypdf-appleocr`, `ocrmypdf-easyocr`, `ocrmypdf-paddleocr`) carry their own licences. Also part of the `[pdf2md]` extra; Tesseract and Ghostscript (AGPL-3.0) are system packages.
+- [LibreOffice](https://www.libreoffice.org/) (MPL-2.0) — optional system dependency pdf2md uses to convert DOC / ODT / RTF to DOCX.

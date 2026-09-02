@@ -1,6 +1,6 @@
 # pdf2md Markdown intake — design
 
-**Status:** approved in discussion 2026-09-02; implementation plan follows.
+**Status:** implemented 2026-09-02 on branch `sync/lightrag-1.5.7` (commits `5395606`..`1e65937`; plan `docs/superpowers/plans/2026-09-02-pdf2md-markdown-intake.md`). Deviations from this spec, all recorded in the plan/commits: the scan's derived-bundle lookup is made only for suffixes the `pdf2md` spec claims (§5.3); the vendored file carries a second edit (a Python 3.12-only f-string hoisted for the 3.10 target); `ruff format` excludes the vendored file.
 **Scope:** OntoRAG fork (`machinarii/OntoRAG`), branch `sync/lightrag-1.5.7`.
 
 ## 1. Summary

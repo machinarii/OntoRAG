@@ -328,7 +328,7 @@ Plan A (infrastructure) shipped on branch `feat/yago-taxonomy-infrastructure` pe
 - [x] (Plan A) Select the ~200-class working vocabulary (top-N by `subClassOf` descendant count, manually pruned for utility). — `ontorag/taxonomy/vocabulary.py::select_working_vocabulary`; manual exclusions via `--exclude` on the bootstrap CLI.
 - [ ] Validate corpus coverage on a 100-doc sample; check `Uncategorized` rate. — run `python scripts/yago/check_coverage.py --sample-dir … --working-dir …` once Plan A bootstrap is complete on the target working directory. Gate: Uncategorized < 40-50%; otherwise add domain overlays before Plan B.
 - [ ] Build an eval harness with a held-out query set + reference answers, run against current `main` *before* Plan B's taxonomy enrichment lands. Otherwise there's no apples-to-apples comparison once context formatting changes.
-- [ ] Pick the document content used for classification (full text vs summary vs first-N tokens). The Plan A classifier accepts arbitrary text; Plan B chooses what to pass in.
+- [ ] Pick the document content used for classification (full text vs summary vs first-N tokens). The Plan A classifier accepts arbitrary text; Plan B chooses what to pass in. — *Since 2026-09-02 the `pdf2md` engine records `metadata.bibliographic` (title, authors, …) and `doc_type` per converted document, and every VLM-analysed image records `subject` / `ocr_text`; see §5.4 for how these are meant to feed the classifier.*
 
 ## 6. Pointers
 
