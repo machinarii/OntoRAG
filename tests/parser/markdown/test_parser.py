@@ -13,6 +13,7 @@ import zipfile
 from pathlib import Path
 
 import pytest
+import sys
 
 from ontorag.parser.markdown import parser as md_parser
 from ontorag.parser.markdown.parser import (
@@ -556,3 +557,52 @@ def test_remote_image_private_host_blocked(monkeypatch):
     (drawing,) = meta["md_drawings"].values()
     assert drawing["kind"] == "external"
     assert warnings.get("images_download_failed") == 1
+
+
+# --- check_svg_rasterizer diagnostics -------------------------------------
+# cairocffi dlopen()s libcairo at *import* time, so on a host where cairosvg is
+# pip-installed but the native library is missing, ``import cairosvg`` itself
+# raises OSError. The probe must not report that as "not installed".
+
+
+def _fail_cairosvg_import(monkeypatch, exc: BaseException) -> None:
+    import builtins
+
+    real_import = builtins.__import__
+
+    def fake_import(name, *args, **kwargs):
+        if name == "cairosvg":
+            raise exc
+        return real_import(name, *args, **kwargs)
+
+    monkeypatch.delitem(sys.modules, "cairosvg", raising=False)
+    monkeypatch.setattr(builtins, "__import__", fake_import)
+
+
+def test_probe_reports_missing_native_lib_when_import_dlopen_fails(monkeypatch):
+    _fail_cairosvg_import(
+        monkeypatch, OSError("cannot load library 'libcairo.2.dylib': dlopen(...)")
+    )
+    msg = md_parser.check_svg_rasterizer()
+    assert msg is not None
+    assert "not installed" not in msg
+    assert "libcairo" in msg
+
+
+def test_probe_mentions_homebrew_fallback_path_on_macos(monkeypatch):
+    _fail_cairosvg_import(
+        monkeypatch, OSError("cannot load library 'libcairo.2.dylib'")
+    )
+    monkeypatch.setattr(sys, "platform", "darwin")
+    msg = md_parser.check_svg_rasterizer()
+    assert msg is not None
+    assert "DYLD_FALLBACK_LIBRARY_PATH=/opt/homebrew/lib" in msg
+
+
+def test_probe_reports_not_installed_only_for_missing_module(monkeypatch):
+    _fail_cairosvg_import(
+        monkeypatch, ModuleNotFoundError("No module named 'cairosvg'")
+    )
+    msg = md_parser.check_svg_rasterizer()
+    assert msg is not None
+    assert "not installed" in msg
