@@ -23,6 +23,7 @@ from typing import TYPE_CHECKING, Callable
 
 from ontorag.constants import (
     PARSER_ENGINE_DOCLING,
+    PARSER_ENGINE_PDF2MD,
     PARSER_ENGINE_LEGACY,
     PARSER_ENGINE_MINERU,
     PARSER_ENGINE_NATIVE,
@@ -59,6 +60,18 @@ def _mineru_endpoint_requirement() -> str | None:
         return "MINERU_LOCAL_ENDPOINT"
     allowed = ", ".join(sorted(_VALID_MINERU_API_MODES))
     return f"valid MINERU_API_MODE ({allowed})"
+
+
+def _pdf2md_available() -> bool:
+    from ontorag.parser.pdf2md import probe  # stdlib-only module
+
+    return probe.check_pdf2md_available()
+
+
+def _pdf2md_requirement() -> str | None:
+    from ontorag.parser.pdf2md import probe
+
+    return None if probe.check_pdf2md_available() else probe.INSTALL_HINT
 
 
 def _env_endpoint_configured(env_name: str) -> Callable[[], bool]:
@@ -298,6 +311,17 @@ _REGISTRY: dict[str, ParserSpec] = {
         endpoint_configured=_env_endpoint_configured("DOCLING_ENDPOINT"),
         endpoint_requirement=lambda: "DOCLING_ENDPOINT",
         extra_suffixes_env="DOCLING_ADDITIONAL_SUFFIXES",
+    ),
+    PARSER_ENGINE_PDF2MD: ParserSpec(
+        engine_name=PARSER_ENGINE_PDF2MD,
+        impl="ontorag.parser.pdf2md.parser:Pdf2MdParser",
+        suffixes=frozenset({"pdf", "epub", "docx", "doc", "odt", "rtf"}),
+        queue_group=PARSER_ENGINE_PDF2MD,
+        concurrency=int(os.getenv("MAX_PARALLEL_PARSE_PDF2MD", "2")),
+        # Local engine, but only usable when the [pdf2md] extra is installed;
+        # routing treats "unavailable" exactly like an unconfigured endpoint.
+        endpoint_configured=_pdf2md_available,
+        endpoint_requirement=_pdf2md_requirement,
     ),
     PARSER_ENGINE_REUSE: ParserSpec(
         engine_name=PARSER_ENGINE_REUSE,
