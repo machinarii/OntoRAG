@@ -77,6 +77,7 @@ from ontorag.exceptions import (
     StorageNotInitializedError,
 )
 from ontorag.constants import (
+    PARSER_ENGINE_PDF2MD,
     DEFAULT_SCAN_ENQUEUE_BATCH_SIZE,
     FILE_EXTRACTION_SUMMARY_PREFIX,
     FULL_DOCS_FORMAT_PENDING_PARSE,
@@ -119,7 +120,11 @@ from ontorag.utils import (
     validate_file_path_security,
 )
 from ontorag.kg.shared_storage import append_pipeline_history
-from ontorag.utils_pipeline import count_active_documents, read_source_file_basename
+from ontorag.utils_pipeline import (
+    count_active_documents,
+    doc_status_field,
+    read_source_file_basename,
+)
 from ontorag.api.admission import adopt_admission_ticket
 from ontorag.api.utils_api import get_combined_auth_dependency
 from ..config import global_args
@@ -2583,9 +2588,7 @@ def _validate_custom_chunking_available(process_options: str, rag: OntoRAG) -> N
     from ontorag.chunker import chunking_by_token_size
 
     if getattr(rag, "chunking_func", chunking_by_token_size) is chunking_by_token_size:
-        raise ValueError(
-            "custom chunking requires a non-default OntoRAG.chunking_func"
-        )
+        raise ValueError("custom chunking requires a non-default OntoRAG.chunking_func")
 
 
 def _resolve_text_chunking(
@@ -2969,7 +2972,7 @@ async def _renew_scan_job_lease(reporter: _ScanJobReporter, scan_task: Any) -> N
 
 
 class _ScanFileClass(str, Enum):
-    """The eight mutually exclusive scan classification exits (LR2 §8.3).
+    """The nine mutually exclusive scan classification exits (LR2 §8.3).
 
     Values double as the scan job's counter keys, so a ``/scan/status`` reader
     sees the taxonomy verbatim."""
@@ -2982,6 +2985,9 @@ class _ScanFileClass(str, Enum):
     SOURCE_IDENTITY_UNKNOWN = "source_identity_unknown"
     RESUME_SAME_PHYSICAL_SOURCE = "resume_same_physical_source"
     ALIAS_DUPLICATE = "alias_duplicate"
+    # A converter engine (pdf2md) already produced this file's <stem>.textpack
+    # document of record; the original stays in place, never enqueued/archived.
+    CONVERTED_SOURCE = "converted_source"
 
 
 @dataclass(frozen=True)
@@ -3037,6 +3043,42 @@ async def _row_source_file(rag: OntoRAG, doc_id: str) -> str | None:
     return read_source_file_basename(getattr(row, "metadata", None) or {})
 
 
+async def _converted_source_owner(
+    rag: OntoRAG, file_path: Path, canonical_source_key: str
+) -> str | None:
+    """Doc id of the ``<stem>.textpack`` document a converter engine (pdf2md)
+    produced from THIS file, else None.
+
+    Converter engines re-point the document of record to the generated bundle
+    (``ParseResult.canonical_source``), so the original's own canonical key is
+    absent from doc_status. The bundle name is deterministic, so one extra
+    ``resolve_doc_source_strict`` lookup finds it; ``metadata.source_file_original``
+    must equal this physical basename so ``book.epub`` cannot claim ``book.pdf``.
+    A FAILED bundle document does not claim the original: the scan must retry it.
+    Only suffixes the converter engine claims are checked, so a ``.txt`` or
+    ``.md`` scan costs no extra lookup.
+    """
+    from ontorag.parser.registry import suffix_capabilities
+    from ontorag.parser.routing import parser_suffix
+
+    if parser_suffix(file_path.name) not in suffix_capabilities(PARSER_ENGINE_PDF2MD):
+        return None
+    derived = f"{Path(canonical_source_key).stem}.textpack"
+    if derived == canonical_source_key:
+        return None
+    resolution = await rag.doc_status.resolve_doc_source_strict(derived)
+    if not isinstance(resolution, SourceUnique):
+        return None
+    if get_doc_status_value(resolution.doc) == DocStatus.FAILED.value:
+        return None
+    metadata = doc_status_field(resolution.doc, "metadata", {}) or {}
+    if not isinstance(metadata, dict):
+        return None
+    if metadata.get("source_file_original") != file_path.name:
+        return None
+    return resolution.doc_id
+
+
 async def classify_scan_file(
     rag: OntoRAG, file_path: Path, canonical_source_key: str
 ) -> _ScanFileDecision:
@@ -3075,6 +3117,9 @@ async def classify_scan_file(
     resolution = await rag.doc_status.resolve_doc_source_strict(canonical_source_key)
 
     if isinstance(resolution, SourceAbsent):
+        converted = await _converted_source_owner(rag, file_path, canonical_source_key)
+        if converted is not None:
+            return _ScanFileDecision(_ScanFileClass.CONVERTED_SOURCE, doc_id=converted)
         return _ScanFileDecision(_ScanFileClass.CLAIMED_NEW)
 
     if isinstance(resolution, SourceConflict):
@@ -3848,6 +3893,15 @@ async def run_scanning_process(
                         _ScanFileClass.PROCESSED.value,
                     )
                     reporter.sample("processed", filename)
+                    continue
+
+                if decision.kind is _ScanFileClass.CONVERTED_SOURCE:
+                    # A converter engine already turned this file into its
+                    # .textpack document of record. The original stays in
+                    # place by design (never archived, never enqueued).
+                    processed_count += 1
+                    reporter.count(_ScanFileClass.CONVERTED_SOURCE.value)
+                    reporter.sample("converted_source", filename)
                     continue
 
                 if decision.kind is _ScanFileClass.STALE_STUB:
