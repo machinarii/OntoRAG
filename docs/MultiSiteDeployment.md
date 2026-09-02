@@ -39,7 +39,7 @@ Each request for `index.html` goes through `SmartStaticFiles` in `ontorag/api/on
 1. Reads the static `index.html` produced by `bun run build`.
 2. Looks for the placeholder comment `<!-- __ONTORAG_RUNTIME_CONFIG__ -->`.
 3. Replaces it with
-   `<script>window.__ONTORAG_CONFIG__ = {"apiPrefix":"…","webuiPrefix":"…"}</script>`,
+   `<script>window.__ONTORAG_CONFIG__ = {"apiPrefix":"…","webuiPrefix":"…","webuiTitle":"…"}</script>`,
    computed from the configured `ONTORAG_API_PREFIX` (the in-app `/webui` mount is hardcoded server-side).
 
 Sequence — browser request to a site-prefixed instance:
@@ -69,15 +69,39 @@ and in-app links.
 
 ---
 
-## One backend variable, that's it
+## Two backend variables, that's it
 
 | Variable | Default | Meaning |
 | --- | --- | --- |
-| `ONTORAG_API_PREFIX` | `""` | Reverse-proxy prefix that the upstream proxy strips before forwarding to FastAPI. Passed to FastAPI as `root_path`. |
+| `ONTORAG_API_PREFIX` | `""` | Reverse-proxy mount prefix. The backend accepts both strip and verbatim forwarding — pick whichever fits your proxy stack. Passed to FastAPI as `root_path`. |
+| `ONTORAG_DEFAULT_UI` | `webui` | Which UI entry the root path `/` redirects to: `webui` (admin) or `workspace` (query-only entry). Controls ONLY the `/` redirect; both entries stay mounted regardless. Any other value fails startup. |
 
-The WebUI is always mounted at `/webui` server-side. `window.__ONTORAG_CONFIG__.webuiPrefix` is computed as `ONTORAG_API_PREFIX + "/webui/"` and injected for the SPA — you do **not** set it yourself.
+There are TWO WebUI entries, both mounted server-side from one shared build: the admin UI at `/webui` and the query-user entry at `/workspace` (each serving its own entry HTML from the same static directory; requesting the other entry's HTML file returns 404). `window.__ONTORAG_CONFIG__` keeps the published shape `{apiPrefix, webuiPrefix, webuiTitle}`; `webuiPrefix` is computed as `ONTORAG_API_PREFIX + "/webui/"` and injected identically for both entries — you do **not** set it yourself, and there is no entry-mode field (the entry identity IS the loaded HTML product). Behind a prefix, browsers see `/site01/webui/` and `/site01/workspace/`. `webuiTitle` carries `WEBUI_TITLE` (null when unset) and is applied to the browser tab title by the same injected snippet, so the tab shows the deployment's own name from the first paint instead of the bundled default.
+
+> **Sites on one host share the browser's client-side settings.** The WebUI keeps its query parameters and chat histories in `localStorage`, which the browser scopes by ORIGIN — and every prefix on one host is the same origin. The keys are not namespaced by prefix yet, so query parameters saved in `/site01/webui` are the ones `/site02/workspace` sends, in that browser. This is client-side state only: each instance's server-side data isolation (`workspace`, storage backends, authentication) is untouched, and another visitor's browser is unaffected. Give the sites separate hostnames if their UI state must not mix.
 
 There are no longer any frontend `VITE_API_PREFIX` / `VITE_WEBUI_PREFIX` variables. Setting them has no effect (they are ignored by the build).
+
+### Forwarding modes: strip and verbatim both work
+
+After setting `ONTORAG_API_PREFIX=/site01`, the backend resolves all routes correctly under either forwarding style:
+
+- **Strip** — proxy removes the prefix, backend sees `/webui/` and `/documents/foo`. The nginx example below uses this style.
+- **Verbatim** — proxy forwards the request unchanged, backend sees `/site01/webui/` and `/site01/documents/foo`. The Vite dev flow ([Scenario 2](#scenario-2--simulate-a-site-prefix)) and any non-rewriting proxy use this style.
+
+A small ASGI middleware in `create_app` prepends `root_path` to `scope["path"]` whenever the path does not already include it, so plain Routes and Mount sub-apps (the WebUI's `StaticFiles`) both resolve identically in either mode. You do not need to standardize on one — both coexist on the same backend without configuration toggles.
+
+### `WHITELIST_PATHS` is written without the prefix
+
+Every path the server compares against configuration — `WHITELIST_PATHS` above all — is matched **after** the mount prefix is removed, identically in both forwarding modes. Entries are the internal route paths, exactly as the routes are declared:
+
+```bash
+ONTORAG_API_PREFIX=/site01
+WHITELIST_PATHS=/health,/api/*        # correct: exempts /site01/health and /site01/api/chat
+# WHITELIST_PATHS=/site01/health      # WRONG: matches nothing, /site01/health then needs auth
+```
+
+So the shipped default needs no change when you add a prefix: `/health` keeps answering unauthenticated liveness probes, and `/api/*` keeps exempting the Ollama-compatible routes — and only those. A `/*` entry matches on path-segment boundaries, so `/api/*` never spills onto a sibling route that merely starts with the same characters.
 
 ---
 
@@ -264,7 +288,7 @@ Browser ──► localhost:5173 (Vite) ──► localhost:9621 (backend, no pr
 # ontorag_webui/.env.development (already in repo as sample)
 VITE_BACKEND_URL=http://localhost:9621
 VITE_API_PROXY=true
-VITE_API_ENDPOINTS=/api,/documents,/graphs,/graph,/health,/query,/docs,/redoc,/openapi.json,/login,/auth-status,/static
+VITE_API_ENDPOINTS=/api,/documents,/graphs,/graph,/health,/query,/docs,/redoc,/openapi.json,/login,/auth-status,/auth/verify,/ui/customization,/static
 # VITE_DEV_API_PREFIX=          ← leave empty
 ```
 
@@ -290,7 +314,7 @@ Browser ──► localhost:5173 (Vite + HMR)
 ```bash
 VITE_BACKEND_URL=…                             # see "Where to point VITE_BACKEND_URL" below
 VITE_API_PROXY=true
-VITE_API_ENDPOINTS=/api,/documents,/graphs,/graph,/health,/query,/docs,/redoc,/openapi.json,/login,/auth-status,/static
+VITE_API_ENDPOINTS=/api,/documents,/graphs,/graph,/health,/query,/docs,/redoc,/openapi.json,/login,/auth-status,/auth/verify,/ui/customization,/static
 VITE_DEV_API_PREFIX=/site01
 ```
 
@@ -362,7 +386,7 @@ slash form; verify the redirect is reaching nginx (check `X-Forwarded-Prefix` an
 
 ### `apiPrefix` is empty in `window.__ONTORAG_CONFIG__` after deploy
 
-View the page source. If you see the literal placeholder `<!-- __ONTORAG_RUNTIME_CONFIG__ -->` instead of an injected `<script>` tag, the request did not go through `SmartStaticFiles` — double-check that `ontorag/api/webui/index.html` exists in the running container and that the WebUI mount succeeded (the server logs `WebUI assets mounted at <path>` at startup).
+View the page source. If you see the literal placeholder `<!-- __ONTORAG_RUNTIME_CONFIG__ -->` instead of an injected `<script>` tag, the request did not go through `SmartStaticFiles` — double-check that `ontorag/api/webui/index.html` exists in the running container and that the WebUI mount succeeded (the server logs `Admin WebUI mounted at <path>` at startup).
 
 ### `bun run dev` proxy returns 404 with `VITE_DEV_API_PREFIX` set
 
@@ -370,4 +394,4 @@ Confirm the backend is also running with the matching `ONTORAG_API_PREFIX`. The 
 
 ### I want to disable the WebUI entirely
 
-Don't build the frontend — `ontorag/api/webui/index.html` will not exist and the server will skip the WebUI mount, redirecting `/` and the WebUI path to `/docs` instead. The runtime-config injection is purely opt-in via the existence of the build artifact.
+Don't build the frontend — `ontorag/api/webui/index.html` will not exist and the server will skip the WebUI mount, redirecting `/` and the WebUI path to `/docs` instead (or, when `ENABLE_API_DOCS=false` also disables the docs, answering them with a small JSON service-info payload whose `health_url` honors the configured prefix). The `/workspace` entry degrades separately: when `workspace.html` is missing (e.g. an older prebuilt bundle), `/webui` stays fully functional while `/workspace` answers with a fixed JSON service-info payload that never redirects to or mentions the API docs; with `ONTORAG_DEFAULT_UI=workspace`, `/` follows that same workspace degradation instead of rerouting to `/webui/` or `/docs`. The runtime-config injection is purely opt-in via the existence of the build artifact. The `/docs,/redoc,/openapi.json,/static` entries in the `VITE_API_ENDPOINTS` examples above stay valid with docs disabled — those routes simply return 404 through the proxy.

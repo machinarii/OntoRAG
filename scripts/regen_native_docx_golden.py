@@ -3,9 +3,9 @@
 sidecar pipeline.
 
 The fixtures live at
-``tests/native_parser/docx/golden/native_docx/<scenario>/``
+``tests/parser/docx/golden/native_docx/<scenario>/``
 and capture the exact on-disk artifacts ``OntoRAG.parse_native`` produces
-for each scenario in ``tests/native_parser/docx/_native_docx_fixtures.py``.
+for each scenario in ``tests/parser/docx/_native_docx_fixtures.py``.
 
 Usage::
 
@@ -23,7 +23,7 @@ from unittest import mock
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
-sys.path.insert(0, str(PROJECT_ROOT / "tests" / "native_parser" / "docx"))
+sys.path.insert(0, str(PROJECT_ROOT / "tests" / "parser" / "docx"))
 
 
 async def _regen() -> None:
@@ -31,16 +31,18 @@ async def _regen() -> None:
         FULL_DOCS_FORMAT_PENDING_PARSE,
         PARSED_DIR_NAME,
     )
-    from ontorag.parser_debug import (
+    from ontorag.parser.base import ParseContext
+    from ontorag.parser.debug import (
         FrozenDateTime,
         build_debug_rag,
     )
+    from ontorag.parser.registry import get_parser
     import ontorag.pipeline as pipeline_module
 
     from _native_docx_fixtures import SCENARIOS  # type: ignore[import]
 
     fixtures_root = (
-        PROJECT_ROOT / "tests" / "native_parser" / "docx" / "golden" / "native_docx"
+        PROJECT_ROOT / "tests" / "parser" / "docx" / "golden" / "native_docx"
     )
     fixtures_root.mkdir(parents=True, exist_ok=True)
 
@@ -56,7 +58,6 @@ async def _regen() -> None:
         def _stub_extract(
             file_path,
             *,
-            fixlevel=None,
             drawing_context=None,
             parse_warnings=None,
             parse_metadata=None,
@@ -82,7 +83,7 @@ async def _regen() -> None:
             with (
                 mock.patch.dict("os.environ", {"INPUT_DIR": str(input_dir)}),
                 mock.patch(
-                    "ontorag.native_parser.docx.parse_document.extract_docx_blocks",
+                    "ontorag.parser.docx.parse_document.extract_docx_blocks",
                     _stub_extract,
                 ),
                 mock.patch.object(
@@ -92,14 +93,16 @@ async def _regen() -> None:
                 ),
                 mock.patch("ontorag.sidecar.writer.datetime", FrozenDateTime),
             ):
-                await rag.parse_native(
-                    scenario.doc_id,
-                    str(source_path),
-                    {
-                        "parse_format": FULL_DOCS_FORMAT_PENDING_PARSE,
-                        "content": "",
-                        "source_path": str(source_path),
-                    },
+                await get_parser("native").parse(
+                    ParseContext(
+                        rag,
+                        scenario.doc_id,
+                        str(source_path),
+                        {
+                            "parse_format": FULL_DOCS_FORMAT_PENDING_PARSE,
+                            "content": "",
+                        },
+                    )
                 )
 
             produced_dir = input_dir / PARSED_DIR_NAME / f"{scenario.file_path}.parsed"

@@ -10,8 +10,10 @@
     "documents": "Tài liệu",
     "knowledgeGraph": "Đồ thị tri thức",
     "retrieval": "Truy xuất",
-    "api": "API",
+    "apiDocs": "Tài liệu API",
     "projectRepository": "Kho dự án",
+    "appSettings": "Cài đặt",
+    "deploymentInfo": "Thông tin triển khai",
     "logout": "Đăng xuất",
     "frontendNeedsRebuild": "Giao diện cần được xây dựng lại",
     "themeToggle": {
@@ -31,13 +33,19 @@
     "errorEmptyFields": "Vui lòng nhập tên người dùng và mật khẩu",
     "errorInvalidCredentials": "Đăng nhập thất bại, vui lòng kiểm tra tên người dùng và mật khẩu",
     "authDisabled": "Xác thực bị tắt. Đang sử dụng chế độ không cần đăng nhập.",
-    "guestMode": "Không cần đăng nhập"
+    "guestMode": "Không cần đăng nhập",
+    "consentLabel": "Tôi đồng ý với {{documents}}",
+    "consentDocuments": "Chính sách quyền riêng tư",
+    "errorConsentRequired": "Vui lòng đọc và đồng ý với các thỏa thuận trước khi đăng nhập"
   },
   "common": {
     "cancel": "Hủy",
     "save": "Lưu",
     "saving": "Đang lưu...",
-    "saveFailed": "Lưu thất bại"
+    "saveFailed": "Lưu thất bại",
+    "errorBoundaryTitle": "Đã xảy ra lỗi",
+    "errorBoundaryDescription": "Không thể hiển thị bảng này. Hãy thử lại hoặc chuyển sang tab khác.",
+    "errorBoundaryRetry": "Thử lại"
   },
   "documentPanel": {
     "clearDocuments": {
@@ -99,7 +107,7 @@
         "error": "Một số tệp tải lên thất bại"
       },
       "generalError": "Tải Lên Thất Bại\n{{error}}",
-      "fileTypes": "Các loại được hỗ trợ: TXT, MD, MDX, DOCX, PDF, PPTX, XLSX, RTF, ODT, EPUB, HTML, HTM, TEX, JSON, XML, YAML, YML, CSV, LOG, CONF, INI, PROPERTIES, SQL, BAT, SH, C, H, CPP, HPP, PY, JAVA, JS, TS, SWIFT, GO, RB, PHP, CSS, SCSS, LESS",
+      "fileTypes": "Các loại được hỗ trợ: {{types}}",
       "fileUploader": {
         "singleFileLimit": "Không thể tải lên nhiều hơn 1 tệp một lần",
         "maxFilesLimit": "Không thể tải lên nhiều hơn {{count}} tệp",
@@ -122,6 +130,9 @@
       "pipelineStatusTooltip": "Xem trạng thái quy trình xử lý tài liệu",
       "uploadedTitle": "Tài Liệu Đã Tải Lên",
       "uploadedDescription": "Danh sách các tài liệu đã tải lên và trạng thái của chúng.",
+      "loading": "Đang tải tài liệu...",
+      "loadErrorTitle": "Không thể tải tài liệu",
+      "retry": "Thử lại",
       "emptyTitle": "Không Có Tài Liệu",
       "emptyDescription": "Chưa có tài liệu nào được tải lên.",
       "columns": {
@@ -139,18 +150,18 @@
       "filters": {
         "all": "Tất cả",
         "completed": "Hoàn tất",
-        "analyzing": "Đang phân tích",
-        "processing": "Đang xử lý",
-        "pending": "Đang chờ",
+        "parse": "Cú pháp",
+        "analyze": "Phân tích",
+        "process": "Xử lý",
         "failed": "Thất bại"
       },
       "status": {
         "all": "Tất cả",
-        "completed": "Hoàn thành",
+        "completed": "Hoàn tất",
         "preprocessed": "Đã tiền xử lý",
-        "parsing": "Đang phân tích cú pháp",
-        "analyzing": "Đang phân tích",
-        "processing": "Đang xử lý",
+        "parsing": "Cú pháp",
+        "analyzing": "Phân tích",
+        "processing": "Xử lý",
         "pending": "Đang chờ",
         "failed": "Thất bại"
       },
@@ -177,7 +188,6 @@
     "pipelineStatus": {
       "title": "Trạng Thái Quy Trình",
       "busy": "Quy Trình Đang Bận",
-      "requestPending": "Yêu Cầu Đang Chờ",
       "cancellationRequested": "Đã Yêu Cầu Hủy",
       "jobName": "Tên Công Việc",
       "startTime": "Thời Gian Bắt Đầu",
@@ -201,6 +211,8 @@
   },
   "graphPanel": {
     "dataIsTruncated": "Dữ liệu đồ thị bị cắt bớt đến số Nút tối Đa",
+    "fetchRetriesExhausted": "Không tải được dữ liệu đồ thị. Hãy làm mới để thử lại.",
+    "graphBuildFailed": "Không hiển thị được dữ liệu đồ thị. Hãy làm mới để thử lại.",
     "statusDialog": {
       "title": "Cài Đặt Máy Chủ OntoRAG",
       "description": "Xem trạng thái hệ thống hiện tại và thông tin kết nối"
@@ -233,6 +245,9 @@
       "disease": "Bệnh",
       "drug": "Thuốc",
       "food": "Thực Phẩm",
+      "table": "Bảng",
+      "drawing": "Hình Vẽ",
+      "equation": "Phương Trình",
       "other": "Khác"
     },
     "sideBar": {
@@ -246,13 +261,14 @@
         "showEdgeLabel": "Hiển Thị Nhãn Cạnh",
         "hideUnselectedEdges": "Ẩn Cạnh Không Được Chọn",
         "edgeEvents": "Sự Kiện Cạnh",
+        "edgeEventsDisabledHint": "Bị vô hiệu hóa với đồ thị có hơn {{count}} cạnh",
         "maxQueryDepth": "Độ Sâu Truy Vấn Tối Đa",
         "maxNodes": "Số Nút Tối Đa",
-        "maxLayoutIterations": "Số Vòng Lặp Bố Cục Tối Đa",
         "resetToDefault": "Đặt lại về mặc định",
         "edgeSizeRange": "Phạm Vi Kích Thước Cạnh",
         "depth": "Sâu",
-        "max": "Tối Đa",
+        "node": "Nút",
+        "edge": "Cạnh",
         "degree": "Bậc",
         "apiKey": "Khóa API",
         "enterYourAPIkey": "Nhập khóa API của bạn",
@@ -294,10 +310,11 @@
     "statusCard": {
       "unavailable": "Thông tin trạng thái không khả dụng",
       "serverInfo": "Thông Tin Máy Chủ",
-      "workingDirectory": "Thư Mục Làm Việc",
       "inputDirectory": "Thư Mục Đầu Vào",
+      "parser": "Bộ Phân Tích",
+      "mineru": "MinerU",
+      "docling": "Docling",
       "otherSettings": "Cài Đặt Khác",
-      "summarySettings": "Cài Đặt Tóm Tắt",
       "llmConfig": "Cấu Hình Mô Hình",
       "llmBinding": "LLM Binding",
       "llmBindingHost": "Điểm Cuối LLM",
@@ -315,14 +332,15 @@
       "rerankerConfig": "Cấu Hình Reranker",
       "rerankerBindingHost": "Điểm Cuối Reranker",
       "rerankerModel": "Mô Hình Reranker",
-      "lockStatus": "Trạng Thái Khóa",
-      "threshold": "Ngưỡng"
+      "lockStatus": "Trạng Thái Khóa"
     },
     "propertiesView": {
       "editProperty": "Chỉnh Sửa {{property}}",
+      "editLockedByPipeline": "Pipeline đang bận; chỉnh sửa đã bị tắt",
       "editPropertyDescription": "Chỉnh sửa giá trị thuộc tính trong vùng văn bản bên dưới.",
       "errors": {
         "duplicateName": "Tên nút đã tồn tại",
+        "invalidEntityName": "Hãy nhập tên nút hợp lệ",
         "updateFailed": "Cập nhật nút thất bại",
         "tryAgainLater": "Vui lòng thử lại sau",
         "updateSuccessButMergeFailed": "Đã cập nhật thuộc tính, nhưng hợp nhất thất bại: {{error}}",
@@ -393,6 +411,7 @@
   },
   "retrievePanel": {
     "chatMessage": {
+      "aiContentNotice": "Nội dung do AI tạo — vui lòng kiểm chứng.",
       "copyTooltip": "Sao chép vào bộ nhớ tạm",
       "copyError": "Sao chép văn bản vào bộ nhớ tạm thất bại",
       "copyEmpty": "Không có nội dung để sao chép",
@@ -403,22 +422,42 @@
       "copyManualInstruction": "Vui lòng chọn và sao chép văn bản thủ công",
       "thinking": "Đang suy nghĩ...",
       "thinkingTime": "Thời gian suy nghĩ {{time}}s",
-      "thinkingInProgress": "Đang suy nghĩ..."
+      "thinkingInProgress": "Đang suy nghĩ...",
+      "responseTime": "Thời gian phản hồi {{time}}giây",
+      "firstTokenTime": "Token đầu {{time}}giây",
+      "progress": {
+        "extracting_keywords": "Đang trích xuất từ khóa...",
+        "retrieving_entities": "Đang truy xuất thực thể...",
+        "retrieving_relations": "Đang truy xuất quan hệ...",
+        "retrieving_chunks": "Đang truy xuất đoạn văn...",
+        "reranking": "Đang xếp hạng lại...",
+        "generating_response": "Đang tạo phản hồi..."
+      }
     },
     "retrieval": {
       "startPrompt": "Bắt đầu truy xuất bằng cách nhập truy vấn của bạn bên dưới",
+      "scrollToBottom": "Cuộn đến tin nhắn mới nhất",
       "clear": "Xóa",
       "send": "Gửi",
+      "stop": "Dừng",
+      "userTerminated": "Người dùng đã dừng — phản hồi có thể chưa hoàn chỉnh",
       "placeholder": "Nhập truy vấn của bạn (Hỗ trợ tiền tố: /<Chế Độ Truy Vấn>)",
       "error": "Lỗi: Không thể nhận phản hồi",
       "queryModeError": "Chỉ hỗ trợ các chế độ truy vấn sau: {{modes}}",
-      "queryModePrefixInvalid": "Tiền tố chế độ truy vấn không hợp lệ. Dùng: /<mode> [khoảng trắng] truy vấn của bạn"
+      "queryModePrefixInvalid": "Tiền tố chế độ truy vấn không hợp lệ. Dùng: /<mode> [khoảng trắng] truy vấn của bạn",
+      "queryEmpty": "Vui lòng nhập câu hỏi trước khi gửi.",
+      "queryTooShort": "Truy vấn quá ngắn. Hãy nhập ít nhất 3 ký tự tiếng Anh hoặc tổ hợp tương đương; mỗi ký tự Trung, Nhật hoặc Hàn được tính là 2.",
+      "dismissError": "Đóng thông báo lỗi"
     },
     "querySettings": {
       "parametersTitle": "Tham Số",
       "parametersDescription": "Cấu hình tham số truy vấn của bạn",
+      "parametersScopeNotice": "Ảnh hưởng truy vấn của trình duyệt này",
+      "parametersScopeTooltip": "Các tham số này được lưu trong trình duyệt hiện tại và vẫn có hiệu lực cho đến khi bạn thay đổi; các truy vấn gửi từ lối vào /workspace mở trong đó cũng dùng chúng. Đây là trạng thái cục bộ theo trình duyệt, không phải chính sách toàn máy chủ: trình duyệt khác và thiết bị khác không bị ảnh hưởng.",
+      "parametersScopeHelpLabel": "Về phạm vi áp dụng của tham số",
       "queryMode": "Chế Độ Truy Vấn",
       "queryModeTooltip": "Chọn chiến lược truy xuất:\n• Naive: Truy xuất vector đoạn văn bản truyền thống\n• Local: Tập trung vào truy xuất thực thể\n• Global: Tập trung vào truy xuất quan hệ\n• Hybrid: Local+Global\n• Mix: Local+Global+Naive\n• Bypass: Bỏ qua truy xuất, gửi lịch sử hội thoại và câu hỏi hiện tại đến LLM",
+      "queryModeWarning": "Có thể làm giảm chất lượng truy xuất",
       "queryModeOptions": {
         "naive": "Naive",
         "local": "Local",
@@ -456,14 +495,13 @@
       "streamResponse": "Phản Hồi Theo Luồng",
       "streamResponseTooltip": "Nếu True, bật đầu ra theo luồng cho phản hồi thời gian thực",
       "userPrompt": "Lời Nhắc Đầu Ra Bổ Sung",
-      "userPromptTooltip": "Cung cấp yêu cầu phản hồi bổ sung cho LLM (không liên quan đến nội dung truy vấn, chỉ để xử lý đầu ra).",
+      "userPromptTooltip": "Cung cấp yêu cầu phản hồi bổ sung cho LLM (không liên quan đến nội dung truy vấn, chỉ dùng để xử lý đầu ra). Máy chủ có thể nối một lời nhắc toàn cục vào phía trước. Để trống để chỉ gửi lời nhắc toàn cục của máy chủ.",
       "userPromptPlaceholder": "Nhập lời nhắc tùy chỉnh (tùy chọn)",
+      "disableUserPromptPrefix": "Bỏ qua lời nhắc toàn cục",
+      "disableUserPromptPrefixTooltip": "Không nối lời nhắc đầu ra toàn cục của máy chủ vào trước lời nhắc đầu ra bổ sung ở trên. Bật tùy chọn này để kiểm soát hoàn toàn chỉ dẫn cuối cùng từ đây.",
       "enableRerank": "Bật Xếp Hạng Lại",
       "enableRerankTooltip": "Bật xếp hạng lại cho các đoạn văn bản đã truy xuất. Nếu True nhưng không có mô hình rerank nào được cấu hình, một cảnh báo sẽ được đưa ra. Mặc định là True."
     }
-  },
-  "apiSite": {
-    "loading": "Đang tải tài liệu API..."
   },
   "apiKeyAlert": {
     "title": "Cần Có Khóa API",
@@ -479,5 +517,28 @@
     "prevPage": "Trang Trước",
     "nextPage": "Trang Tiếp",
     "lastPage": "Trang Cuối"
+  },
+  "workspace": {
+    "welcome": {
+      "defaultMarkdown": "Chào mừng! Hãy đặt câu hỏi về cơ sở tri thức và nhận câu trả lời kèm trích dẫn. Đăng nhập để bắt đầu.",
+      "enterButton": "Vào không gian làm việc",
+      "loginButton": "Đăng nhập",
+      "enterFailed": "Không thể kết nối máy chủ. Vui lòng thử lại."
+    },
+    "queryEmpty": {
+      "defaultMarkdown": "Hãy đặt bất kỳ câu hỏi nào về cơ sở tri thức để bắt đầu."
+    }
+  },
+  "migration": {
+    "failedTitle": "Không thể chuẩn bị cài đặt cục bộ",
+    "failedBody": "Không thể di chuyển cài đặt đã lưu sang định dạng lưu trữ mới. Không có gì bị mất — hãy tải lại để thử lại.",
+    "dataLostTitle": "Không thể khôi phục một số cài đặt đã lưu",
+    "dataLostBody": "Bộ nhớ trình duyệt đã đầy nên một số cài đặt của bạn (giao diện, ngôn ngữ, khóa API) không được giữ lại và không còn khôi phục được. Tiếp tục sẽ giữ những gì còn lại và dùng giá trị mặc định cho phần còn lại.",
+    "continueAfterLoss": "Tiếp tục",
+    "retry": "Tải lại",
+    "historyDropped": "Lịch sử trò chuyện vượt quá dung lượng lưu trữ của trình duyệt trong quá trình nâng cấp và đã bị loại bỏ. Các cài đặt đã được di chuyển bình thường."
+  },
+  "retrievalHistory": {
+    "quotaDropped": "Bộ nhớ trình duyệt đã đầy: lịch sử trò chuyện không còn được lưu. Cuộc trò chuyện hiện tại vẫn hiển thị cho đến khi bạn rời trang."
   }
 }

@@ -28,10 +28,23 @@ Caveats:
 from __future__ import annotations
 
 import asyncio
-from typing import Any
+import re
+from typing import TYPE_CHECKING, Any
 
 from ontorag.constants import DEFAULT_SENTENCE_SPLIT_REGEX
-from ontorag.utils import EmbeddingFunc, Tokenizer, logger
+from ontorag.utils import (
+    EmbeddingFunc,
+    Tokenizer,
+    logger,
+    run_in_chunking_executor,
+)
+
+if TYPE_CHECKING:
+    from langchain_experimental.text_splitter import (
+        SemanticChunker as SemanticChunkerType,
+    )
+else:
+    SemanticChunkerType = Any
 
 try:
     from langchain_core.embeddings import Embeddings
@@ -78,6 +91,109 @@ class _AsyncEmbeddingFuncAdapter(Embeddings):
         return self._run([text], context="query")[0]
 
 
+def _sentence_spans(text: str, sentences: list[str]) -> list[tuple[int, int]]:
+    spans: list[tuple[int, int]] = []
+    cursor = 0
+    for sentence in sentences:
+        if not sentence:
+            spans.append((cursor, cursor))
+            continue
+        start = text.find(sentence, cursor)
+        if start < 0:
+            start = text.find(sentence)
+        if start < 0:
+            start = cursor
+        end = start + len(sentence)
+        spans.append((start, end))
+        cursor = end
+    return spans
+
+
+def _trim_span(text: str, start: int, end: int) -> tuple[int, int]:
+    start = max(0, min(start, len(text)))
+    end = max(start, min(end, len(text)))
+    while start < end and text[start].isspace():
+        start += 1
+    while end > start and text[end - 1].isspace():
+        end -= 1
+    return start, end
+
+
+def _semantic_groups_with_spans(
+    splitter: SemanticChunkerType,
+    text: str,
+) -> list[tuple[str, int, int]]:
+    """Mirror SemanticChunker grouping while keeping original source spans.
+
+    .. warning::
+        This re-implements the body of ``SemanticChunker.split_text`` so each group
+        carries its exact source span (``text[start:end]``) instead of the upstream
+        ``" ".join(sentences)`` reflow. It relies on **private** members
+        (``sentence_split_regex``, ``breakpoint_threshold_type``, ``min_chunk_size``,
+        ``number_of_chunks``, ``_calculate_sentence_distances``,
+        ``_threshold_from_clusters``, ``_calculate_breakpoint_threshold``). Verified
+        byte-for-byte against ``langchain-experimental`` 0.3.2–0.4.x (the range pinned
+        in ``pyproject.toml``: ``langchain-experimental>=0.3.2,<1``). If that pin is
+        widened, re-verify against the new upstream ``split_text`` —
+        ``tests/chunker/test_chunker_semantic_vector.py`` has a drift guard that
+        compares this mirror's grouping to the live ``splitter.split_text`` output.
+    """
+    single_sentences_list = re.split(splitter.sentence_split_regex, text)
+    spans = _sentence_spans(text, single_sentences_list)
+
+    def _group(start_index: int, end_index: int) -> tuple[str, int, int] | None:
+        start, _ = spans[start_index]
+        _, end = spans[end_index]
+        start, end = _trim_span(text, start, end)
+        if start >= end:
+            return None
+        return text[start:end], start, end
+
+    if len(single_sentences_list) == 1:
+        group = _group(0, 0)
+        return [group] if group else []
+    if (
+        splitter.breakpoint_threshold_type == "gradient"
+        and len(single_sentences_list) == 2
+    ):
+        return [g for i in range(2) if (g := _group(i, i)) is not None]
+
+    distances, sentences = splitter._calculate_sentence_distances(single_sentences_list)
+    if splitter.number_of_chunks is not None:
+        breakpoint_distance_threshold = splitter._threshold_from_clusters(distances)
+        breakpoint_array = distances
+    else:
+        breakpoint_distance_threshold, breakpoint_array = (
+            splitter._calculate_breakpoint_threshold(distances)
+        )
+
+    indices_above_thresh = [
+        i for i, x in enumerate(breakpoint_array) if x > breakpoint_distance_threshold
+    ]
+
+    chunks: list[tuple[str, int, int]] = []
+    start_index = 0
+    for index in indices_above_thresh:
+        end_index = index
+        group_sentences = sentences[start_index : end_index + 1]
+        combined_text = " ".join([d["sentence"] for d in group_sentences])
+        if (
+            splitter.min_chunk_size is not None
+            and len(combined_text) < splitter.min_chunk_size
+        ):
+            continue
+        group = _group(start_index, end_index)
+        if group is not None:
+            chunks.append(group)
+        start_index = index + 1
+
+    if start_index < len(sentences):
+        group = _group(start_index, len(sentences) - 1)
+        if group is not None:
+            chunks.append(group)
+    return chunks
+
+
 async def chunking_by_semantic_vector(
     tokenizer: Tokenizer,
     content: str,
@@ -88,6 +204,8 @@ async def chunking_by_semantic_vector(
     breakpoint_threshold_amount: float | None = None,
     buffer_size: int = 1,
     sentence_split_regex: str = DEFAULT_SENTENCE_SPLIT_REGEX,
+    number_of_chunks: int | None = None,
+    min_chunk_size: int | None = None,
 ) -> list[dict[str, Any]]:
     """Semantic vector chunker — the ``"V"`` chunking strategy.
 
@@ -113,6 +231,8 @@ async def chunking_by_semantic_vector(
             Default extends the upstream English-only pattern with
             Chinese sentence terminators ``。？！`` so mixed-language and
             pure-Chinese inputs split correctly.
+        number_of_chunks: Optional target chunk count (LangChain SemanticChunker).
+        min_chunk_size: Optional minimum character size for semantic groups.
 
     Returns:
         Ordered list of ``{"tokens", "content", "chunk_order_index"}``
@@ -136,7 +256,12 @@ async def chunking_by_semantic_vector(
             chunking_by_recursive_character,
         )
 
-        return chunking_by_recursive_character(
+        # Off the loop like every other R run. Without this the ``await
+        # asyncio.to_thread`` further down is never reached, so V's "already
+        # offloaded" reputation does not hold for a deployment without an
+        # embedding function — the R attack surface reappears in full.
+        return await run_in_chunking_executor(
+            chunking_by_recursive_character,
             tokenizer,
             content,
             chunk_token_size,
@@ -146,7 +271,7 @@ async def chunking_by_semantic_vector(
     if not _LANGCHAIN_EXPERIMENTAL_AVAILABLE:
         raise ImportError(
             "langchain-experimental is required for the 'V' chunking "
-            "strategy; install with `pip install langchain-experimental>=0.3`."
+            "strategy; install with `pip install langchain-experimental>=0.3.2`."
         )
 
     loop = asyncio.get_running_loop()
@@ -157,6 +282,8 @@ async def chunking_by_semantic_vector(
         "buffer_size": int(buffer_size),
         "breakpoint_threshold_type": breakpoint_threshold_type,
         "sentence_split_regex": sentence_split_regex,
+        "number_of_chunks": number_of_chunks,
+        "min_chunk_size": min_chunk_size,
     }
     if breakpoint_threshold_amount is not None:
         chunker_kwargs["breakpoint_threshold_amount"] = float(
@@ -164,7 +291,7 @@ async def chunking_by_semantic_vector(
         )
 
     splitter = SemanticChunker(**chunker_kwargs)
-    pieces = await asyncio.to_thread(splitter.split_text, content)
+    pieces = await asyncio.to_thread(_semantic_groups_with_spans, splitter, content)
 
     # SemanticChunker has no internal size cap; oversized pieces here
     # would otherwise rely on the embedding-time hard fallback (which
@@ -179,39 +306,71 @@ async def chunking_by_semantic_vector(
     )
 
     target_max = max(int(chunk_token_size), 1)
-    results: list[dict[str, Any]] = []
-    for piece in pieces:
-        body = piece.strip()
-        if not body:
-            continue
-        piece_tokens = len(tokenizer.encode(body))
-        if piece_tokens <= target_max:
-            results.append(
-                {
-                    "tokens": piece_tokens,
-                    "content": body,
-                    "chunk_order_index": len(results),
-                }
-            )
-            continue
-        # Oversized semantic piece: re-split via R while preserving the
-        # surrounding chunk order.  ``chunk_overlap_token_size=0`` keeps
-        # V's non-overlapping semantics.
-        sub_pieces = chunking_by_recursive_character(
-            tokenizer,
-            body,
-            target_max,
-            chunk_overlap_token_size=0,
-        )
-        for sub in sub_pieces:
-            sub_body = sub.get("content", "")
-            if not sub_body:
+
+    def _size_and_resplit() -> list[dict[str, Any]]:
+        """Encode every semantic piece and re-split the oversized ones.
+
+        ``await asyncio.to_thread`` above covers the embedding-driven grouping
+        and nothing else: this loop encodes each piece and, for anything over
+        budget, runs a whole R pass on it. On the event loop that is comparable
+        in cost to the grouping it follows, which is why the whole loop — not
+        each piece — moves off it in one hop.
+
+        ``chunking_by_recursive_character`` is called DIRECTLY here: this
+        function already runs inside the chunking executor, and a nested
+        submission into a single-worker pool whose permit it holds would
+        deadlock.
+        """
+        results: list[dict[str, Any]] = []
+        for piece, source_start, source_end in pieces:
+            body = piece.strip()
+            if not body:
                 continue
-            results.append(
-                {
-                    "tokens": sub.get("tokens", len(tokenizer.encode(sub_body))),
-                    "content": sub_body,
-                    "chunk_order_index": len(results),
-                }
+            piece_tokens = len(tokenizer.encode(body))
+            if piece_tokens <= target_max:
+                results.append(
+                    {
+                        "tokens": piece_tokens,
+                        "content": body,
+                        "chunk_order_index": len(results),
+                        "_source_span": {
+                            "start": source_start,
+                            "end": source_end,
+                        },
+                    }
+                )
+                continue
+            # Oversized semantic piece: re-split via R while preserving the
+            # surrounding chunk order.  ``chunk_overlap_token_size=0`` keeps
+            # V's non-overlapping semantics.
+            sub_pieces = chunking_by_recursive_character(
+                tokenizer,
+                body,
+                target_max,
+                chunk_overlap_token_size=0,
             )
-    return results
+            for sub in sub_pieces:
+                sub_body = sub.get("content", "")
+                if not sub_body:
+                    continue
+                sub_span = sub.get("_source_span")
+                source_span = None
+                if isinstance(sub_span, dict):
+                    try:
+                        source_span = {
+                            "start": source_start + int(sub_span["start"]),
+                            "end": source_start + int(sub_span["end"]),
+                        }
+                    except (KeyError, TypeError, ValueError):
+                        source_span = None
+                results.append(
+                    {
+                        "tokens": sub.get("tokens", len(tokenizer.encode(sub_body))),
+                        "content": sub_body,
+                        "chunk_order_index": len(results),
+                        **({"_source_span": source_span} if source_span else {}),
+                    }
+                )
+        return results
+
+    return await run_in_chunking_executor(_size_and_resplit)

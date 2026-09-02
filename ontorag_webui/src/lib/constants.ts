@@ -1,9 +1,8 @@
 import { ButtonVariantType } from '@/components/ui/Button'
-import { normalizeApiPrefix, normalizeWebuiPrefix } from '@/lib/pathPrefix'
-import { getRuntimeApiPrefix, getRuntimeWebuiPrefix } from '@/lib/runtimeConfig'
+import { normalizeApiPrefix } from '@/lib/pathPrefix'
+import { getRuntimeApiPrefix } from '@/lib/runtimeConfig'
 
 export const backendBaseUrl = normalizeApiPrefix(getRuntimeApiPrefix())
-export const webuiPrefix = normalizeWebuiPrefix(getRuntimeWebuiPrefix())
 
 export const controlButtonVariant: ButtonVariantType = 'ghost'
 
@@ -38,14 +37,27 @@ export const minNodeSize = 4
 export const maxNodeSize = 20
 
 export const healthCheckInterval = 15 // seconds
+// Request timeouts for the short polling endpoints. Kept below their own
+// polling interval so a stalled backend fails fast instead of leaving
+// requests hanging forever (the axios instance sets no global timeout —
+// /query and document uploads are legitimately long-running).
+export const healthCheckTimeout = 10 // seconds
+export const pipelineStatusTimeout = 10 // seconds
+// Message carried by the getDocumentsPaginatedWithTimeout timeout error.
+// Lives here so the refresh error classifier can recognise it without
+// importing the API module (which creates the axios instance on load).
+export const documentFetchTimeoutMessage = 'Document fetch timeout'
 
-export const defaultQueryLabel = '*'
+// Re-exported from the pure defaults module (also used by the store-free
+// legacy settings migration chain — see src/lib/queryDefaults.ts).
+export { defaultQueryLabel, suggestedUserPrompts } from '@/lib/queryDefaults'
 
 // reference: https://developer.mozilla.org/en-US/docs/Web/HTTP/MIME_types/Common_types
 export const supportedFileTypes = {
   'text/plain': [
     '.txt',
     '.md',
+    '.textpack', // # Markdown Bundle(zip)
     '.mdx', // # MDX (Markdown + JSX)
     '.rtf', // # Rich Text Format
     '.odt', // # OpenDocument Text
@@ -92,3 +104,28 @@ export const SiteInfo = {
   home: '/',
   github: 'https://github.com/machinarii/OntoRAG'
 }
+
+// --- Graph layout performance thresholds ------------------------------------
+// Shared by the initial FA2 layout (GraphControl) and the manual worker
+// layouts (LayoutsControl) so the two cannot drift.
+
+// Above this node count, node labels are forced off regardless of the
+// showNodeLabel setting (the hovered node's label is still drawn by sigma's
+// hover layer). Rendering thousands of labels is a major large-graph slowdown.
+export const LABEL_RENDER_LIMIT = 2000
+
+// Above this node count, layout switches assign positions directly instead of
+// animating: animateNodes interpolates every node per frame on the main thread.
+export const ANIMATE_NODE_LIMIT = 5000
+
+// Edge-count threshold that switches the graph between "small-graph experience"
+// and "large-graph performance". At or below it edges render as curves and edge
+// events (hover/click picking) follow the user setting; above it edges render
+// straight and edge events are fully disabled (no picking buffer allocated).
+// Shared by GraphControl (defaultEdgeType), GraphViewer (enableEdgeEvents
+// gating) and Settings (greying the Edge Events menu item) so they cannot drift.
+export const EDGE_PERF_LIMIT = 5000
+
+// Time budget (ms) a relaxing worker layout runs before it is stopped. Scales
+// with graph size, capped so huge graphs don't run unbounded.
+export const workerBudgetMs = (order: number): number => Math.min(1500 + order / 10, 10000)

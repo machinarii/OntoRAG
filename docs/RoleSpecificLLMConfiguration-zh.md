@@ -8,10 +8,10 @@ OntoRAG 支持为不同处理阶段配置不同的 LLM 或 VLM。这个机制适
 
 | 角色 | 用途 |
 | --- | --- |
-| `EXTRACT` | 实体/关系抽取，以及实体/关系描述摘要。 |
-| `KEYWORD` | 查询关键词抽取，用于检索前的 high-level / low-level keyword 生成。 |
-| `QUERY` | 最终问答、普通查询、bypass 查询，以及 Ollama-compatible API 的查询路径。 |
-| `VLM` | 多模态分析阶段，用于图片、表格、公式等内容的 VLM 分析。 |
+| `EXTRACT` | 文件插入阶段使用的模型，主要复杂实体关系抽取和摘要总结。建议配置关闭思考模式并具备处理复杂问题的高速模型，模型参数量建议为30B或以上，上下文长度至少为32KB。 |
+| `KEYWORD` | 查询阶段关键词抽取，用于检索前的 high-level / low-level keyword 生成。建议配置关闭思考模式的超高速模型，以提高查询阶段的响应速度。模型数量建议为7B或以上。 |
+| `QUERY` | 查询阶段用于根据召回内容最终问答用关乎问题。建议配置开启思考模式的高质量模型。模型能力越强，回答的质量会越高。模型参数量建议为30B或以上，上下文长度至少为32KB。 |
+| `VLM` | 文件插入阶段用于分析图片。需要配置具有图片识别能力的高质量模型。模型参数量建议为30B或以上。 |
 
 如果某个角色没有专门配置，OntoRAG 会使用基础 `LLM_*` 配置。
 
@@ -26,10 +26,10 @@ LLM_BINDING_HOST=https://api.openai.com/v1
 LLM_BINDING_API_KEY=your_api_key
 
 # 所有 LLM 请求的默认超时时间
-LLM_TIMEOUT=180
+LLM_TIMEOUT=240
 
-# 所有 LLM 调用的默认最大并发数
-MAX_ASYNC=4
+# 所有 LLM 调用的默认最大并发数(MAX_ASYNC 作为兼容旧名仍可用)
+MAX_ASYNC_LLM=4
 ```
 
 常用字段：
@@ -41,7 +41,13 @@ MAX_ASYNC=4
 | `LLM_BINDING_HOST` | 基础 provider endpoint。对于 SDK 默认 endpoint，可使用对应 sentinel，例如 `DEFAULT_GEMINI_ENDPOINT` 或 `DEFAULT_BEDROCK_ENDPOINT`。 |
 | `LLM_BINDING_API_KEY` | 基础 API key。Bedrock 不使用这个字段。 |
 | `LLM_TIMEOUT` | 基础 LLM timeout。角色未设置 timeout 时继承它。 |
-| `MAX_ASYNC` | 基础 LLM 最大并发。角色未设置 `{ROLE}_MAX_ASYNC_LLM` 时继承它。 |
+| `MAX_ASYNC_LLM` | 基础 LLM 最大并发。角色未设置 `{ROLE}_MAX_ASYNC_LLM` 时继承它。`MAX_ASYNC` 作为兼容旧名仍可用。 |
+
+### 与文件处理的关系
+
+`MAX_ASYNC_LLM` 还是文件处理调度器使用的基础值：对单个文档，文本块的实体/关系抽取最多并发运行这么多 task；每个实体合并或关系合并阶段最多运行其两倍数量的 task。这些是流水线 task 上限，不会替代角色级请求限流。
+
+Extract 角色既处理文本块抽取，也在图合并时生成描述摘要。设置 `EXTRACT_MAX_ASYNC_LLM` 后，它会限制该角色实际发出的 LLM 请求；未设置时继承 `MAX_ASYNC_LLM`。调整此角色覆盖值不会改变调度器的单文档 task 上限。完整 worker 拓扑见[文件处理流水线规格](FileProcessingPipeline-zh.md#86-流水线并发参数)。
 
 ## 角色覆盖变量
 
@@ -64,7 +70,7 @@ QUERY_LLM_TIMEOUT=240
 | `{ROLE}_LLM_MODEL` | 覆盖角色模型名。 |
 | `{ROLE}_LLM_BINDING_HOST` | 覆盖角色 endpoint。 |
 | `{ROLE}_LLM_BINDING_API_KEY` | 覆盖角色 API key。Bedrock 不支持。 |
-| `{ROLE}_MAX_ASYNC_LLM` | 覆盖角色最大并发。未设置时继承 `MAX_ASYNC`。 |
+| `{ROLE}_MAX_ASYNC_LLM` | 覆盖角色最大并发。未设置时继承 `MAX_ASYNC_LLM`。 |
 | `{ROLE}_LLM_TIMEOUT` | 覆盖角色 timeout。未设置时继承 `LLM_TIMEOUT`。 |
 
 ## Provider 参数覆盖
@@ -100,6 +106,10 @@ VLM_GEMINI_LLM_TEMPERATURE=0.2
 | `bedrock` | `BEDROCK_LLM_*` | `EXTRACT_BEDROCK_LLM_MAX_TOKENS` |
 | `gemini` | `GEMINI_LLM_*` | `VLM_GEMINI_LLM_THINKING_CONFIG` |
 
+本文只讲角色前缀与继承规则。`{FIELD}` 部分——每个前缀下可用的全部参数、类型、取值语法，
+以及各 provider 驱动实际如何使用这些参数——见
+[LLM and Embedding Provider Options Reference](./LLMProviderOptions.md)（英文技术参考）。
+
 ## 继承规则
 
 ### 同一个 provider 内覆盖
@@ -110,7 +120,7 @@ VLM_GEMINI_LLM_TEMPERATURE=0.2
 - 未设置 `{ROLE}_LLM_BINDING_HOST` 时继承 `LLM_BINDING_HOST`。
 - 未设置 `{ROLE}_LLM_BINDING_API_KEY` 时继承 `LLM_BINDING_API_KEY`。
 - 未设置 `{ROLE}_LLM_TIMEOUT` 时继承 `LLM_TIMEOUT`。
-- 未设置 `{ROLE}_MAX_ASYNC_LLM` 时继承 `MAX_ASYNC`。
+- 未设置 `{ROLE}_MAX_ASYNC_LLM` 时继承 `MAX_ASYNC_LLM`。
 - provider 参数先继承基础 provider options，再叠加角色专属 provider options。
 
 因此，同一个 provider 下只想换模型时，只需要写模型名：
@@ -244,8 +254,8 @@ LLM_BINDING=openai
 LLM_MODEL=gpt-5-mini
 LLM_BINDING_HOST=https://api.openai.com/v1
 LLM_BINDING_API_KEY=your_extract_openai_api_key
-LLM_TIMEOUT=180
-MAX_ASYNC=4
+LLM_TIMEOUT=240
+MAX_ASYNC_LLM=4
 
 ###########################################################################
 # IMPORTANT:
@@ -293,7 +303,7 @@ KEYWORD_OPENAI_LLM_MAX_TOKENS=2048
 # Optional for Qwen-style models served by vLLM when you want to disable thinking.
 KEYWORD_OPENAI_LLM_EXTRA_BODY='{"chat_template_kwargs": {"enable_thinking": false}}'
 KEYWORD_MAX_ASYNC_LLM=4
-KEYWORD_LLM_TIMEOUT=180
+KEYWORD_LLM_TIMEOUT=60
 ```
 
 这个模式不是跨 provider，因为三个角色的 binding 都是 `openai`。OntoRAG 会分别把每个角色的 `*_LLM_BINDING_HOST` 和 `*_LLM_BINDING_API_KEY` 传给 OpenAI-compatible client。
@@ -374,3 +384,4 @@ QUERY_BEDROCK_LLM_TEMPERATURE=0.2
 - Gemini Vertex AI 模式由进程级 Google 环境变量控制，不能在同一个 OntoRAG 进程里让某些角色使用 Vertex AI、另一些角色使用 AI Studio API key。
 - `LLM_BINDING_HOST` 在 Docker/Compose 中通常需要使用容器可访问地址，例如 `host.docker.internal`，角色级 host 也遵循相同原则。
 - 修改 `.env` 后请重启 OntoRAG Server。部分 IDE 终端会预加载 `.env`，建议打开新的终端会话确认环境变量生效。
+- 支持思考模式的 Ollama 模型在提取阶段可能因为隐藏推理耗尽了全部生成预算、在给出任何输出前就用完额度，导致实体/关系静默返回为空（issue #3597）。遇到这种情况可设置 `EXTRACT_OLLAMA_LLM_THINK=false`（如果关键词提取也受影响，同样设置 `KEYWORD_OLLAMA_LLM_THINK=false`）。除 `true`/`false` 外，该选项还接受推理档位（`low`/`medium`/`high`，需要 Ollama 服务端支持档位）。完全不设置表示跟随模型自身默认；留空（`OLLAMA_LLM_THINK=`）等同于 `false`，不等同于未设置。
