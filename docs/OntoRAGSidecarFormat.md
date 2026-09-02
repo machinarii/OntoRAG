@@ -174,6 +174,8 @@ The top level is a dict container of the form `{"version": "1.0", "drawings": { 
   "llm_analyze_result": {
     "name": "Product outer-dimension engineering drawing",
     "type": "Illustration",
+    "subject": "Outer dimensions of the product's power module",
+    "ocr_text": "L 120.0\nW 64.5\nH 32.0\nunit: mm",
     "description": "This drawing is a schematic of the product's outer dimensions, presenting three views of an electronic device or power module design…",
     "analyze_time": 1778697752,
     "status": "success",
@@ -391,7 +393,7 @@ Applicable to text-like files; locates content by absolute character position. `
 
 | `status` | Trigger scenario | Field description |
 |---|---|---|
-| `success` | The model returns valid JSON and all required fields are present | Drawing: `name / type / description`; Table: `name / description`; Equation: `name / description / equation` |
+| `success` | The model returns valid JSON and all required fields are present | Drawing: `name / type / description` (required) plus `subject / ocr_text` (see below); Table: `name / description`; Equation: `name / description / equation` |
 | `skipped` | Multimodal analysis was deliberately skipped: image format unsupported, pixels < `VLM_MIN_IMAGE_PIXEL` (default 32 px), larger than `VLM_MAX_IMAGE_BYTES` (default 5 MB), or VLM not enabled | `message` records the skip reason |
 | `failure` | Required fields missing, JSON still invalid after repair, the VLM/EXTRACT role is not configured while the corresponding modality is enabled, or the model invocation throws an exception | `message` records the diagnostic |
 
@@ -402,6 +404,15 @@ Additional notes:
 - Items for enabled modalities are recomputed on each `analyze_multimodal` run, and the current run overwrites any prior `llm_analyze_result` (`success`, `skipped`, or `failure`). This allows operators to fix VLM/EXTRACT configuration and retry without manually clearing stale sidecar results. LLM calls still use the analysis cache: if the cache key matches, the provider is not called and semantic fields usually remain the same, though runtime fields such as `analyze_time` are rewritten. A cache miss, for example after changing the effective role model/binding/host, prompt inputs, or image metadata, can produce different saved content.
 
 Drawing `type` is constrained to a 12-value enum (see [`IMAGE_TYPE_ENUM`](../ontorag/prompt_multimodal.py): `Photo / Illustration / Screenshot / Icon / Chart / Table / Infographic / Flowchart / Chat Log / Wireframe / Texture / Other`); values returned by the model outside the enum are normalized to `Other` rather than failing.
+
+Drawings carry two further fields that make an image *classification-ready* for the taxonomy layer (see `docs/GraphAndRagArchitecture.md` §5.4):
+
+| Field | Description |
+|---|---|
+| `subject` | String: what the image is **about** — its subject matter (e.g. `Acme Corp quarterly revenue, FY2025`) — as opposed to `type`, which is its presentational medium. The prompt requires it; if the model still omits it or returns a non-string, it is stored as `""` with a warning (following the `type` → `Other` precedent) rather than failing the document. Rendered into the multimodal chunk as `[Image Subject]…`. |
+| `ocr_text` | String: **verbatim** text baked into the image (titles, axis labels, legends, node labels), reading order preserved, original language kept. `""` when the image has no legible text; a missing or non-string value is also stored as `""`. Rendered into the multimodal chunk as a `[Image Text]…` section after the description (omitted when empty). Distinct from the parser-side `extras.ocr_texts` some engines emit. |
+
+Sidecars written before these fields existed still build multimodal chunks; the corresponding lines are simply absent.
 
 ## 10. `smart_audit.json` (optional, native DOCX)
 

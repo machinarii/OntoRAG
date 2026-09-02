@@ -20,12 +20,17 @@ uniformly:
 
 The output schema differs by modality:
 
-- Image    : ``{"name": str, "type": str, "description": str}``
+- Image    : ``{"name": str, "type": str, "subject": str, "ocr_text": str,
+              "description": str}``
 - Table    : ``{"name": str, "description": str}``
 - Equation : ``{"name": str, "equation": str, "description": str}``
 
 Image ``type`` is restricted to :data:`IMAGE_TYPE_ENUM`; values outside the
-enum are folded into :data:`IMAGE_TYPE_FALLBACK` by the caller.
+enum are folded into :data:`IMAGE_TYPE_FALLBACK` by the caller.  ``type`` is
+the image's presentational *medium*; ``subject`` is what it is *about* (the
+classification-ready field for the taxonomy layer) and ``ocr_text`` is the
+verbatim text baked into the pixels (``""`` when there is none; the caller
+treats a missing or non-string value as ``""``).
 """
 
 from __future__ import annotations
@@ -120,8 +125,22 @@ MULTIMODAL_PROMPTS[
    - Pick exactly one value from this fixed list (verbatim, case-sensitive):
      Photo, Illustration, Screenshot, Icon, Chart, Table, Infographic, Flowchart, Chat Log, Wireframe, Texture, Other
    - Choose the single best fit. Use `Other` when no listed type clearly applies.
+   - `type` describes the MEDIUM (how the content is presented), never the subject matter.
 
-5. DESCRIPTION (`description`, ≤ 500 words, natural prose — not bullets)
+5. SUBJECT (`subject`, one short phrase, ≤ 15 words)
+   - State what the image is ABOUT — its subject matter — not what kind of image it is.
+   - Name the concrete domain, entities, quantities or process depicted, using specific proper nouns where visible.
+   - Good examples: `Acme Corp quarterly revenue, FY2025`, `CRISPR-Cas9 gene editing workflow`, `Eiffel Tower, Paris`.
+   - Bad examples: `a chart`, `a diagram of a process`, `photo`.
+   - Never leave this empty; if the subject is genuinely unclear, describe the most specific thing that IS visible.
+
+6. OCR TEXT (`ocr_text`)
+   - Transcribe VERBATIM all legible text baked into the image — titles, axis labels, legends, data labels, box/node labels, annotations, captions rendered inside the image.
+   - Preserve reading order; separate lines with `\\n`; keep the original language and spelling; do not translate, paraphrase or summarize.
+   - Do NOT include text from Captions / Footnotes / Leading / Trailing context — only text visible in the image itself.
+   - If the image contains no legible text, return an empty string `""`.
+
+7. DESCRIPTION (`description`, ≤ 500 words, natural prose — not bullets)
    Cover the following where applicable:
    - What the image depicts overall and what question/claim it visually supports.
    - The primary subject(s), their attributes, and any meaningful relationships between them.
@@ -130,12 +149,12 @@ MULTIMODAL_PROMPTS[
    - Use specific proper nouns rather than pronouns whenever possible.
    - If the image clearly supports the surrounding context(leading or trailing text), briefly note that relationship at the end. Otherwise omit.
 
-6. OUTPUT RULES
+8. OUTPUT RULES
    - Return ONE valid JSON object only.
    - No surrounding markdown, no code fences, no preamble, no explanation.
    - All string values must be properly escaped JSON strings (escape `"` as `\\"`, escape backslashes as `\\\\`, newlines as `\\n`).
    - Any LaTeX inside a string value must use double-escaped backslashes (e.g. `\\frac{{a}}{{b}}` is written as `"\\\\frac{{a}}{{b}}"` in the JSON).
-   - The output values for the JSON fields `name` and `description` must be written in `{language}`.
+   - The output values for the JSON fields `name`, `subject` and `description` must be written in `{language}`; `ocr_text` stays in the image's original language.
 
 ================ ADDITIONAL CONTEXT ================
 - Captions: {captions}
@@ -156,6 +175,8 @@ MULTIMODAL_PROMPTS[
 {{
   "name": "<concise distinctive name>",
   "type": "<one value from the fixed type list>",
+  "subject": "<what the image is about, ≤15 words>",
+  "ocr_text": "<verbatim text baked into the image, or empty string>",
   "description": "<interpretive description, ≤500 words>"
 }}
 

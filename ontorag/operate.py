@@ -4345,11 +4345,26 @@ async def extract_entities(
             ):
                 mm_entity_name = sidecar_id
                 now_ts = int(time.time())
+                # Drawings are typed by the VLM's image type (Chart /
+                # Flowchart / ...) when the chunk builder recorded one,
+                # normalized exactly like LLM-extracted entity types so it
+                # sits alongside them; legacy chunks and tables/equations
+                # keep the structural kind.
+                mm_entity_type = sidecar_type
+                if sidecar_type == "drawing":
+                    image_type = sidecar_block.get("image_type")
+                    if isinstance(image_type, str) and image_type.strip():
+                        normalized = _normalize_and_validate_entity_type(
+                            sanitize_and_normalize_extracted_text(image_type),
+                            f"sidecar image_type for {sidecar_id}",
+                        )
+                        if normalized:
+                            mm_entity_type = normalized
                 mm_nodes_list = maybe_nodes.setdefault(mm_entity_name, [])
                 mm_nodes_list.append(
                     {
                         "entity_name": mm_entity_name,
-                        "entity_type": sidecar_type,
+                        "entity_type": mm_entity_type,
                         # description == the full multimodal chunk content so
                         # the extracted entity carries the same grounding
                         # surface the prompt produced; analyze_multimodal's
