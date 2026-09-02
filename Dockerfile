@@ -46,7 +46,7 @@ COPY uv.lock .
 
 # Install base, API, and offline extras without the project to improve caching
 RUN --mount=type=cache,target=/root/.local/share/uv \
-    uv sync --frozen --no-dev --extra api --extra offline --no-install-project --no-editable
+    uv sync --frozen --no-dev --extra api --extra offline --extra pdf2md --no-install-project --no-editable
 
 # Copy project sources after dependency layer
 COPY ontorag/ ./ontorag/
@@ -56,7 +56,7 @@ COPY --from=frontend-builder /app/ontorag/api/webui ./ontorag/api/webui
 
 # Sync project in non-editable mode and ensure pip is available for runtime installs
 RUN --mount=type=cache,target=/root/.local/share/uv \
-    uv sync --frozen --no-dev --extra api --extra offline --no-editable \
+    uv sync --frozen --no-dev --extra api --extra offline --extra pdf2md --no-editable \
     && /app/.venv/bin/python -m ensurepip --upgrade
 
 # Prepare offline cache directory, pre-populate tiktoken data, and download the
@@ -97,7 +97,7 @@ ENV PATH=/app/.venv/bin:/root/.local/bin:$PATH
 # the wheels downloaded in the builder stage without adding an image layer.
 RUN --mount=type=cache,target=/root/.local/share/uv \
     --mount=type=bind,from=builder,source=/app/spacy_models,target=/tmp/spacy_models \
-    uv sync --frozen --no-dev --extra api --extra offline --no-editable \
+    uv sync --frozen --no-dev --extra api --extra offline --extra pdf2md --no-editable \
     && /app/.venv/bin/python -m ensurepip --upgrade \
     && /app/.venv/bin/python -m pip install --no-index --no-cache-dir \
         --find-links=/tmp/spacy_models zh_core_web_sm en_core_web_sm
@@ -123,6 +123,7 @@ ENV PROMPT_DIR=/app/data/prompts
 # installs packages at runtime), data dirs, and the tiktoken cache are writable.
 RUN apt-get update \
     && apt-get install -y --no-install-recommends gosu libcairo2 \
+        tesseract-ocr ghostscript libreoffice-core libreoffice-writer \
     && rm -rf /var/lib/apt/lists/* \
     && groupadd -g 1000 ontorag \
     && useradd -u 1000 -g ontorag -m -d /home/ontorag -s /usr/sbin/nologin ontorag \

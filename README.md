@@ -142,6 +142,15 @@ uv pip install ontorag-hku
 # Or: pip install ontorag-hku
 ```
 
+### Optional: Markdown-canonical intake for PDF / EPUB / DOCX (pdf2md)
+
+```bash
+uv sync --extra pdf2md            # or: pip install 'ontorag[pdf2md]'
+# scanned PDFs also need tesseract + ghostscript; DOC/ODT/RTF need LibreOffice
+```
+
+With the `pdf2md` engine routed for a suffix (e.g. `ONTORAG_PARSER=pdf:pdf2md-iteP,epub:pdf2md-iteP,*:native-teP,*:legacy-R`), each source is converted into a **`.textpack`** — structure-aware Markdown with real headings, a table of contents, tables, footnotes and the figures — which becomes the catalogued and archived document; **the original file is never moved**. Scanned PDFs are OCR'd in place with OCRmyPDF (the pre-OCR original is kept in `__originals__/`), and bibliographic metadata (title, authors, year, ISBN, document type) lands in `doc_status.metadata` and the WebUI. PyMuPDF, which pdf2md depends on, is AGPL-3.0 — install the extra only where that licence is acceptable. Details: `docs/FileProcessingPipeline.md` §3.8.
+
 ## Quick Start
 
 ### LLM and Technology Stack Requirements for OntoRAG

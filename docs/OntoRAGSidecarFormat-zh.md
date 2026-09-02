@@ -438,3 +438,40 @@ charspan: 内容从标定段落的m个字符开始到底n个字符结束（可�
   "shadow_diff": { }
 }
 ```
+
+## 十一、pdf2md 生成的 `.textpack` 包
+
+`pdf2md` 引擎（见 *FileProcessingPipeline* §3.8）把 PDF / EPUB / DOCX / DOC / ODT / RTF 源文件转换为一个 `.textpack`，它成为文档记录，随后由 native Markdown 引擎像解析任何上传的 `.textpack` 一样解析：
+
+```
+<name>.textpack (zip)
+├── <name>.md          # 正文；已去掉 YAML front matter；图片写作 ![caption](figs/<sha256[:12]>.<ext>)
+├── figs/<sha12>.<ext> # 从 PDF 裁切或从 EPUB/DOCX 抽取的图片，按内容去重
+└── pdf2md.json        # 清单（见下）；Markdown 解析器忽略它，目录读取它
+```
+
+`pdf2md.json`：
+
+```json
+{
+  "schema": 1,
+  "source": {"name": "book.pdf", "format": "pdf", "sha256": "…", "bytes": 123456},
+  "bibliographic": {"title": "…", "authors": ["…"], "year": 2022, "publisher": "…",
+                    "edition": "…", "isbn": ["…"], "arxiv": "…", "language": "en"},
+  "doc_type": "book", "doc_scores": {"book": 14.0, "paper": 3.0},
+  "pages": 575, "figures": 22, "tables": 5,
+  "ocr": null,
+  "converter": {"pdf2md": "pdf2md-files.zip 2026-09-02", "ontorag": "1.5.7"},
+  "warnings": []
+}
+```
+
+| 字段 | 说明 |
+|---|---|
+| `source` | 生成该包所用文件的名称、格式和 SHA-256。只有该摘要与当前源文件字节一致时，引擎才会复用已有的包。 |
+| `bibliographic` | 只包含 pdf2md 实际找到的键；`year` 为整数，`isbn` 与 `arxiv` 保持字符串。 |
+| `doc_type` / `doc_scores` | pdf2md 的文档类型判定及其证据分数。 |
+| `ocr` | 带文字层的源文件为 `null`；否则为 `{"applied": true, "engine": "tesseract", "languages": "eng", "original_backup": "__originals__/book.pdf"}` —— OCR 前的原文件保存在源文件旁的该路径。 |
+| `converter` | 内置 pdf2md 构建与 OntoRAG 的版本。 |
+
+同样的 `bibliographic` / `doc_type` / `doc_scores` / `ocr` / `converter` 值会在 PARSING 转换时镜像到 `doc_status.metadata`（另加 `source_file_original`，即入队时的文件名），因此数据库与归档包对文档的描述完全一致。手工制作、不含 `pdf2md.json` 的 `.textpack` 仍是 Markdown 引擎的合法输入，只是没有目录记录。

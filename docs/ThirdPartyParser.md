@@ -45,6 +45,15 @@ class MyParser(BaseParser):
 
 `ParseResult` fields: `doc_id` / `file_path` / `parse_format` (`"raw"` or `"ontorag"`) / `content` / `blocks_path` (`""` when there is no sidecar) / `parse_engine` / `parse_stage_skipped` (skipped scenarios such as cache hits) / `parse_warnings` (non-fatal warnings, persisted to `doc_status.metadata`).
 
+**Converter engines** (an engine that generates a new source file and wants *that* file to be the document of record — the built-in `pdf2md` engine is the reference) may additionally set:
+
+| Field | Effect in the parse stage |
+|---|---|
+| `canonical_source` | Basename of the generated file (e.g. `book.textpack`). `doc_status.file_path` and `metadata.source_file` are re-pointed to it, the enqueued name is kept as `metadata.source_file_original`, and `full_docs` mirrors both. From then on the source resolver, the archive step, citations and `DELETE /documents/{id}` see the generated file; the original is never referenced again and is not moved. |
+| `document_metadata` | A dict merged into `doc_status.metadata` (the built-in engine uses `bibliographic`, `doc_type`, `doc_scores`, `ocr`, `converter`). Keys you want carried through every later status must also be added to `_DOC_STATUS_METADATA_CARRY_OVER_KEYS` in `ontorag/utils_pipeline.py` (the ordering test in `tests/pipeline/test_pipeline_release_closure.py` pins that tuple). |
+
+Write the generated file beside the source, then delegate the real parse to the engine that understands it (pdf2md delegates to `NativeMarkdownParser` with a `ParseContext` whose `file_path` is the bundle and whose `content_data["parse_engine"]` names the delegate) — the delegate's own `ctx.archive_source(...)` then archives the generated file. Because the original's canonical key disappears from `doc_status`, the scan classifier has a matching rule: a file whose `<stem>.textpack` document exists, is not FAILED and records the file's basename as `source_file_original` is classified `CONVERTED_SOURCE` (counted, never enqueued or archived). That lookup is only made for suffixes the `pdf2md` spec claims; an engine producing a different bundle suffix needs its own rule in `document_routes._converted_source_owner`.
+
 > Note: `parse_warnings → doc_status.metadata` is the general contract for every parser — the pipeline mirrors whatever a parser returns, without inspecting key names. The built-in native DOCX smart-heading engine is the one exception: it diverts *its own* `smart_`/`title_block_`-prefixed diagnostics to the sidecar `<base>.smart_audit.json` (under a `parse_warnings` key) instead of doc_status, and returns only the remaining non-smart warnings. This is a private policy of that engine, not a global prefix rule — a third-party parser returning `smart_*` warnings still gets them written to `doc_status.metadata`.
 
 ### 2.2 Three Implementation Paths (Choose a Base Class by Engine Type)

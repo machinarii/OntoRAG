@@ -438,3 +438,40 @@ Example:
   "shadow_diff": { }
 }
 ```
+
+## 11. `.textpack` bundles produced by pdf2md
+
+The `pdf2md` engine (see *FileProcessingPipeline* §3.8) converts PDF / EPUB / DOCX / DOC / ODT / RTF sources into a `.textpack` that becomes the document of record and is then parsed by the native Markdown engine like any uploaded `.textpack`:
+
+```
+<name>.textpack (zip)
+├── <name>.md          # body; YAML front matter removed; figures as ![caption](figs/<sha256[:12]>.<ext>)
+├── figs/<sha12>.<ext> # figures cropped (PDF) or extracted (EPUB/DOCX), deduplicated by content
+└── pdf2md.json        # manifest (below); ignored by the Markdown parser, read by the catalog
+```
+
+`pdf2md.json`:
+
+```json
+{
+  "schema": 1,
+  "source": {"name": "book.pdf", "format": "pdf", "sha256": "…", "bytes": 123456},
+  "bibliographic": {"title": "…", "authors": ["…"], "year": 2022, "publisher": "…",
+                    "edition": "…", "isbn": ["…"], "arxiv": "…", "language": "en"},
+  "doc_type": "book", "doc_scores": {"book": 14.0, "paper": 3.0},
+  "pages": 575, "figures": 22, "tables": 5,
+  "ocr": null,
+  "converter": {"pdf2md": "pdf2md-files.zip 2026-09-02", "ontorag": "1.5.7"},
+  "warnings": []
+}
+```
+
+| Field | Description |
+|---|---|
+| `source` | Name, format and SHA-256 of the file the bundle was built from. The engine reuses an existing bundle only while this digest matches the current source bytes. |
+| `bibliographic` | Only the keys pdf2md found; `year` is an integer, `isbn` and `arxiv` stay strings. |
+| `doc_type` / `doc_scores` | pdf2md's document-type classification and its evidence scores. |
+| `ocr` | `null` for text-layer sources; otherwise `{"applied": true, "engine": "tesseract", "languages": "eng", "original_backup": "__originals__/book.pdf"}` — the pre-OCR original lives at that path beside the source. |
+| `converter` | Versions of the vendored pdf2md build and of OntoRAG. |
+
+The same `bibliographic` / `doc_type` / `doc_scores` / `ocr` / `converter` values are mirrored into `doc_status.metadata` (plus `source_file_original`, the enqueued file name) at the PARSING transition, so the database and the archived bundle describe the document identically. A hand-made `.textpack` without `pdf2md.json` is still a valid input for the Markdown engine; it simply carries no catalog record.

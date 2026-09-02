@@ -274,6 +274,7 @@ The text APIs expose the same path as `chunking.strategy="custom"`. Its `params`
 | `native` | Built-in intelligent structured content extractor | `docx` `md` `textpack` |
 | `mineru` | External MinerU content extraction engine | `pdf` `docx` `pptx` `xlsx` `png` `jpg` `jpeg` `jp2` `webp` `gif` `bmp` (extensible, see `MINERU_ADDITIONAL_SUFFIXES`) |
 | `docling` | External Docling content extraction engine | `pdf` `docx` `pptx` `xlsx` `md` `html` `xhtml` `png` `jpg` `jpeg` `tiff` `webp` `bmp` (extensible, see `DOCLING_ADDITIONAL_SUFFIXES`) |
+| `pdf2md` | Local structure-aware converter (vendored pdf2md + OCRmyPDF); produces a Markdown-canonical `.textpack` that becomes the document of record, then parses it with `native`. Optional extra `ontorag[pdf2md]` (PyMuPDF is AGPL-3.0) | `pdf` `epub` `docx` `doc` `odt` `rtf` (see §3.8; keep `docx` on `native` unless you want pdf2md's reader) |
 
 `mineru` and `docling` are external content extraction engines; before enabling related rules, the services must be running first, and the corresponding endpoint/token must be configured in OntoRAG.
 
@@ -508,6 +509,32 @@ The `native`, `mineru` and `docling` engines each keep a raw-artifact cache next
 | `legacy` | — | no cache | not applicable |
 
 Each bundle records the engine version and the effective parameter signature in its manifest, so changing the endpoint, an extraction parameter, or `MINERU_ENGINE_VERSION` / `DOCLING_ENGINE_VERSION` invalidates the cache on its own. The force flags exist for the case the manifest cannot detect: the *service* changed while its version string did not. Deleting a document with "also delete file" removes the cache directory along with `.parsed/`.
+
+### 3.8 Using the pdf2md Engine (Markdown-canonical intake)
+
+`pdf2md` turns a PDF, EPUB, DOCX, DOC, ODT or RTF source into a **Markdown-canonical `.textpack`** — a zip holding `<name>.md` (structure-aware Markdown with real headings, a generated table of contents, tables and footnotes), `figs/` (the figures pdf2md cropped or extracted, deduplicated by content) and `pdf2md.json` (bibliographic metadata, document type, OCR provenance). The bundle is then parsed by the built-in `native` Markdown engine exactly like an uploaded `.textpack`, so figures flow into the VLM analysis (§4) and gain `type` / `subject` / `ocr_text`.
+
+**Install and route.** `pip install 'ontorag[pdf2md]'` (PyMuPDF is AGPL-3.0; install the extra only where that licence is acceptable). For scanned PDFs the host also needs `tesseract` and `gs` (Ghostscript); for DOC/ODT/RTF, LibreOffice (`soffice` on `PATH`, or `PDF2MD_SOFFICE`). Then route the suffixes you want, e.g. `ONTORAG_PARSER=pdf:pdf2md-iteP,epub:pdf2md-iteP,doc:pdf2md-iteP,*:native-teP,*:legacy-R`. A rule that names `pdf2md` requires the extra to be installed (startup validation refuses otherwise, like an unconfigured external engine). `docx` is deliberately left on `native` in every shipped example: pdf2md's DOCX reader ignores tracked changes, comments and text boxes, while `native` extracts embedded images, tables and equations directly.
+
+**The `.textpack` is the document of record.** After a successful parse, `doc_status.file_path` and `metadata.source_file` name `<name>.textpack`, the enqueued name is kept as `metadata.source_file_original`, and the bundle — not the original — is what gets archived to `__parsed__/`, cited by chunks, and deleted by `DELETE /documents/{id}`. **The original file is never moved or deleted by OntoRAG.** A re-scan recognises an original whose bundle document exists (scan counter `converted_source`) and neither enqueues nor archives it. If the original changes, the manifest's `source.sha256` no longer matches and the next parse rebuilds the bundle; an unchanged source reuses the existing bundle.
+
+**Scanned (image-only) PDFs are OCR'd in place.** When no page carries a text layer, OntoRAG copies the original to `<folder>/__originals__/<name>.pdf` (created beside the file; an existing backup is never overwritten), runs OCRmyPDF to a temporary file and atomically replaces `<folder>/<name>.pdf` with the searchable PDF — your library is upgraded, not consumed. `PDF_OCR_ENGINE` is passed to OCRmyPDF's `--ocr-engine`; Tesseract is the default, and the `ocrmypdf-appleocr` (macOS Vision), `ocrmypdf-easyocr` (GPU) and `ocrmypdf-paddleocr` plugins register their own engine names, so a better recogniser is a `pip install` plus one variable. `PDF_OCR_LANGUAGES` (comma-separated Tesseract codes), `PDF_OCR_DESKEW` and `PDF_OCR_TIMEOUT` tune the run. EPUB/DOCX/DOC never need OCR.
+
+**Catalog metadata.** `doc_status.metadata` gains `bibliographic` (`title`, `authors`, `year`, `publisher`, `edition`, `isbn`, `arxiv`, `language` — only the keys pdf2md found), `doc_type` (`book` / `paper` / `deck` / `document`) with `doc_scores`, `ocr` (`null`, or `{applied, engine, languages, original_backup}`) and `converter` versions. `/documents` returns them; the WebUI shows the bibliographic title and authors in the document list. The same record is stored inside the bundle as `pdf2md.json` (see the sidecar format guide), so an archived `.textpack` is self-describing.
+
+**Failure behaviour.**
+
+| Situation | Outcome |
+| --- | --- |
+| Extra not installed | Engine unavailable: per-file routing skips the rule; a `ONTORAG_PARSER` rule naming it fails startup validation with `pip install 'ontorag[pdf2md]'`. |
+| Image-only PDF, but `ocrmypdf` / `tesseract` / `gs` missing | Document FAILED with the probe's message naming what is missing; text-layer PDFs still convert. |
+| OCRmyPDF error or `PDF_OCR_TIMEOUT` exceeded | Temporary output removed, original untouched (its `__originals__/` copy is kept), FAILED with OCRmyPDF's message; a scan retry re-runs OCR. |
+| OCR output still has no text layer | FAILED `OCR produced no text layer`; the OCR'd file stays in place. |
+| DOC/ODT/RTF without LibreOffice | FAILED with the LibreOffice hint. |
+| pdf2md refuses or crashes | FAILED with its message; nothing written outside the work directory. |
+| Delegated Markdown parse fails | Native engine semantics; the `.textpack` stays so a retry skips conversion. |
+
+Concurrency is its own queue group: `MAX_PARALLEL_PARSE_PDF2MD` (default 2). Conversion and OCR run in the parse worker, so nothing heavy runs during upload or scan enqueue.
 
 ## 4. Multimodal Analysis (VLM)
 

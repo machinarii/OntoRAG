@@ -274,6 +274,7 @@ ONTORAG_PARSER=pdf:legacy-R(chunk_ts=800,chunk_ol=80);*:legacy-R  # 规则
 | `native` | 内置智能结构化内容抽取器 | `docx` `md` `textpack` |
 | `mineru` | 外部 MinerU 内容提取引擎 | `pdf` `docx` `pptx` `xlsx` `png` `jpg` `jpeg` `jp2` `webp` `gif` `bmp`（可扩展，见 `MINERU_ADDITIONAL_SUFFIXES`） |
 | `docling` | 外部 Docling 内容提取引擎 | `pdf` `docx` `pptx` `xlsx` `md` `html` `xhtml` `png` `jpg` `jpeg` `tiff` `webp` `bmp`（可扩展，见 `DOCLING_ADDITIONAL_SUFFIXES`） |
+| `pdf2md` | 本地的结构感知转换器（内置 pdf2md + OCRmyPDF）：生成以 Markdown 为准的 `.textpack` 作为文档记录，再交给 `native` 解析。可选 extra `ontorag[pdf2md]`（PyMuPDF 为 AGPL-3.0） | `pdf` `epub` `docx` `doc` `odt` `rtf`（见 §3.8；除非需要 pdf2md 的 DOCX 读取器，否则 `docx` 仍走 `native`） |
 
 `mineru` 和 `docling` 是外部内容提取引擎，启用相关规则前必须先把服务跑起来，再在 OntoRAG 配置对应 endpoint/token。
 
@@ -508,6 +509,32 @@ ONTORAG_PARSER=pdf:mineru(language=en);*:legacy-R                       # 规则
 | `legacy` | — | 无缓存 | 不适用 |
 
 每个产物包都在 manifest 里记录引擎版本与生效参数签名，所以改服务端点、改抽取参数、或改 `MINERU_ENGINE_VERSION` / `DOCLING_ENGINE_VERSION` 本身就会让缓存失效。强制标志是为 manifest 察觉不到的那种情况准备的：**服务**变了而它的版本串没变。删除文档时勾选"同时删除文件"会把缓存目录连同 `.parsed/` 一并移除。
+
+### 3.8 使用 pdf2md 引擎（以 Markdown 为准的入库）
+
+`pdf2md` 把 PDF、EPUB、DOCX、DOC、ODT、RTF 源文件转换为**以 Markdown 为准的 `.textpack`**：一个 zip，内含 `<name>.md`（结构感知的 Markdown：真实标题层级、自动生成的目录、表格与脚注）、`figs/`（pdf2md 裁切或抽取出的图片，按内容去重）以及 `pdf2md.json`（书目元数据、文档类型、OCR 来源）。随后该包由内置的 `native` Markdown 引擎解析，与上传一个 `.textpack` 完全一致，因此图片会进入 VLM 分析（§4），获得 `type` / `subject` / `ocr_text`。
+
+**安装与路由。** `pip install 'ontorag[pdf2md]'`（PyMuPDF 为 AGPL-3.0，只在可接受该许可证的部署中安装）。扫描版 PDF 还需要主机上的 `tesseract` 与 `gs`（Ghostscript）；DOC/ODT/RTF 需要 LibreOffice（`soffice` 在 `PATH` 上，或设置 `PDF2MD_SOFFICE`）。然后按后缀路由，例如 `ONTORAG_PARSER=pdf:pdf2md-iteP,epub:pdf2md-iteP,doc:pdf2md-iteP,*:native-teP,*:legacy-R`。规则中出现 `pdf2md` 时必须已安装该 extra（否则启动校验会像未配置的外部引擎一样拒绝）。所有示例都刻意让 `docx` 继续走 `native`：pdf2md 的 DOCX 读取器会忽略修订、批注和文本框，而 `native` 能直接抽取内嵌图片、表格和公式。
+
+**`.textpack` 就是文档记录。** 解析成功后，`doc_status.file_path` 与 `metadata.source_file` 指向 `<name>.textpack`，入队时的文件名保留在 `metadata.source_file_original`；归档到 `__parsed__/`、被分块引用、被 `DELETE /documents/{id}` 删除的都是这个包，而不是原文件。**OntoRAG 永远不会移动或删除原文件。** 再次扫描时，已有对应包文档的原文件会被识别出来（扫描计数器 `converted_source`），既不入队也不归档。原文件若发生变化，清单中的 `source.sha256` 不再匹配，下次解析会重新生成包；未变化的源文件复用已有的包。
+
+**扫描版（纯图片）PDF 会就地 OCR。** 当没有任何页面带文字层时，OntoRAG 先把原文件复制到 `<folder>/__originals__/<name>.pdf`（在文件旁创建；已存在的备份绝不会被覆盖），再用 OCRmyPDF 输出到临时文件，最后原子地把 `<folder>/<name>.pdf` 替换为可检索的 PDF —— 你的资料库被升级而不是被消耗。`PDF_OCR_ENGINE` 会传给 OCRmyPDF 的 `--ocr-engine`：默认 Tesseract，`ocrmypdf-appleocr`（macOS Vision）、`ocrmypdf-easyocr`（GPU）、`ocrmypdf-paddleocr` 等插件会注册各自的引擎名，因此换一个更好的识别器只是一次 `pip install` 加一个变量。`PDF_OCR_LANGUAGES`（逗号分隔的 Tesseract 语言代码）、`PDF_OCR_DESKEW`、`PDF_OCR_TIMEOUT` 用于调节。EPUB/DOCX/DOC 不需要 OCR。
+
+**目录元数据。** `doc_status.metadata` 新增 `bibliographic`（`title`、`authors`、`year`、`publisher`、`edition`、`isbn`、`arxiv`、`language`，只包含 pdf2md 实际找到的键）、`doc_type`（`book` / `paper` / `deck` / `document`）及 `doc_scores`、`ocr`（`null`，或 `{applied, engine, languages, original_backup}`）以及 `converter` 版本。`/documents` 会返回它们；WebUI 的文档列表显示书目标题与作者。同一份记录也以 `pdf2md.json` 存放在包内（见 sidecar 格式说明），因此归档后的 `.textpack` 是自描述的。
+
+**失败行为。**
+
+| 情形 | 结果 |
+| --- | --- |
+| 未安装 extra | 引擎不可用：按文件路由时跳过该规则；`ONTORAG_PARSER` 中出现它时启动校验失败并提示 `pip install 'ontorag[pdf2md]'`。 |
+| 纯图片 PDF，但缺少 `ocrmypdf` / `tesseract` / `gs` | 文档 FAILED，消息指明缺少什么；带文字层的 PDF 仍可转换。 |
+| OCRmyPDF 出错或超过 `PDF_OCR_TIMEOUT` | 删除临时输出，原文件不动（`__originals__/` 中的副本保留），FAILED 并附 OCRmyPDF 的消息；扫描重试会重新 OCR。 |
+| OCR 输出仍无文字层 | FAILED `OCR produced no text layer`；OCR 后的文件留在原处。 |
+| DOC/ODT/RTF 但没有 LibreOffice | FAILED 并提示安装 LibreOffice。 |
+| pdf2md 拒绝或崩溃 | FAILED 并附其消息；工作目录之外不写任何东西。 |
+| 委托的 Markdown 解析失败 | 按 native 引擎的语义处理；`.textpack` 保留，重试时跳过转换。 |
+
+并发是独立的队列组：`MAX_PARALLEL_PARSE_PDF2MD`（默认 2）。转换与 OCR 在解析 worker 中运行，上传与扫描入队阶段不承担任何重负载。
 
 ## 4. 多模态分析（VLM）
 
