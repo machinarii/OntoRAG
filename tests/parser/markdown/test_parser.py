@@ -25,7 +25,13 @@ from ontorag.parser.markdown.parser import (
     _unwrap_embedded_ipv4,
 )
 
+
 from tests.parser.markdown.conftest import PNG_BYTES as _PNG_BYTES
+
+_requires_cairo = pytest.mark.skipif(
+    md_parser.check_svg_rasterizer() is not None,
+    reason="cairosvg cannot rasterize here (native libcairo missing); install cairo to run",
+)
 
 _PNG_B64 = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="
 
@@ -56,6 +62,7 @@ def test_looks_like_svg():
     assert _looks_like_svg(b"<html><body>no svg</body></html>") is False
 
 
+@_requires_cairo
 def test_svg_rasterized_to_png_via_coerce():
     coerced = _image_bytes_and_ext(
         _SVG_BYTES, max_bytes=25 * 1024 * 1024, max_svg_pixels=16_000_000
@@ -97,6 +104,7 @@ def test_svg_dimensions_parsed_from_width_height_and_viewbox():
     assert md_parser._svg_pixel_dimensions(svg_none) is None
 
 
+@_requires_cairo
 def test_svg_oversized_canvas_rejected_before_render(monkeypatch):
     # A tiny SVG declaring a huge canvas is rejected on the pre-render pixel
     # budget — cairosvg.svg2png must never be reached.
@@ -110,6 +118,7 @@ def test_svg_oversized_canvas_rejected_before_render(monkeypatch):
     assert md_parser._rasterize_svg(big, max_pixels=16_000_000) is None
 
 
+@_requires_cairo
 def test_base64_svg_decoded_and_rasterized():
     import base64 as _b64
 
@@ -125,6 +134,7 @@ def test_base64_svg_decoded_and_rasterized():
     assert not warnings
 
 
+@_requires_cairo
 def test_textpack_svg_file_rasterized_to_png(tmp_path: Path):
     pack = tmp_path / "note.textpack"
     with zipfile.ZipFile(pack, "w") as zf:

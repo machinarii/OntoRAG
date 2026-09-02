@@ -15,7 +15,13 @@ import pytest
 from ontorag.parser.markdown import parser as md_parser
 from ontorag.parser.markdown.parser import NativeMarkdownParser
 
+
 from tests.parser.markdown.conftest import PNG_BYTES as _PNG_BYTES
+
+_requires_cairo = pytest.mark.skipif(
+    md_parser.check_svg_rasterizer() is not None,
+    reason="cairosvg cannot rasterize here (native libcairo missing); install cairo to run",
+)
 
 _URL = "http://host/y.png"
 _MD = f"# H\n\n![x]({_URL})\n"
@@ -176,6 +182,7 @@ def test_tampered_cache_file_falls_back_to_download(tmp_path, monkeypatch):
     assert counter["n"] == 2  # integrity mismatch -> miss -> re-download
 
 
+@_requires_cairo
 def test_svg_cached_as_png_and_reused_without_rasterizing(tmp_path, monkeypatch):
     # _download returns the post-rasterization PNG, so a cache hit reuses PNG
     # bytes and never calls cairosvg.
