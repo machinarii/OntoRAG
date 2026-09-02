@@ -1,6 +1,6 @@
 # pdf2md Markdown Intake Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Add a `pdf2md` parser engine that converts PDF/EPUB/DOCX/DOC/ODT/RTF sources into a Markdown-canonical `.textpack` (OCR'ing scanned PDFs in place first), hands it to the native Markdown engine, and makes the `.textpack` the catalogued/archived document while the original stays untouched in its folder.
 
@@ -9,6 +9,8 @@
 **Tech Stack:** Python 3.10+, PyMuPDF (extra only), OCRmyPDF CLI via `python -m ocrmypdf` (extra only; Tesseract/Ghostscript system binaries), LibreOffice `soffice` (optional system binary), pytest, ruff, Bun/React for one WebUI cell.
 
 **Spec:** `docs/superpowers/specs/2026-09-02-pdf2md-markdown-intake-design.md`
+
+**Status:** all 11 tasks executed 2026-09-02 (inline, TDD); every step below is checked. Final verification: 7820 passed / 0 failed / 202 skipped; WebUI 616 pass; ruff clean.
 
 ## Global Constraints
 
@@ -63,7 +65,7 @@
 - Produces: `convert_source(source: Path, work_dir: Path, *, doc_type: str | None = None, soffice: str | None = None, figure_dpi: int = 200) -> ConversionResult` where `ConversionResult(markdown: str, figure_dir: Path | None, stats: dict[str, Any], stdout: str)`; raises `Pdf2MdConversionError(message)`.
 - Produces: `_pdf2md.run(args: argparse.Namespace) -> None` (the refactored body of upstream `main()`).
 
-- [ ] **Step 1: Vendor the files**
+- [x] **Step 1: Vendor the files**
 
 ```bash
 mkdir -p ontorag/parser/pdf2md tests/parser/pdf2md
@@ -85,7 +87,7 @@ Prepend this header to `ontorag/parser/pdf2md/_pdf2md.py` (before the module doc
 # ruff: noqa
 ```
 
-- [ ] **Step 2: Split `main()` into `main()` + `run(args)`**
+- [x] **Step 2: Split `main()` into `main()` + `run(args)`**
 
 In `_pdf2md.py`, find `def main():` (upstream line ~4255). Replace the two lines
 
@@ -109,7 +111,7 @@ def run(args) -> None:
 
 Nothing else in the function body changes. `R = PP = OL = DT = DK = DD = ST = sys.modules[__name__]` at the bottom must stay.
 
-- [ ] **Step 3: Write the failing tests**
+- [x] **Step 3: Write the failing tests**
 
 `tests/parser/pdf2md/conftest.py`:
 
@@ -217,12 +219,12 @@ def test_convert_missing_source_raises(tmp_path: Path):
         convert_source(tmp_path / "nope.pdf", tmp_path / "work")
 ```
 
-- [ ] **Step 4: Run tests to verify they fail**
+- [x] **Step 4: Run tests to verify they fail**
 
 Run: `./scripts/test.sh tests/parser/pdf2md/test_convert.py -v`
 Expected: FAIL — `ModuleNotFoundError: No module named 'ontorag.parser.pdf2md.convert'`
 
-- [ ] **Step 5: Implement `convert.py` and the package init**
+- [x] **Step 5: Implement `convert.py` and the package init**
 
 `ontorag/parser/pdf2md/__init__.py`:
 
@@ -341,12 +343,12 @@ def convert_source(
     )
 ```
 
-- [ ] **Step 6: Run tests to verify they pass**
+- [x] **Step 6: Run tests to verify they pass**
 
 Run: `./scripts/test.sh tests/parser/pdf2md/test_convert.py -v`
 Expected: 4 PASS (or SKIP if `pymupdf` is not installed — install it first: `uv pip install pymupdf`).
 
-- [ ] **Step 7: Lint and commit**
+- [x] **Step 7: Lint and commit**
 
 ```bash
 .venv/bin/python -m ruff check ontorag/parser/pdf2md tests/parser/pdf2md && .venv/bin/python -m ruff format ontorag/parser/pdf2md/convert.py tests/parser/pdf2md
@@ -365,7 +367,7 @@ git commit -m "feat(pdf2md): vendor pdf2md and expose convert_source()"
 **Interfaces:**
 - Produces: `pdf_text_layer_census(path: Path) -> Census` with `Census(pages: int, text_pages: int)` and property `image_only -> bool` (`pages > 0 and text_pages == 0`).
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```python
 from pathlib import Path
@@ -400,9 +402,9 @@ def test_empty_document_is_not_image_only(tmp_path: Path):
     assert pdf_text_layer_census(path).image_only is False
 ```
 
-- [ ] **Step 2: Run to verify failure** — `./scripts/test.sh tests/parser/pdf2md/test_census.py -v` → `ModuleNotFoundError`.
+- [x] **Step 2: Run to verify failure** — `./scripts/test.sh tests/parser/pdf2md/test_census.py -v` → `ModuleNotFoundError`.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 ```python
 """Does this PDF carry a text layer? (PyMuPDF word census per page.)"""
@@ -434,7 +436,7 @@ def pdf_text_layer_census(path: Path) -> Census:
         doc.close()
 ```
 
-- [ ] **Step 4: Run to verify pass**, then **Step 5: Commit** — `git commit -m "feat(pdf2md): text-layer census"`.
+- [x] **Step 4: Run to verify pass**, then **Step 5: Commit** — `git commit -m "feat(pdf2md): text-layer census"`.
 
 ---
 
@@ -450,7 +452,7 @@ def pdf_text_layer_census(path: Path) -> Census:
 - Produces: `pack_textpack(*, out_path: Path, stem: str, body: str, figure_dir: Path | None, manifest: dict) -> Path` (zip with `<stem>.md`, `figs/<sha12>.<ext>`, `pdf2md.json`; links rewritten).
 - Produces: `MANIFEST_NAME = "pdf2md.json"`, `BIBLIOGRAPHIC_KEYS`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```python
 from __future__ import annotations
@@ -571,9 +573,9 @@ def test_pack_textpack_round_trips_through_markdown_parser(tmp_path: Path):
     assert (bundle_root / MANIFEST_NAME).is_file()
 ```
 
-- [ ] **Step 2: Run to verify failure** — `./scripts/test.sh tests/parser/pdf2md/test_textpack.py -v` → `ModuleNotFoundError`.
+- [x] **Step 2: Run to verify failure** — `./scripts/test.sh tests/parser/pdf2md/test_textpack.py -v` → `ModuleNotFoundError`.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 ```python
 """Front matter, manifest and .textpack packing for the pdf2md engine.
@@ -683,7 +685,7 @@ def pack_textpack(*, out_path: Path, stem: str, body: str, figure_dir: Path | No
     return out_path
 ```
 
-- [ ] **Step 4: Run to verify pass** (6 PASS), **Step 5: Commit** — `git commit -m "feat(pdf2md): textpack packing, front matter and manifest"`.
+- [x] **Step 4: Run to verify pass** (6 PASS), **Step 5: Commit** — `git commit -m "feat(pdf2md): textpack packing, front matter and manifest"`.
 
 ---
 
@@ -698,7 +700,7 @@ def pack_textpack(*, out_path: Path, stem: str, body: str, figure_dir: Path | No
 - Produces: `OcrError(RuntimeError)`, `OcrProducedNoTextError(OcrError)`.
 - Consumes: `pdf_text_layer_census` (Task 2).
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```python
 from __future__ import annotations
@@ -802,9 +804,9 @@ def test_default_runner_omits_ocr_engine_flag_for_tesseract(monkeypatch, tmp_pat
     assert "--ocr-engine" not in calls["cmd"]
 ```
 
-- [ ] **Step 2: Run to verify failure** — `./scripts/test.sh tests/parser/pdf2md/test_ocr.py -v` → `ModuleNotFoundError`.
+- [x] **Step 2: Run to verify failure** — `./scripts/test.sh tests/parser/pdf2md/test_ocr.py -v` → `ModuleNotFoundError`.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 ```python
 """OCR a scanned PDF in place: back up the original, replace it with a
@@ -910,7 +912,7 @@ def ocr_in_place(
 
 Note: `OcrProducedNoTextError` is raised inside the `try` and is an `OcrError`, so the first `except OcrError` branch removes the temp and re-raises it unchanged.
 
-- [ ] **Step 4: Run to verify pass** (6 PASS), **Step 5: Commit** — `git commit -m "feat(pdf2md): OCR in place with original backup"`.
+- [x] **Step 4: Run to verify pass** (6 PASS), **Step 5: Commit** — `git commit -m "feat(pdf2md): OCR in place with original backup"`.
 
 ---
 
@@ -928,7 +930,7 @@ Note: `OcrProducedNoTextError` is raised inside the `try` and is an `OcrError`, 
 - Produces: `check_pdf2md_available() -> bool`; `check_ocr_available() -> str | None`; `check_soffice_available(explicit: str | None = None) -> str | None` (all stdlib only; `None` = OK).
 - Produces: registry key `"pdf2md"`; `PARSER_ENGINE_PDF2MD`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 `tests/parser/pdf2md/test_probe.py`:
 
@@ -1011,9 +1013,9 @@ def test_pdf2md_available_claims_pdf(monkeypatch):
     assert resolve_file_parser_engine("book.pdf") == "pdf2md"
 ```
 
-- [ ] **Step 2: Run to verify failure** — both files → `ImportError` / `KeyError`.
+- [x] **Step 2: Run to verify failure** — both files → `ImportError` / `KeyError`.
 
-- [ ] **Step 3: Implement `probe.py`**
+- [x] **Step 3: Implement `probe.py`**
 
 ```python
 """Import-cheap availability probes for the pdf2md engine (stdlib only)."""
@@ -1051,7 +1053,7 @@ def check_soffice_available(explicit: str | None = None) -> str | None:
     return "DOC/ODT/RTF conversion needs LibreOffice (soffice) on PATH or PDF2MD_SOFFICE"
 ```
 
-- [ ] **Step 4: Register the engine**
+- [x] **Step 4: Register the engine**
 
 `ontorag/constants.py` after line 372:
 
@@ -1111,9 +1113,9 @@ pdf2md = [
     assert engines == frozenset({"native", "legacy", "mineru", "docling", "pdf2md"})
 ```
 
-- [ ] **Step 5: Run to verify pass** — `./scripts/test.sh tests/parser/pdf2md tests/parser/test_registry.py tests/parser/test_plugins.py -v`. If `test_pdf2md_unavailable_falls_through_routing` fails because routing does not consult `endpoint_configured` for local engines, read `ontorag/parser/routing.py` for where `engine_endpoint_configured` is called and confirm it is applied to every spec (it is for mineru/docling); adjust the monkeypatch target to `registry._pdf2md_available` if routing bound the callable at import.
+- [x] **Step 5: Run to verify pass** — `./scripts/test.sh tests/parser/pdf2md tests/parser/test_registry.py tests/parser/test_plugins.py -v`. If `test_pdf2md_unavailable_falls_through_routing` fails because routing does not consult `endpoint_configured` for local engines, read `ontorag/parser/routing.py` for where `engine_endpoint_configured` is called and confirm it is applied to every spec (it is for mineru/docling); adjust the monkeypatch target to `registry._pdf2md_available` if routing bound the callable at import.
 
-- [ ] **Step 6: Commit** — `uv sync --extra pdf2md` (updates `uv.lock`), then `git add -A && git commit -m "feat(pdf2md): register engine, availability probes, [pdf2md] extra"`.
+- [x] **Step 6: Commit** — `uv sync --extra pdf2md` (updates `uv.lock`), then `git add -A && git commit -m "feat(pdf2md): register engine, availability probes, [pdf2md] extra"`.
 
 ---
 
@@ -1129,7 +1131,7 @@ pdf2md = [
 - Produces: `ParseResult.canonical_source: str | None = None`, `ParseResult.document_metadata: dict[str, Any] | None = None`; both emitted by `to_dict()` only when set.
 - Produces (pipeline behaviour): when `parsed_data["canonical_source"]` is set, `doc_status.file_path` = its canonical basename, `metadata.source_file` = its basename, `metadata.source_file_original` = the previous `file_path`; `document_metadata` merged into `metadata`; `full_docs` row's `file_path`/`source_file` updated.
 
-- [ ] **Step 1: Write the failing unit test**
+- [x] **Step 1: Write the failing unit test**
 
 `tests/parser/test_parse_result_canonical_source.py`:
 
@@ -1155,9 +1157,9 @@ def test_to_dict_emits_new_fields_when_set():
     assert d["document_metadata"] == {"doc_type": "book"}
 ```
 
-- [ ] **Step 2: Run to verify failure** — `TypeError: unexpected keyword argument 'canonical_source'`.
+- [x] **Step 2: Run to verify failure** — `TypeError: unexpected keyword argument 'canonical_source'`.
 
-- [ ] **Step 3: Implement the dataclass fields**
+- [x] **Step 3: Implement the dataclass fields**
 
 In `ParseResult` after `smartheading_llm_cache_ids`:
 
@@ -1181,7 +1183,7 @@ and in `to_dict()` before `return out`:
             out["document_metadata"] = self.document_metadata
 ```
 
-- [ ] **Step 4: Run unit test → PASS. Write the failing pipeline test**
+- [x] **Step 4: Run unit test → PASS. Write the failing pipeline test**
 
 `tests/pipeline/_fake_conv_parser.py` (a registrable engine that behaves like a converter):
 
@@ -1310,9 +1312,9 @@ def test_canonical_source_repoints_doc_status_and_archives_bundle(tmp_path, monk
 
 If `get_docs_by_track_id` is not the accessor's name, use `await rag.doc_status.get_docs_by_statuses([DocStatus.PROCESSED])` and pick the single row.
 
-- [ ] **Step 5: Run to verify failure** — `assert file_path == "book.textpack"` fails with `'book.pdf'`.
+- [x] **Step 5: Run to verify failure** — `assert file_path == "book.textpack"` fails with `'book.pdf'`.
 
-- [ ] **Step 6: Implement the parse-stage application**
+- [x] **Step 6: Implement the parse-stage application**
 
 `ontorag/utils_pipeline.py` — extend the tuple:
 
@@ -1358,9 +1360,9 @@ If `get_docs_by_track_id` is not the accessor's name, use `await rag.doc_status.
 
 Archive: `FakeConvParser` does not archive; the real engine delegates to the Markdown parser which calls `ctx.archive_source(bundle)`. To make the test's archive assertion hold for the fake, add at the end of `FakeConvParser.parse` before `return`: `await ctx.archive_source(str(bundle))`.
 
-- [ ] **Step 7: Run to verify pass** — both new test files and `./scripts/test.sh tests/pipeline -q` (no regressions).
+- [x] **Step 7: Run to verify pass** — both new test files and `./scripts/test.sh tests/pipeline -q` (no regressions).
 
-- [ ] **Step 8: Commit** — `git commit -m "feat(parser): ParseResult.canonical_source re-points the document of record"`.
+- [x] **Step 8: Commit** — `git commit -m "feat(parser): ParseResult.canonical_source re-points the document of record"`.
 
 ---
 
@@ -1375,7 +1377,7 @@ Archive: `FakeConvParser` does not archive; the real engine delegates to the Mar
 - Produces: `Pdf2MdParser(BaseParser)` with `engine_name = "pdf2md"` and `async parse(ctx) -> ParseResult` whose result has `parse_engine="pdf2md"`, `canonical_source="<stem>.textpack"`, `document_metadata` from the manifest.
 - Produces: `Pdf2MdSettings.from_env()` (reads the §5.4 env vars).
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```python
 from __future__ import annotations
@@ -1511,9 +1513,9 @@ async def test_unsupported_suffix_rejected(tmp_path: Path):
         await Pdf2MdParser().parse(ParseContext(_FakeRag(), "doc-6", str(src), {"parse_engine": "pdf2md"}))
 ```
 
-- [ ] **Step 2: Run to verify failure** — `ModuleNotFoundError: ontorag.parser.pdf2md.parser`.
+- [x] **Step 2: Run to verify failure** — `ModuleNotFoundError: ontorag.parser.pdf2md.parser`.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 ```python
 """pdf2md engine: convert to a Markdown-canonical .textpack, then delegate.
@@ -1697,9 +1699,9 @@ class Pdf2MdParser(BaseParser):
 
 Notes for the implementer: `ctx.resolve()` calls `ctx.rag._resolve_source_file_for_parser(file_path, ...)`; the test double returns the path unchanged, so an absolute test path resolves directly. `NativeMarkdownParser.validate_source` requires the `.textpack` suffix — satisfied. `OcrResult` is re-exported from `ocr.py` for the test's monkeypatch.
 
-- [ ] **Step 4: Run to verify pass** — `./scripts/test.sh tests/parser/pdf2md/test_parser.py -v` (6 PASS).
+- [x] **Step 4: Run to verify pass** — `./scripts/test.sh tests/parser/pdf2md/test_parser.py -v` (6 PASS).
 
-- [ ] **Step 5: One real end-to-end conversion (no mocks)**
+- [x] **Step 5: One real end-to-end conversion (no mocks)**
 
 Append to `test_parser.py`:
 
@@ -1713,7 +1715,7 @@ async def test_real_conversion_of_synthesised_pdf(text_pdf: Path, archived):
 
 Run; if pdf2md classifies the two-page synthetic PDF oddly that is fine — the assertion is only that body text survived into the sidecar.
 
-- [ ] **Step 6: Commit** — `git commit -m "feat(pdf2md): Pdf2MdParser orchestrates OCR/convert/pack and delegates to the Markdown engine"`.
+- [x] **Step 6: Commit** — `git commit -m "feat(pdf2md): Pdf2MdParser orchestrates OCR/convert/pack and delegates to the Markdown engine"`.
 
 ---
 
@@ -1727,7 +1729,7 @@ Run; if pdf2md classifies the two-page synthetic PDF oddly that is fine — the 
 - Produces: `_ScanFileClass.CONVERTED_SOURCE = "converted_source"`; `classify_scan_file` returns it when the derived `<stem>.textpack` key resolves to a unique, non-FAILED document whose `metadata.source_file_original == file_path.name`.
 - Consumes: `resolve_doc_source_strict`, `doc_status_field`.
 
-- [ ] **Step 1: Write the failing test** (append; reuse the module's `_ResolverDocStatus` and row helpers — read lines 45-140 of the file for `_row(...)`/rag construction helpers and use the same ones):
+- [x] **Step 1: Write the failing test** (append; reuse the module's `_ResolverDocStatus` and row helpers — read lines 45-140 of the file for `_row(...)`/rag construction helpers and use the same ones):
 
 ```python
 def test_converted_original_is_skipped_without_archive():
@@ -1761,9 +1763,9 @@ def test_textpack_document_with_different_original_does_not_claim_this_file():
 
 If the module has no `_row` helper, build the row as `DocProcessingStatus(content_summary="", content_length=0, file_path=..., status=..., created_at="", updated_at="", metadata=...)` — check the dataclass's required fields at `ontorag/base.py:1044`.
 
-- [ ] **Step 2: Run to verify failure** — `AttributeError: CONVERTED_SOURCE`.
+- [x] **Step 2: Run to verify failure** — `AttributeError: CONVERTED_SOURCE`.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 Enum: add `CONVERTED_SOURCE = "converted_source"` after `ALIAS_DUPLICATE`, and update the class docstring ("nine ... exits").
 
@@ -1832,9 +1834,9 @@ Caller branch, after the `PROCESSED` block:
                     continue
 ```
 
-- [ ] **Step 4: Run to verify pass** — `./scripts/test.sh tests/api/routes/test_scan_classification_exits.py -v`; also `./scripts/test.sh tests/api -q`.
+- [x] **Step 4: Run to verify pass** — `./scripts/test.sh tests/api/routes/test_scan_classification_exits.py -v`; also `./scripts/test.sh tests/api -q`.
 
-- [ ] **Step 5: Commit** — `git commit -m "feat(scan): skip originals already converted to a .textpack document"`.
+- [x] **Step 5: Commit** — `git commit -m "feat(scan): skip originals already converted to a .textpack document"`.
 
 ---
 
@@ -1844,7 +1846,7 @@ Caller branch, after the `PROCESSED` block:
 - Modify: `ontorag_webui/src/features/DocumentManager.tsx:89-110` (`getDisplayFileName`) and the two `{doc.file_path}` cells (~1693, ~1706)
 - Test: `ontorag_webui/src/features/documentDisplayName.test.ts`
 
-- [ ] **Step 1: Extract the helper into its own module and write the failing test**
+- [x] **Step 1: Extract the helper into its own module and write the failing test**
 
 Create `ontorag_webui/src/features/documentDisplayName.ts`:
 
@@ -1887,9 +1889,9 @@ describe('bibliographic display', () => {
 })
 ```
 
-- [ ] **Step 2: Run to verify failure** — `cd ontorag_webui && bun test documentDisplayName` → module not found.
+- [x] **Step 2: Run to verify failure** — `cd ontorag_webui && bun test documentDisplayName` → module not found.
 
-- [ ] **Step 3: Implement** — create the module above; in `DocumentManager.tsx` import both helpers and, in each of the two cells that render `{doc.file_path}`, render:
+- [x] **Step 3: Implement** — create the module above; in `DocumentManager.tsx` import both helpers and, in each of the two cells that render `{doc.file_path}`, render:
 
 ```tsx
 {bibliographicTitle(doc) ?? doc.file_path}
@@ -1900,9 +1902,9 @@ describe('bibliographic display', () => {
 
 keeping the existing `title={doc.file_path}` tooltip so the file name remains discoverable.
 
-- [ ] **Step 4: Verify** — `bun test` (all green), `bun run lint`, `bun run build`.
+- [x] **Step 4: Verify** — `bun test` (all green), `bun run lint`, `bun run build`.
 
-- [ ] **Step 5: Commit** — `git commit -m "feat(webui): show bibliographic title and authors for converted documents"`.
+- [x] **Step 5: Commit** — `git commit -m "feat(webui): show bibliographic title and authors for converted documents"`.
 
 ---
 
@@ -1913,7 +1915,7 @@ keeping the existing `title={doc.file_path}` tooltip so the file name remains di
 - Modify: `Dockerfile:125` (runtime apt line)
 - Modify: `AGENTS.md`, `README.md`, `docs/FileProcessingPipeline.md` (+ `-zh.md`), `docs/OntoRAGSidecarFormat.md` (+ `-zh.md`), `docs/ThirdPartyParser.md`, `docs/GraphAndRagArchitecture.md` §5.4
 
-- [ ] **Step 1: env.example / env.docker-compose-full** — insert after the `ONTORAG_PARSER=` line in both files:
+- [x] **Step 1: env.example / env.docker-compose-full** — insert after the `ONTORAG_PARSER=` line in both files:
 
 ```bash
 
@@ -1938,7 +1940,7 @@ keeping the existing `title={doc.file_path}` tooltip so the file name remains di
 # PDF2MD_FIGURE_DPI=200
 ```
 
-- [ ] **Step 2: Dockerfile** — change line 125 to install the OCR/LibreOffice system packages in the full image only:
+- [x] **Step 2: Dockerfile** — change line 125 to install the OCR/LibreOffice system packages in the full image only:
 
 ```dockerfile
     && apt-get install -y --no-install-recommends gosu libcairo2 \
@@ -1947,7 +1949,7 @@ keeping the existing `title={doc.file_path}` tooltip so the file name remains di
 
 and add `--extra pdf2md` to the full image's `uv sync` line (find it with `grep -n "uv sync" Dockerfile`; leave `Dockerfile.lite` untouched).
 
-- [ ] **Step 3: Documentation**
+- [x] **Step 3: Documentation**
 
 - `AGENTS.md` *Module Layout*: after the `parser/` bullet add: ``- **parser/pdf2md/** *(OntoRAG fork addition)*: Markdown-canonical intake. `_pdf2md.py` is the vendored pdf2md converter (PyMuPDF; `[pdf2md]` extra), `census.py` text-layer census, `ocr.py` OCRmyPDF in place with `__originals__/` backup, `textpack.py` bundle + `pdf2md.json` manifest, `parser.py` orchestrates and delegates to the native Markdown engine. The generated `.textpack` becomes the document of record via `ParseResult.canonical_source`; originals are never moved. Design: `docs/superpowers/specs/2026-09-02-pdf2md-markdown-intake-design.md`.`` Also add `pdf2md` to the *Setup* extras list and the env vars to *Configuration*.
 - `README.md`: one paragraph under the features/install section: install extra, what it does, the residency rule, the OCR behaviour, and the routing example.
@@ -1956,20 +1958,20 @@ and add `--extra pdf2md` to the full image's `uv sync` line (find it with `grep 
 - `docs/ThirdPartyParser.md`: under §2.1 Contract, document `ParseResult.canonical_source` / `document_metadata` and the re-point semantics (spec §5.2), noting the scan `CONVERTED_SOURCE` rule.
 - `docs/GraphAndRagArchitecture.md` §5.4: one paragraph — `bibliographic` and `doc_type` are now recorded per document by pdf2md and are the intended document-level inputs for Plan B's classifier.
 
-- [ ] **Step 4: Verify docs build nothing (markdown) and env files parse** — `grep -n "PDF2MD\|PDF_OCR" env.example env.docker-compose-full`, `docker build --target builder -t ontorag-test . --quiet` optional if Docker is present.
+- [x] **Step 4: Verify docs build nothing (markdown) and env files parse** — `grep -n "PDF2MD\|PDF_OCR" env.example env.docker-compose-full`, `docker build --target builder -t ontorag-test . --quiet` optional if Docker is present.
 
-- [ ] **Step 5: Commit** — `git commit -m "docs(pdf2md): env, Docker and documentation for the Markdown intake engine"`.
+- [x] **Step 5: Commit** — `git commit -m "docs(pdf2md): env, Docker and documentation for the Markdown intake engine"`.
 
 ---
 
 ### Task 11: Full verification
 
-- [ ] **Step 1:** `uv sync --extra api --extra test --extra offline-storage --extra offline-llm --extra pdf2md`
-- [ ] **Step 2:** `.venv/bin/python -m ruff check . && .venv/bin/python -m ruff format --check ontorag tests`
-- [ ] **Step 3:** `./scripts/test.sh tests` — expected: 0 failed; the new suites run (not skipped) because `pymupdf` is installed.
-- [ ] **Step 4:** `cd ontorag_webui && bun test && bun run lint && bun run build`
-- [ ] **Step 5:** Manual smoke, if a real PDF is at hand: `ONTORAG_PARSER=pdf:pdf2md-iteP,*:native-teP,*:legacy-R`, drop `book.pdf` in `inputs/`, run a scan, confirm `inputs/book.pdf` unchanged, `inputs/__parsed__/book.textpack` archived, `doc_status.file_path == "book.textpack"`, `metadata.bibliographic` populated, drawings analysed with `subject`/`ocr_text`; run a second scan and confirm `converted_source` in the scan counters with no re-enqueue.
-- [ ] **Step 6:** Commit anything outstanding; do not push (the branch push awaits the user's `gh auth refresh -s workflow`).
+- [x] **Step 1:** `uv sync --extra api --extra test --extra offline-storage --extra offline-llm --extra pdf2md`
+- [x] **Step 2:** `.venv/bin/python -m ruff check . && .venv/bin/python -m ruff format --check ontorag tests`
+- [x] **Step 3:** `./scripts/test.sh tests` — expected: 0 failed; the new suites run (not skipped) because `pymupdf` is installed.
+- [x] **Step 4:** `cd ontorag_webui && bun test && bun run lint && bun run build`
+- [x] **Step 5:** Manual smoke, if a real PDF is at hand: `ONTORAG_PARSER=pdf:pdf2md-iteP,*:native-teP,*:legacy-R`, drop `book.pdf` in `inputs/`, run a scan, confirm `inputs/book.pdf` unchanged, `inputs/__parsed__/book.textpack` archived, `doc_status.file_path == "book.textpack"`, `metadata.bibliographic` populated, drawings analysed with `subject`/`ocr_text`; run a second scan and confirm `converted_source` in the scan counters with no re-enqueue.
+- [x] **Step 6:** Commit anything outstanding; do not push (the branch push awaits the user's `gh auth refresh -s workflow`).
 
 ---
 
