@@ -29,6 +29,7 @@ Top-level directories:
 - **parser/**: Unified parsing layer. `parser/routing.py` resolves engine and filename hints for `legacy`, `native`, `mineru`, and `docling` flows; `parser/debug.py` provides an offline OntoRAG stub for the `parser/cli.py` debug entry point (`python -m ontorag.parser.cli`). Native format parsers live as sibling sub-packages under `parser/` (currently `parser/docx/`); external HTTP-based adapters live under `parser/external/` (`mineru`, `docling`) with shared helpers in `parser/external/_common.py`, `_manifest.py`, `_zip.py`.
 - **chunker/**: Chunking strategies (token-size, recursive character, semantic vector, paragraph semantic).
 - **api/**: FastAPI service (`ontorag_server.py`) with REST endpoints and Ollama-compatible API; routers under `routers/`, static Swagger assets, packaged WebUI output, and Gunicorn launcher.
+- **parser/pdf2md/** *(OntoRAG fork addition)*: Markdown-canonical intake for PDF / EPUB / DOCX / DOC / ODT / RTF. `_pdf2md.py` is the vendored pdf2md converter (PyMuPDF, AGPL — only under the `[pdf2md]` extra), `census.py` the text-layer census, `ocr.py` OCRmyPDF in place with a `__originals__/` backup of the pre-OCR file, `textpack.py` the `.textpack` bundle + `pdf2md.json` manifest, `probe.py` import-cheap availability probes, `parser.py` the `Pdf2MdParser` that orchestrates census → OCR → convert → pack and then delegates the real parse to the native Markdown engine on the bundle. The generated `.textpack` becomes the document of record via `ParseResult.canonical_source` (parse stage re-points `doc_status.file_path` / `metadata.source_file`, keeps `metadata.source_file_original`); originals are never moved, and the scan's `CONVERTED_SOURCE` exit skips them on re-scan. `docx` stays on `native` by default. Design: `docs/superpowers/specs/2026-09-02-pdf2md-markdown-intake-design.md`; plan: `docs/superpowers/plans/2026-09-02-pdf2md-markdown-intake.md`.
 - **taxonomy/** *(OntoRAG fork addition)*: Standalone YAGO 4.0 taxonomy stack consumed by Plan B. `parser.py` (N-Triples → `YagoClass`), `graph_loader.py` (load + ancestor walk), `vocabulary.py` (descendant-count working-vocabulary selection), `class_index.py` (vector index over class label+comment), `classifier.py` (`DocumentClassifier.classify` — single LLM call, ≥50%-of-top threshold, 10-class cap, `ontorag:Uncategorized` sentinel on failure), `manifest.py` (pinned SHA256s + `verify_yago_files()`), `constants.py` (RDF IRIs + tunables). Design lives in `docs/GraphAndRagArchitecture.md` §5; implementation plan in `docs/superpowers/plans/2026-05-22-yago-taxonomy-infrastructure.md`. Reuses existing `BaseGraphStorage` / `BaseVectorStorage` — no backend changes.
 
 ## Core Architecture
@@ -172,6 +173,7 @@ uv sync --extra api
 uv sync --extra offline-storage  # Storage backends
 uv sync --extra offline-llm      # LLM providers
 uv sync --extra test             # Testing dependencies
+uv sync --extra pdf2md           # pdf2md Markdown intake (PyMuPDF is AGPL-3.0; also needs tesseract, ghostscript, optionally libreoffice)
 ```
 
 ### API Server
@@ -510,6 +512,7 @@ Primary configuration file for API server. Generate it with `make env-base` or c
 - Query parameters (TOP_K, MAX_TOTAL_TOKENS, etc.)
 - Reranking configuration (RERANK_BINDING, RERANK_MODEL)
 - Authentication (AUTH_ACCOUNTS, ONTORAG_API_KEY)
+- pdf2md intake (`MAX_PARALLEL_PARSE_PDF2MD`, `PDF_OCR_ENGINE`, `PDF_OCR_LANGUAGES`, `PDF_OCR_DESKEW`, `PDF_OCR_TIMEOUT`, `PDF2MD_ORIGINALS_DIRNAME`, `PDF2MD_SOFFICE`, `PDF2MD_FIGURE_DPI`)
 
 See `env.example` for comprehensive template.
 
