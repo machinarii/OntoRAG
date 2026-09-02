@@ -132,6 +132,14 @@ class ParseResult:
     # purge parse-stage cache — there is no chunk llm_cache_list at parse
     # time to carry them.
     smartheading_llm_cache_ids: list[str] | None = None
+    # Set by converter engines (pdf2md): the generated bundle that becomes
+    # the document of record. The parse stage re-points doc_status.file_path
+    # / metadata.source_file to it and records the enqueued name as
+    # metadata.source_file_original. Never set by ordinary engines.
+    canonical_source: str | None = None
+    # Catalog metadata merged into doc_status.metadata at the PARSING upsert
+    # (bibliographic, doc_type, doc_scores, ocr, converter).
+    document_metadata: dict[str, Any] | None = None
 
     def to_dict(self) -> dict[str, Any]:
         out: dict[str, Any] = {
@@ -149,6 +157,10 @@ class ParseResult:
             out["parse_warnings"] = self.parse_warnings
         if self.smartheading_llm_cache_ids:
             out["smartheading_llm_cache_ids"] = self.smartheading_llm_cache_ids
+        if self.canonical_source:
+            out["canonical_source"] = self.canonical_source
+        if self.document_metadata:
+            out["document_metadata"] = self.document_metadata
         return out
 
 
