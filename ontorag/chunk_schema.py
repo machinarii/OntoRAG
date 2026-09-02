@@ -205,7 +205,8 @@ def normalize_chunk_sidecar(dp: dict[str, Any]) -> dict[str, Any] | None:
 
         {"type": <one of block|drawing|table|equation>,
          "id":   <primary source id>,
-         "refs": [{"type": ..., "id": ...}, ...]}
+         "refs": [{"type": ..., "id": ...}, ...],
+         "image_type": <VLM image type; drawing chunks only, when present>}
 
     ``refs`` is always materialized as a list with at least the primary id.
     Single-source chunks therefore land in storage with ``refs=[{type,id}]``
@@ -232,7 +233,13 @@ def normalize_chunk_sidecar(dp: dict[str, Any]) -> dict[str, Any] | None:
     if not refs:
         refs = [{"type": sidecar_type, "id": sidecar_id}]
 
-    return {"type": sidecar_type, "id": sidecar_id, "refs": refs}
+    out: dict[str, Any] = {"type": sidecar_type, "id": sidecar_id, "refs": refs}
+    # Drawing chunks may carry the VLM's image ``type`` (Chart / Photo / ...)
+    # so the multimodal graph node can be typed by medium.
+    image_type = str(sidecar.get("image_type") or "").strip()
+    if sidecar_type == "drawing" and image_type:
+        out["image_type"] = image_type
+    return out
 
 
 # `<cite type="..." refid="...">visible text</cite>` → `visible text`.

@@ -6619,9 +6619,28 @@ class _PipelineMixin:
                 type_value = _required_json_string(parsed, prefix, "type")
                 if type_value not in _IMAGE_TYPE_VALUES:
                     type_value = IMAGE_TYPE_FALLBACK
+                # ``subject`` is the classification-ready field (what the
+                # image is about, vs ``type`` = its medium).  Like an
+                # out-of-enum ``type`` folding to Other, a missing or
+                # non-string subject degrades to "" with a warning rather
+                # than failing the document: the chunk builder tolerates an
+                # absent subject and the image is simply not
+                # classification-ready until re-analyzed.  ``ocr_text`` is
+                # legitimately empty for most images, so it folds silently.
+                subject_raw = parsed.get("subject")
+                subject = subject_raw.strip() if isinstance(subject_raw, str) else ""
+                if not subject:
+                    logger.warning(
+                        f"{prefix}: VLM response missing 'subject'; "
+                        "image will not be classification-ready"
+                    )
+                ocr_raw = parsed.get("ocr_text")
+                ocr_text = ocr_raw.strip() if isinstance(ocr_raw, str) else ""
                 return {
                     "name": name,
                     "type": type_value,
+                    "subject": subject,
+                    "ocr_text": ocr_text,
                     "description": description,
                 }
 
@@ -6954,6 +6973,8 @@ class _PipelineMixin:
                     {
                         "name": analysis_fields["name"],
                         "type": analysis_fields["type"],
+                        "subject": analysis_fields["subject"],
+                        "ocr_text": analysis_fields["ocr_text"],
                         "description": analysis_fields["description"],
                         "analyze_time": int(time.time()),
                         "status": "success",
@@ -7624,6 +7645,8 @@ class _PipelineMixin:
             kind: str,
             name: str,
             image_type: str,
+            image_subject: str,
+            image_ocr_text: str,
             description: str,
             footnotes_joined: str,
             equation_body: str,
@@ -7638,6 +7661,9 @@ class _PipelineMixin:
             # regression pins this contract end-to-end.
             if kind == "drawing":
                 head = f"[Image Name]{name}\n[Image Type]{image_type}"
+                # Sidecars written before ``subject`` existed omit the line.
+                if image_subject:
+                    head += f"\n[Image Subject]{image_subject}"
                 footnote_label = "Image Footnotes"
             elif kind == "table":
                 head = f"[Table Name]{name}"
@@ -7647,6 +7673,8 @@ class _PipelineMixin:
                 footnote_label = "Equation Footnotes"
 
             sections = [head, description]
+            if kind == "drawing" and image_ocr_text:
+                sections.append(f"[Image Text]{image_ocr_text}")
             if footnotes_joined:
                 sections.append(f"[{footnote_label}]{footnotes_joined}")
             return "\n\n".join(s for s in sections if s).strip()
@@ -7699,6 +7727,12 @@ class _PipelineMixin:
                     str(analysis.get("equation") or "")
                 )
                 image_type = sanitize_text_for_encoding(str(analysis.get("type") or ""))
+                image_subject = sanitize_text_for_encoding(
+                    str(analysis.get("subject") or "")
+                )
+                image_ocr_text = sanitize_text_for_encoding(
+                    str(analysis.get("ocr_text") or "")
+                )
                 if not name:
                     raise MultimodalAnalysisError(
                         f"{root_key}/{item_id}: success result missing 'name'"
@@ -7724,6 +7758,8 @@ class _PipelineMixin:
                         kind=kind,
                         name=name,
                         image_type=image_type,
+                        image_subject=image_subject,
+                        image_ocr_text=image_ocr_text,
                         description=desc,
                         footnotes_joined=footnotes_joined,
                         equation_body=equation_body,
@@ -7759,6 +7795,11 @@ class _PipelineMixin:
                     "id": str(item_id),
                     "refs": [{"type": kind, "id": str(item_id)}],
                 }
+                if kind == "drawing":
+                    # Lets operate.extract_entities type the multimodal graph
+                    # node by medium (Chart / Flowchart / ...) instead of the
+                    # structural "drawing".
+                    sidecar_block["image_type"] = image_type
                 cache_list = item.get("llm_cache_list")
                 cache_list = (
                     [str(c) for c in cache_list if str(c).strip()]

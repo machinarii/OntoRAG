@@ -3463,6 +3463,8 @@ def test_mm_chunks_and_modality_relations_from_sidecars(tmp_path):
             "type": "drawing",
             "id": "d1",
             "refs": [{"type": "drawing", "id": "d1"}],
+            # VLM image type, so extract_entities can type the mm node.
+            "image_type": "Chart",
         }
         assert chunk["heading"] == {
             "level": 0,

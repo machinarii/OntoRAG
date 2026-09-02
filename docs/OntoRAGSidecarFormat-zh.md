@@ -174,6 +174,8 @@ inputs/space1/__parsed__/<规范文件名>.parsed/
   "llm_analyze_result": {
     "name": "产品外廓尺寸工程图纸",
     "type": "Illustration",
+    "subject": "产品电源模块的外廓尺寸",
+    "ocr_text": "长 120.0\n宽 64.5\n高 32.0\n单位：mm",
     "description": "该图纸为产品的外廓尺寸示意图，展示了一个电子设备或电源模块的三视图设计…",
     "analyze_time": 1778697752,
     "status": "success",
@@ -391,7 +393,7 @@ charspan: 内容从标定段落的m个字符开始到底n个字符结束（可�
 
 | `status` | 触发场景 | 字段说明 |
 |---|---|---|
-| `success` | 模型成功返回合法 JSON 且必需字段齐全 | 图形：`name / type / description`；表格：`name / description`；公式：`name / description / equation` |
+| `success` | 模型成功返回合法 JSON 且必需字段齐全 | 图形：`name / type / description`（必需）以及 `subject / ocr_text`（见下）；表格：`name / description`；公式：`name / description / equation` |
 | `skipped` | 期跳过多模态分析：图片格式不支持、像素 < `VLM_MIN_IMAGE_PIXEL`（默认 32px）、大于 `VLM_MAX_IMAGE_BYTES`（默认 5 MB）、未启用VLM | `message` 写跳过原因 |
 | `failure` | 必需字段缺失、JSON 修复后仍不合法、VLM/EXTRACT role 未配置而对应模态被启用、模型调用异常 | `message` 写诊断 |
 
@@ -402,6 +404,15 @@ charspan: 内容从标定段落的m个字符开始到底n个字符结束（可�
 - 对已启用模态的 item，每次 `analyze_multimodal` 都会重新计算，并用本次结果覆盖已有的 `llm_analyze_result`（无论原先是 `success`、`skipped` 还是 `failure`）。这样修正 VLM/EXTRACT 配置后可以直接重试，无须手动清理旧 sidecar 结果。LLM 调用仍会走 analysis cache：如果 cache key 命中，不会再次请求 provider，语义字段通常保持一致，但 `analyze_time` 等运行时字段会被重写。只有 cache miss，例如有效 role 模型 / binding / host、prompt 输入或图片元数据变化后，保存内容才可能与上次不同。
 
 图形 `type` 受 12 项枚举约束（见 [`IMAGE_TYPE_ENUM`](../ontorag/prompt_multimodal.py)：`Photo / Illustration / Screenshot / Icon / Chart / Table / Infographic / Flowchart / Chat Log / Wireframe / Texture / Other`）；模型若返回枚举外的值，会被规整成 `Other` 而不是失败。
+
+图形另带两个字段，使图片对分类体系层而言**可直接分类**（见 `docs/GraphAndRagArchitecture.md` §5.4）：
+
+| 字段 | 说明 |
+|---|---|
+| `subject` | 字符串：图片的**主题**——它讲的是什么（如 `Acme 公司 2025 财年季度营收`），区别于 `type` 所描述的呈现媒介。提示词要求必填；若模型仍未返回或返回非字符串，则按 `type` → `Other` 的同一惯例存为 `""` 并记录 warning，不会让文档失败。渲染进多模态 chunk 为 `[Image Subject]…`。 |
+| `ocr_text` | 字符串：图片像素中**逐字**可见的文字（标题、坐标轴标签、图例、节点标签），保持阅读顺序与原语言。图中无可读文字时为 `""`；缺失或非字符串同样存为 `""`。渲染进多模态 chunk 为紧随 description 之后的 `[Image Text]…` 段（为空时省略）。与部分引擎产生的解析侧 `extras.ocr_texts` 是不同字段。 |
+
+在这两个字段出现之前写出的 sidecar 仍能正常构建多模态 chunk，只是对应行不会出现。
 
 ## 十、`smart_audit.json`（可选，仅 native DOCX）
 
