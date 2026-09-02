@@ -140,6 +140,14 @@ api = [
 ]
 
 # Offline deployment dependencies (layered design for flexibility)
+# Markdown-canonical intake via the vendored pdf2md converter + OCRmyPDF.
+# PyMuPDF is AGPL-3.0: install this extra only where that licence is acceptable.
+# System packages also needed for OCR: tesseract-ocr, ghostscript; for
+# DOC/ODT/RTF input: libreoffice (soffice on PATH).
+pdf2md = [
+    "pymupdf>=1.24",
+    "ocrmypdf>=16",
+]
 offline-storage = [
     # Storage backend dependencies
     "faiss-cpu>=1.7.0,<2.0.0",

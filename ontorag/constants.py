@@ -370,6 +370,7 @@ PARSER_ENGINE_LEGACY = "legacy"
 PARSER_ENGINE_NATIVE = "native"
 PARSER_ENGINE_MINERU = "mineru"
 PARSER_ENGINE_DOCLING = "docling"
+PARSER_ENGINE_PDF2MD = "pdf2md"
 PARSED_DIR_NAME = "__parsed__"  # Dir for parsed files (renamed from __enqueued__)
 # Reserved doc_status.metadata key holding the custom-chunk patch journal
 # (issue #3400 Phase 3). While present, the document has an in-flight or
