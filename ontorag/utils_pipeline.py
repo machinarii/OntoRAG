@@ -386,6 +386,13 @@ _DOC_STATUS_METADATA_CARRY_OVER_KEYS: tuple[str, ...] = (
     # deletion can purge them (delete_llm_cache=True).
     "smartheading_llm_cache_ids",
     "analyzing_start_time",
+    # Converter engines (pdf2md): the bundle became the document of record.
+    "source_file_original",
+    "bibliographic",
+    "doc_type",
+    "doc_scores",
+    "ocr",
+    "converter",
     "analyzing_end_time",
     "analyzing_stage_skipped",
     # Custom-chunk patch journal: the durable recovery anchor for an

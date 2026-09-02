@@ -4431,6 +4431,29 @@ class _PipelineMixin:
                     parse_format_w, explicit_engine_w
                 )
 
+                # Converter engines hand back a generated bundle that becomes
+                # the document of record: re-point file_path / source_file to
+                # it and remember the enqueued name. The bundle is what the
+                # source resolver, archive step and citations now see; the
+                # original file is never referenced again and stays put.
+                canonical_source_w = parsed_data_w.get("canonical_source")
+                if isinstance(canonical_source_w, str) and canonical_source_w.strip():
+                    original_file_path_w = file_path_w
+                    file_path_w = normalize_document_file_path(canonical_source_w)
+                    status_doc_w.file_path = file_path_w
+                    status_doc_w.metadata["source_file"] = Path(canonical_source_w).name
+                    status_doc_w.metadata["source_file_original"] = original_file_path_w
+                    await self._persist_parsed_full_docs(
+                        doc_id_w,
+                        {
+                            "file_path": file_path_w,
+                            "source_file": Path(canonical_source_w).name,
+                        },
+                    )
+                document_metadata_w = parsed_data_w.get("document_metadata")
+                if isinstance(document_metadata_w, dict):
+                    status_doc_w.metadata.update(document_metadata_w)
+
                 # parse_* may have patched content_hash for
                 # pending_parse → raw transitions.
                 refreshed = await self.doc_status.get_by_id(doc_id_w)
