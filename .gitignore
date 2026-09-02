@@ -57,7 +57,7 @@ inputs/
 output/
 rag_storage/
 data/
-yago/
+/yago/
 
 # User cumstomized prompt directory
 prompts/entity_type/

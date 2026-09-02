@@ -13,6 +13,7 @@ from unittest.mock import patch, MagicMock
 from fastapi.testclient import TestClient
 
 import pytest
+from pathlib import Path
 
 
 # Env vars that the project's `.env` may have populated (via load_dotenv at
@@ -454,6 +455,21 @@ class TestRuntimeConfigInjection:
         assert "no-store" in cache_control
 
 
+def _webui_built() -> bool:
+    """The WebUI Mount only exists when ontorag/api/webui/index.html is present
+    (create_app installs a redirecting fallback otherwise), so the Mount tests
+    below need a built bundle: ``cd ontorag_webui && bun run build``."""
+    import ontorag.api
+
+    return (Path(ontorag.api.__file__).parent / "webui" / "index.html").exists()
+
+
+_requires_webui = pytest.mark.skipif(
+    not _webui_built(),
+    reason="WebUI not built (cd ontorag_webui && bun run build); the /webui Mount is absent",
+)
+
+
 class TestUvicornRootPathSemantics:
     """Lock in the deployment contract that both proxy-strip and verbatim
     forwarding work through FastAPI's app-level ``root_path`` plus a
@@ -560,6 +576,7 @@ class TestUvicornRootPathSemantics:
         status = await self._call_with_scope(app, "/site01/openapi.json")
         assert status == 200
 
+    @_requires_webui
     @pytest.mark.asyncio
     async def test_mount_strip_mode_matches(self):
         """WebUI Mount, proxy-strip mode: backend receives /webui/.
@@ -575,6 +592,7 @@ class TestUvicornRootPathSemantics:
         status = await self._call_with_scope(app, "/webui/")
         assert status == 200
 
+    @_requires_webui
     @pytest.mark.asyncio
     async def test_mount_verbatim_mode_matches(self):
         """WebUI Mount, verbatim mode: backend receives /site01/webui/.
@@ -738,7 +756,10 @@ class TestWhitelistUnderApiPrefix:
             client = TestClient(create_app(_colliding_prefix_args))
             prefix = "" if mode == "strip" else "/api/v1"
 
-            assert client.delete(f"{prefix}/documents").status_code == 401
+            # API-key-only mode (--key, no AUTH_ACCOUNTS): a request with no
+            # credentials is refused with 403 "API Key required" -- 401 is
+            # reserved for password/JWT auth (see get_combined_auth_dependency).
+            assert client.delete(f"{prefix}/documents").status_code == 403
 
     @pytest.mark.parametrize("mode", ["verbatim", "strip"])
     def test_whitelisted_routes_stay_open_under_a_prefix(

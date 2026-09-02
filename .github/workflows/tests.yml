@@ -43,10 +43,15 @@ jobs:
         --extra api --extra offline-storage --extra offline-llm --extra pytest
 
     - name: Run offline tests
-      # Run only tests marked as 'offline' (no external dependencies);
-      # integration tests requiring databases/APIs are skipped by default.
+      # Run every test that does not need external services. Integration
+      # tests (databases/APIs) are skipped by tests/conftest.py unless
+      # --run-integration is passed, which is the documented default gate.
+      # Do NOT narrow this to `-m offline`: many suites (all of tests/api/,
+      # tests/parser/markdown/, ...) carry no marker at all and were silently
+      # never run in CI under that filter, letting real failures ship.
+      # Tests needing a built WebUI or native libcairo skip themselves.
       # --no-sync: the environment was already synced above.
-      run: uv run --no-sync pytest tests/ -m offline -v --tb=short
+      run: uv run --no-sync pytest tests/ -v --tb=short
 
     - name: Upload test results
       if: always()

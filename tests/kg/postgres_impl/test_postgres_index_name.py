@@ -28,8 +28,15 @@ class TestSafeIndexName:
         """Long table names exceeding 63 bytes should get hashed."""
         from ontorag.kg.postgres_impl import _safe_index_name
 
-        # Long table name that would exceed 63 bytes
-        long_table_name = "ONTORAG_VDB_ENTITY_text_embedding_3_large_3072d"
+        # Long table name that would exceed 63 bytes.  Deliberately well
+        # over the limit: with the shorter "ontorag" prefix the previous
+        # fixture landed at exactly 63 bytes, which PostgreSQL accepts, so
+        # the hashing branch was never exercised.
+        long_table_name = "ONTORAG_VDB_ENTITY_text_embedding_3_large_3072d_workspace_a"
+        naive_name = f"idx_{long_table_name.lower()}_hnsw_cosine"
+        assert len(naive_name.encode("utf-8")) > 63, (
+            "fixture must exceed the 63-byte limit for this test to be meaningful"
+        )
         result = _safe_index_name(long_table_name, "hnsw_cosine")
 
         # Should be within 63 bytes
@@ -42,7 +49,6 @@ class TestSafeIndexName:
         assert result.endswith("_hnsw_cosine")
 
         # Should NOT be the naive concatenation (which would be truncated)
-        naive_name = f"idx_{long_table_name.lower()}_hnsw_cosine"
         assert result != naive_name
 
     def test_deterministic_output(self):
