@@ -5,6 +5,21 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
+# macOS + Homebrew: Python's ctypes does not search the Homebrew prefix, so
+# cairocffi (cairosvg) cannot dlopen libcairo even after `brew install cairo`
+# and the SVG rasterization tests skip. Point dyld's fallback search there.
+# dyld reads this at process start, so it must be exported here, not in
+# conftest.py. Respect an explicit setting from the caller.
+if [ "$(uname -s)" = "Darwin" ] && [ -z "${DYLD_FALLBACK_LIBRARY_PATH:-}" ]; then
+    for _brew_lib in /opt/homebrew/lib /usr/local/lib; do
+        if [ -e "$_brew_lib/libcairo.2.dylib" ]; then
+            export DYLD_FALLBACK_LIBRARY_PATH="$_brew_lib"
+            break
+        fi
+    done
+    unset _brew_lib
+fi
+
 if [ "$#" -eq 0 ]; then
     set -- tests
 fi

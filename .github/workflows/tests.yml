@@ -42,6 +42,20 @@ jobs:
         uv sync --frozen --python ${{ matrix.python-version }}
         --extra api --extra offline-storage --extra offline-llm --extra pytest
 
+    - name: Set up Bun
+      uses: oven-sh/setup-bun@v2
+      with:
+        bun-version: latest
+
+    - name: Build WebUI
+      # tests/api/test_path_prefixes.py's Mount tests exercise the /webui
+      # StaticFiles mount, which create_app only installs when
+      # ontorag/api/webui/index.html exists; without a build they skip.
+      working-directory: ontorag_webui
+      run: |
+        bun install --frozen-lockfile
+        bun run build
+
     - name: Run offline tests
       # Run every test that does not need external services. Integration
       # tests (databases/APIs) are skipped by tests/conftest.py unless
@@ -49,7 +63,8 @@ jobs:
       # Do NOT narrow this to `-m offline`: many suites (all of tests/api/,
       # tests/parser/markdown/, ...) carry no marker at all and were silently
       # never run in CI under that filter, letting real failures ship.
-      # Tests needing a built WebUI or native libcairo skip themselves.
+      # Tests needing native libcairo skip themselves when it is absent
+      # (ubuntu-latest ships libcairo2, so they run here).
       # --no-sync: the environment was already synced above.
       run: uv run --no-sync pytest tests/ -v --tb=short
 

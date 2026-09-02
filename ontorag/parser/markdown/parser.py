@@ -40,6 +40,7 @@ matrix, whose one exception is DNS resolution.
 
 from __future__ import annotations
 
+import sys
 import base64
 import binascii
 import errno
@@ -260,20 +261,39 @@ def check_svg_rasterizer() -> str | None:
     warning. Never raises — :func:`_rasterize_svg` already degrades gracefully
     per image.
     """
+    # cairocffi dlopen()s libcairo when *imported*, so on a host with cairosvg
+    # pip-installed but no native library, ``import cairosvg`` itself raises
+    # OSError -- that is a missing-libcairo condition, not "not installed".
+    # Only a ModuleNotFoundError means the package is absent.
     try:
         import cairosvg
-    except Exception as exc:  # noqa: BLE001 - optional native dep
+    except ModuleNotFoundError as exc:
         logger.debug("[native_md] cairosvg import failed: %s", exc)
         return "cairosvg is not installed; SVG images will be skipped."
+    except Exception as exc:  # noqa: BLE001 - dlopen failure inside cairocffi
+        logger.debug("[native_md] cairosvg import failed: %s", exc)
+        return _missing_libcairo_message()
     try:
         cairosvg.svg2png(bytestring=_SVG_RASTERIZER_PROBE)
     except Exception as exc:  # noqa: BLE001 - missing libcairo or similar
         logger.debug("[native_md] cairosvg rasterization probe failed: %s", exc)
-        return (
-            "cairosvg is installed but the native libcairo library was not "
-            "found; SVG images will be skipped."
-        )
+        return _missing_libcairo_message()
     return None
+
+
+def _missing_libcairo_message() -> str:
+    msg = (
+        "cairosvg is installed but the native libcairo library was not "
+        "found; SVG images will be skipped."
+    )
+    if sys.platform == "darwin":
+        # Python's ctypes does not search the Homebrew prefix on Apple
+        # Silicon, so `brew install cairo` alone is not enough.
+        msg += (
+            " On macOS with Homebrew: brew install cairo, then export "
+            "DYLD_FALLBACK_LIBRARY_PATH=/opt/homebrew/lib."
+        )
+    return msg
 
 
 def _image_bytes_and_ext(
