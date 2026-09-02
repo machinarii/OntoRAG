@@ -67,15 +67,16 @@ Notes:
 
 | **Parameter** | **Type** | **Explanation** | **Default** |
 | -------------- | ---------- | ----------------- | ------------- |
-| **working_dir** | `str` | Directory where the cache will be stored | `ontorag_cache+timestamp` |
+| **working_dir** | `str` | Directory where the cache will be stored | `./rag_storage` |
 | **workspace** | str | Workspace name for data isolation between different OntoRAG Instances | |
 | **kv_storage** | `str` | Storage type for documents and text chunks. Supported types: `JsonKVStorage`,`PGKVStorage`,`RedisKVStorage`,`MongoKVStorage`,`OpenSearchKVStorage` | `JsonKVStorage` |
 | **vector_storage** | `str` | Storage type for embedding vectors. Supported types: `NanoVectorDBStorage`,`PGVectorStorage`,`MilvusVectorDBStorage`,`ChromaVectorDBStorage`,`FaissVectorDBStorage`,`MongoVectorDBStorage`,`QdrantVectorDBStorage`,`OpenSearchVectorDBStorage` | `NanoVectorDBStorage` |
-| **graph_storage** | `str` | Storage type for graph edges and nodes. Supported types: `NetworkXStorage`,`Neo4JStorage`,`PGGraphStorage`,`AGEStorage`,`OpenSearchGraphStorage` | `NetworkXStorage` |
+| **graph_storage** | `str` | Storage type for graph edges and nodes. Supported types: `NetworkXStorage`,`Neo4JStorage`,`PGGraphStorage`,`PGTableGraphStorage`,`AGEStorage`,`OpenSearchGraphStorage` | `NetworkXStorage` |
 | **doc_status_storage** | `str` | Storage type for documents process status. Supported types: `JsonDocStatusStorage`,`PGDocStatusStorage`,`MongoDocStatusStorage`,`OpenSearchDocStatusStorage` | `JsonDocStatusStorage` |
 | **chunk_token_size** | `int` | Maximum token size per chunk when splitting documents | `1200` |
 | **chunk_overlap_token_size** | `int` | Overlap token size between two chunks when splitting documents | `100` |
-| **tokenizer** | `Tokenizer` | The function used to convert text into tokens (numbers) and back using .encode() and .decode() functions following `TokenizerInterface` protocol. If you don't specify one, it will use the default Tiktoken tokenizer. | `TiktokenTokenizer` |
+| **embedding_chunk_overlap_token_size** | `int` | Overlap token size the embedding hard fallback borrows from the previous window when a chunk is still over the embedding model's context limit after chunking. Independent from `chunk_overlap_token_size` (some chunking strategies, e.g. V, deliberately zero that one out for unrelated reasons); `0` disables the fallback's overlap; negative values raise `ValueError` at construction. Configured by env var `EMBEDDING_CHUNK_OVERLAP_TOKEN_SIZE`. | `100` |
+| **tokenizer** | `Tokenizer` | The function used to convert text into tokens (numbers) and back using .encode() and .decode() functions following `TokenizerInterface` protocol. If you don't specify one, it will use the default Tiktoken tokenizer. An injected tokenizer must be safe to call concurrently from multiple threads and must survive `copy.deepcopy` — see [Injecting a custom tokenizer](#injecting-a-custom-tokenizer). | `TiktokenTokenizer` |
 | **tiktoken_model_name** | `str` | If you're using the default Tiktoken tokenizer, this is the name of the specific Tiktoken model to use. This setting is ignored if you provide your own tokenizer. | `gpt-4o-mini` |
 | **entity_extract_max_gleaning** | `int` | Number of loops in the entity extraction process, appending history messages | `1` |
 | **node_embedding_algorithm** | `str` | Algorithm for node embedding (currently not used) | `node2vec` |
@@ -84,16 +85,150 @@ Notes:
 | **embedding_batch_num** | `int` | Maximum batch size for embedding processes (multiple texts sent per batch) | `32` |
 | **embedding_func_max_async** | `int` | Maximum number of concurrent asynchronous embedding processes | `16` |
 | **llm_model_func** | `callable` | Function for LLM generation | `gpt_4o_mini_complete` |
-| **llm_model_name** | `str` | LLM model name for generation | `meta-llama/Llama-3.2-1B-Instruct` |
+| **llm_model_name** | `str` | LLM model name for generation | `gpt-4o-mini` |
 | **summary_context_size** | `int` | Maximum tokens send to LLM to generate summaries for entity relation merging | `10000`（configured by env var SUMMARY_CONTEXT_SIZE) |
 | **summary_max_tokens** | `int` | Maximum token size for entity/relation description | `500`（configured by env var SUMMARY_MAX_TOKENS) |
-| **llm_model_max_async** | `int` | Maximum number of concurrent asynchronous LLM processes | `4`（default value changed by env var MAX_ASYNC) |
+| **llm_model_max_async** | `int` | Base maximum LLM concurrency; also caps per-document chunk extraction tasks, while each entity/relation merge phase uses twice this task limit | `4`（default value changed by env var MAX_ASYNC_LLM; MAX_ASYNC is still accepted as a deprecated alias; `EXTRACT_MAX_ASYNC_LLM` can independently limit actual Extract-role requests) |
 | **llm_model_kwargs** | `dict` | Additional parameters for LLM generation | |
 | **vector_db_storage_cls_kwargs** | `dict` | Additional parameters for vector database, like setting the threshold for nodes and relations retrieval | cosine_better_than_threshold: 0.2（default value changed by env var COSINE_THRESHOLD) |
 | **enable_llm_cache** | `bool` | If `TRUE`, stores LLM results in cache; repeated prompts return cached responses | `TRUE` |
 | **enable_llm_cache_for_entity_extract** | `bool` | If `TRUE`, stores LLM results in cache for entity extraction; Good for beginners to debug your application | `TRUE` |
-| **addon_params** | `dict` | Runtime knobs for extraction. Supported keys: `language` (output language for entity/relation summaries), `entity_type_prompt_file` (file name — not a path — of a YAML profile loaded from `PROMPT_DIR/entity_type`; `PROMPT_DIR` defaults to `./prompts`), `entity_types_guidance` (inline override that wins over the file profile). | `{"language": "English", "entity_type_prompt_file": ""}` |
+| **addon_params** | `dict` | Runtime knobs for extraction prompts and chunking. See [addon_params](#addon_params). | Env-backed defaults from `SUMMARY_LANGUAGE`, `ENTITY_TYPE_PROMPT_FILE`, and `CHUNK_*` |
 | **embedding_cache_config** | `dict` | Configuration for question-answer caching. Contains three parameters: `enabled`: Boolean value to enable/disable cache lookup functionality. When enabled, the system will check cached responses before generating new answers. `similarity_threshold`: Float value (0-1), similarity threshold. When a new question's similarity with a cached question exceeds this threshold, the cached answer will be returned directly without calling the LLM. `use_llm_check`: Boolean value to enable/disable LLM similarity verification. When enabled, LLM will be used as a secondary check to verify the similarity between questions before returning cached answers. | Default: `{"enabled": False, "similarity_threshold": 0.95, "use_llm_check": False}` |
+
+
+## addon_params
+
+`addon_params` is a live configuration mapping on each `OntoRAG` instance. OntoRAG currently reads the fields below; unknown custom keys may remain in the dict, but core OntoRAG behavior does not use them.
+
+### Supported Fields
+
+| Field | Value | Purpose |
+|---|---|---|
+| `language` | Non-empty string. Defaults to `SUMMARY_LANGUAGE`, then `English`. | Output language used in entity and relationship extraction, entity/relation summaries, keyword extraction, and multimodal analysis prompts. |
+| `entity_type_prompt_file` | `.yml` or `.yaml` file name only. Loaded from `${PROMPT_DIR:-./prompts}/entity_type`. | Loads an entity extraction prompt profile. The profile can define `entity_types_guidance`, `entity_extraction_examples`, and `entity_extraction_json_examples`. The active extraction mode must have matching examples: text mode needs `entity_extraction_examples`; JSON mode needs `entity_extraction_json_examples`. |
+| `entity_types_guidance` | Non-empty string. | Inline entity type guidance injected into extraction prompts. This overrides both the prompt profile file and the built-in default guidance. |
+| `chunker` | Dict with F/R/V/P chunking settings (the `C` selector reuses the `fixed_token` sub-dictionary). | Runtime baseline for chunker parameters. Each document gets a slim `chunk_options` snapshot at enqueue time; later edits affect only future enqueues. |
+
+Compact `chunker` shape:
+
+```jsonc
+{
+  "chunk_token_size": 1200,
+  "fixed_token": {
+    "chunk_token_size": 1200,
+    "chunk_overlap_token_size": 100,
+    "split_by_character": null,
+    "split_by_character_only": false
+  },
+  "recursive_character": {
+    "chunk_token_size": 1200,
+    "chunk_overlap_token_size": 100,
+    "separators": ["\n\n", "\n", "。", "！", "？", "；", "，", " ", ""]
+  },
+  "semantic_vector": {
+    "chunk_token_size": 1200,
+    "breakpoint_threshold_type": "percentile",
+    "breakpoint_threshold_amount": null,
+    "buffer_size": 1,
+    // env/SDK only (CHUNK_V_SENTENCE_SPLIT_REGEX); the REST chunking.params
+    // object rejects this key with 422 — see GHSA-32jh-39m7-8x84 (ReDoS)
+    "sentence_split_regex": "(?<=[.?!])\\s+|(?<=[。？！])"
+  },
+  "paragraph_semantic": {
+    "chunk_token_size": 2000,
+    "chunk_overlap_token_size": 100
+  }
+}
+```
+
+### Initialization
+
+When you create a `OntoRAG` object, `addon_params` is normalized before storage initialization:
+
+- If `addon_params` is omitted, OntoRAG builds defaults from `SUMMARY_LANGUAGE`, `ENTITY_TYPE_PROMPT_FILE`, and the chunker-related `CHUNK_*` environment variables.
+- If you pass a partial dict, missing `language`, `entity_type_prompt_file`, and `chunker` values are still backfilled from the same env-backed defaults.
+- `entity_type_prompt_file` and `entity_types_guidance` are resolved into a cached entity extraction prompt profile during construction.
+- `chunk_token_size` and `chunk_overlap_token_size` constructor arguments are overlaid into `addon_params["chunker"]` only for slots that were not already set by explicit `addon_params` or strategy-specific env vars.
+
+Example:
+
+```python
+rag = OntoRAG(
+    working_dir=WORKING_DIR,
+    llm_model_func=llm_model_func,
+    embedding_func=embedding_func,
+    addon_params={
+        "language": "Chinese",
+        "entity_type_prompt_file": "entity_type_prompt.sample.yml",
+        "entity_types_guidance": "- Paper: academic papers, reports, and preprints",
+        "chunker": {
+            "chunk_token_size": 1000,
+            "recursive_character": {
+                "separators": ["\n\n", "\n", "。", "！", "？", " "]
+            }
+        },
+    },
+)
+await rag.initialize_storages()
+```
+
+### Updating After Creation
+
+`rag.addon_params` is an observable mapping. Top-level updates mark the derived prompt cache dirty; the cache is refreshed the next time OntoRAG builds runtime config for extraction or query work.
+
+Update one field:
+
+```python
+rag.addon_params["language"] = "Chinese"
+rag.addon_params["entity_types_guidance"] = "- Dataset: structured research data"
+```
+
+Replace the whole mapping:
+
+```python
+rag.addon_params = {
+    "language": "German",
+    "entity_type_prompt_file": "domain_profile.yml",
+}
+```
+
+Replacing `rag.addon_params` creates a new observable mapping. If you kept an old reference, discard it and re-read `rag.addon_params` before making more changes.
+
+Change F-strategy fixed-token splitting defaults for future documents:
+
+```python
+rag.addon_params["chunker"]["fixed_token"]["split_by_character"] = "\n\n"
+rag.addon_params["chunker"]["fixed_token"]["split_by_character_only"] = True
+```
+
+`split_by_character` pre-splits text by the given separator before token-window chunking. When `split_by_character_only` is `True`, an oversized segment raises an error instead of being split again by token size.
+
+Change R-strategy recursive splitting defaults for future documents:
+
+```python
+rag.addon_params["chunker"]["recursive_character"]["separators"] = [
+    "\n\n",
+    "\n",
+    "###",
+    "。",
+    "！",
+    "？",
+    " ",
+]
+```
+
+Nested `chunker` edits are read when future documents are enqueued. Documents already enqueued keep their persisted `chunk_options` snapshot.
+
+`semantic_vector.sentence_split_regex` is the one exception: it is re-read from `addon_params` (seeded by `CHUNK_V_SENTENCE_SPLIT_REGEX`) on **every** processing run, and any value inside a persisted `chunk_options` snapshot is discarded and logged at WARNING. This also applies to an explicit `chunk_options=` passed to `apipeline_enqueue_documents` — a per-document splitter pattern is not supported. The pattern is applied by `re.split` to the document body while CPython holds the GIL, so an untrusted one can freeze the whole worker process; see [GHSA-32jh-39m7-8x84](https://github.com/machinarii/OntoRAG/security/advisories/GHSA-32jh-39m7-8x84).
+
+### Notes and Precedence
+
+- Entity type guidance precedence is: `addon_params["entity_types_guidance"]` > `entity_type_prompt_file` profile > built-in default guidance.
+- Chunker precedence is: explicit `addon_params["chunker"]` values > strategy-specific `CHUNK_*` env vars > legacy constructor fields (`chunk_token_size`, `chunk_overlap_token_size`) > legacy env vars (`CHUNK_SIZE`, `CHUNK_OVERLAP_SIZE`).
+- Per-strategy `chunk_token_size`: every strategy reads `chunk_token_size` from its own sub-dict first and falls back to the top-level `chunk_token_size` when its sub-dict doesn't set one. F, R, and V can each seed their sub-dict value from a dedicated env var (`CHUNK_F_SIZE` / `CHUNK_R_SIZE` / `CHUNK_V_SIZE`) or set it explicitly in `addon_params`; when neither is set they inherit the top-level value.
+- `paragraph_semantic.chunk_token_size` is the exception: unlike F/R/V it never inherits the top-level `chunk_token_size`; if not explicit it uses `CHUNK_P_SIZE`, then the built-in default `2000`.
+- `enable_multimodal_pipeline` is deprecated and ignored if passed in `addon_params`. Use per-document `process_options` such as `i`, `t`, and `e` to control multimodal processing.
 
 
 ## QueryParam
@@ -104,7 +239,7 @@ Use `QueryParam` to control the behavior of your query:
 class QueryParam:
     """Configuration parameters for query execution in OntoRAG."""
 
-    mode: Literal["local", "global", "hybrid", "naive", "mix", "bypass"] = "global"
+    mode: Literal["local", "global", "hybrid", "naive", "mix", "bypass"] = "mix"
     """Specifies the retrieval mode:
     - "local": Focuses on context-dependent information.
     - "global": Utilizes global knowledge.
@@ -148,22 +283,14 @@ class QueryParam:
     Format: [{"role": "user/assistant", "content": "message"}].
     """
 
-    model_func: Callable[..., object] | None = None
-    """Deprecated optional override for the LLM model function.
-    Use role-specific LLM configuration at initialization or
-    await rag.aupdate_llm_role_config("query" | "keyword", ...) for runtime
-    LLM changes instead. Kept for backward compatibility with direct Python callers.
-
-    Note: when set, the LLM cache key collapses to a single "override" identity,
-    so swapping the override across calls will reuse stale cached responses.
-    Use aupdate_llm_role_config() for cache-correct model swaps.
-    """
-
     user_prompt: str | None = None
     """User-provided prompt for the query.
-    Addition instructions for LLM. If provided, this will be inject into the prompt template.
-    It's purpose is the let user customize the way LLM generate the response.
+    Additional instructions for LLM. If provided, this will be injected into the prompt template.
+    Its purpose is to let the user customize the way LLM generates the response.
     """
+
+    disable_user_prompt_prefix: bool = False
+    """If True, the server-side global prompt prefix is NOT prepended to `user_prompt`."""
 
     enable_rerank: bool = True
     """Enable reranking for retrieved text chunks. If True but no rerank model is configured, a warning will be issued.
@@ -348,9 +475,9 @@ async def initialize_rag():
 
 **Further reading:**
 - [LlamaIndex Documentation](https://developers.llamaindex.ai/python/framework/)
-- [Direct OpenAI Example](examples/unofficial-sample/ontorag_llamaindex_direct_demo.py)
-- [LiteLLM Proxy Example](examples/unofficial-sample/ontorag_llamaindex_litellm_demo.py)
-- [LiteLLM Proxy with Opik Example](examples/unofficial-sample/ontorag_llamaindex_litellm_opik_demo.py)
+- [Direct OpenAI Example](../examples/unofficial-sample/ontorag_llamaindex_direct_demo.py)
+- [LiteLLM Proxy Example](../examples/unofficial-sample/ontorag_llamaindex_litellm_demo.py)
+- [LiteLLM Proxy with Opik Example](../examples/unofficial-sample/ontorag_llamaindex_litellm_opik_demo.py)
 
 #### Using Azure OpenAI Models
 
@@ -445,9 +572,50 @@ To enhance retrieval quality, documents can be re-ranked based on a more effecti
 
 Inject one of these functions into the `rerank_model_func` attribute of the OntoRAG object. For detailed usage, refer to `examples/rerank_example.py`.
 
+### Injecting a Custom Tokenizer
+
+Any object with `encode(str) -> list[int]` and `decode(list[int]) -> str` can be
+wrapped in `Tokenizer` and passed as `tokenizer=`. Two requirements apply:
+
+1. **It must be safe to call concurrently from multiple threads.** Token counting
+   is CPU-bound, so OntoRAG runs it in worker threads to keep the asyncio event
+   loop responsive; several of them may enter your `encode`/`decode` at once.
+   OntoRAG deliberately does not serialize calls on your behalf — a lock owned
+   by OntoRAG would end up being waited on by the event loop behind a worker
+   thread, which is exactly the stall the threading is there to avoid.
+2. **It must survive `copy.deepcopy`.** `OntoRAG` is a dataclass and builds its
+   internal config with `dataclasses.asdict`, which deep-copies non-dataclass
+   fields.
+
+The two interact: if you achieve thread safety with an internal `threading.Lock`,
+deep-copying it raises `TypeError: cannot pickle '_thread.lock' object`. Declare
+`__deepcopy__` returning `self`, which is sound precisely because a thread-safe
+tokenizer is safe to share:
+
+```python
+class MyTokenizer:
+    def __init__(self):
+        self._lock = threading.Lock()
+
+    def __deepcopy__(self, memo):
+        return self  # thread-safe, therefore shareable
+
+    def encode(self, content: str) -> list[int]: ...
+    def decode(self, tokens: list[int]) -> str: ...
+
+rag = OntoRAG(..., tokenizer=Tokenizer("my-model", MyTokenizer()))
+```
+
+The built-in `TiktokenTokenizer` satisfies both. Note that copying it is not a
+way to get isolation: `tiktoken` caches encodings in a process-wide registry, so
+every `TiktokenTokenizer` for a given model — copies included — resolves to the
+same underlying BPE engine.
+
 ### User Prompt vs. Query
 
 When using OntoRAG for content queries, avoid combining the search process with unrelated output processing, as this significantly impacts query effectiveness. The `user_prompt` parameter in `QueryParam` does not participate in the RAG retrieval phase — it guides the LLM on how to process the retrieved results after the query is completed.
+
+"Does not participate in retrieval" means it does not influence *what* is found or *how* it is ranked: it is not used for keyword extraction, vector search, or reranking. It does still consume part of the token budget, because it genuinely occupies space in the final prompt alongside the retrieved context.
 
 ```python
 query_param = QueryParam(
@@ -461,6 +629,75 @@ response_default = rag.query(
 )
 print(response_default)
 ```
+
+### A Global User Prompt Prefix
+
+`user_prompt` is supplied per request, so it cannot express an output policy
+that should hold for every caller. `OntoRAG.user_prompt_prefix` is that policy:
+a server-side string prepended to each request's `user_prompt`.
+
+```python
+rag = OntoRAG(..., user_prompt_prefix="Answer in the language of the question.\n\n")
+```
+
+For the API server it comes from the environment instead — `USER_PROMPT_PREFIX`
+for a short value, or `USER_PROMPT_PREFIX_FILE` (a `.md`/`.txt` file name under
+`PROMPT_DIR/user_prompt`) when the text is long, multi-paragraph, or contains
+`${...}`, which python-dotenv would otherwise interpolate away.
+
+The two strings are concatenated **verbatim, with no separator inserted** — end
+the prefix with your own `\n\n` so it does not run into the caller's text. The
+prefix comes first because a model weights later instructions more heavily on
+conflict, so the per-request prompt wins.
+
+**An empty `user_prompt` does not disable the prefix.** When a request sends no
+`user_prompt` — `None`, `""`, or the field omitted entirely — the prefix alone
+becomes the instructions sent to the LLM. This is the common deployment: the
+operator sets one policy and callers send nothing.
+
+```python
+# All three send exactly "Answer in the language of the question." to the model.
+rag.query("...", param=QueryParam(mode="hybrid"))
+rag.query("...", param=QueryParam(mode="hybrid", user_prompt=None))
+rag.query("...", param=QueryParam(mode="hybrid", user_prompt=""))
+```
+
+This matters for the WebUI in particular, which ships `user_prompt: ""` as its
+default: leaving the box blank applies the operator's policy rather than
+clearing it. The `Additional Instructions` section falls back to `n/a` only when
+**both** the prefix and the request's `user_prompt` are empty.
+
+A request opts out with `disable_user_prompt_prefix` — the only way to suppress
+the prefix — which is what lets a front-end take full control of the final
+instruction text:
+
+```python
+QueryParam(user_prompt="...", disable_user_prompt_prefix=True)
+```
+
+The prefix is configuration, not request data: a request can decline it but can
+never read or replace it. Three limits are worth knowing:
+
+- **`bypass` mode ignores it**, as it ignores `user_prompt` entirely — empty or
+  not. That path has no `{user_prompt}` slot and its `system_prompt` argument
+  belongs to the caller, so this is not an exception to the rule above: bypass
+  simply sends no user instructions at all.
+- **`only_need_prompt=True` returns the composed prompt**, so any client that
+  can set that debug flag can read the prefix verbatim.
+- **`only_need_context` and `only_need_prompt` are charged for the prefix**, even
+  though `only_need_context` returns before any prompt is sent. These switches
+  preview the real request: if retrieval-only calls skipped the charge they
+  would report more chunks than a live query retrieves, and context sized
+  against that number would be truncated at answer time. `/query/data`
+  (`aquery_data`) is retrieval-only and follows the same rule.
+- **A custom `system_prompt` without a `{user_prompt}` placeholder drops it**,
+  the same way it already drops `user_prompt`. The token budget accounts for
+  this: the prefix is charged against the context allowance only when the
+  template that will actually be rendered has somewhere to put it.
+
+The prefix participates in the answer cache key, so editing it invalidates
+answers generated under the old one. With no prefix configured the key is
+unchanged, so existing cache entries keep hitting.
 
 
 ## Storage Backends
@@ -492,14 +729,22 @@ OpenSearchKVStorage  OpenSearch
 NetworkXStorage          NetworkX (default)
 Neo4JStorage             Neo4J
 PGGraphStorage           PostgreSQL with AGE plugin
+PGTableGraphStorage      PostgreSQL, plain tables (no AGE, no extensions)
 MemgraphStorage          Memgraph
 OpenSearchGraphStorage   OpenSearch
 ```
 
 > Testing has shown that Neo4J delivers superior performance in production environments compared to PostgreSQL with AGE plugin.
+>
+> `PGTableGraphStorage` implements the graph layer on ordinary indexed tables plus
+> JSONB, so it runs on any stock PostgreSQL 14+ — including managed instances
+> (RDS, Cloud SQL, Supabase, Neon) where the AGE extension cannot be installed.
+> It shares the same `POSTGRES_*` configuration and connection pool as the other
+> PG storages. Choose `PGGraphStorage` only if you specifically need AGE/Cypher.
 
 **VECTOR_STORAGE**
 ```
+NoopVectorDBStorage         Disabled (graph-only ingestion)
 NanoVectorDBStorage         NanoVector (default)
 PGVectorStorage             Postgres
 MilvusVectorDBStorage       Milvus
@@ -508,6 +753,79 @@ QdrantVectorDBStorage       Qdrant
 MongoVectorDBStorage        MongoDB
 OpenSearchVectorDBStorage   OpenSearch
 ```
+
+#### Graph-only ingestion
+
+`NoopVectorDBStorage` is intended for an initial or offline corpus backfill
+where the graph and KV stores are authoritative and vector indexes can be
+materialized once from the final state. It avoids embedding and persisting
+intermediate entity, relationship, and chunk revisions during ingestion.
+
+Do not use this workflow when newly inserted documents must become queryable
+immediately. Normal incremental ingestion should use the intended persistent
+vector backend from the beginning.
+
+Configure the backfill process with the no-op backend. `embedding_func=None` is
+supported when no other configured component requires embeddings:
+
+```python
+rag = OntoRAG(
+    working_dir=WORKING_DIR,
+    llm_model_func=llm_model_func,
+    embedding_func=None,
+    vector_storage="NoopVectorDBStorage",
+)
+```
+
+The backend accepts vector mutations without calling the embedding function or
+persisting vectors. Graph, full-document, text-chunk, LLM-cache, document-status,
+and graph-recovery writes continue normally.
+
+While `NoopVectorDBStorage` is active, only `bypass` queries are available.
+`local`, `global`, `hybrid`, `mix`, and `naive` modes require vector indexes and
+raise an error that points to `ontorag-rebuild-vdb`.
+
+If the semantic-vector (`V`) chunker is selected while `embedding_func=None`,
+it logs a warning and falls back to recursive-character chunking. Configure an
+embedding function during ingestion if semantic-vector chunk boundaries are
+required; this is separate from whether vectors are persisted.
+
+##### Switching to persistent vectors
+
+After the backfill, stop the server and all ingestion writers. Keep
+`WORKING_DIR`, `WORKSPACE`, graph storage, KV storage, and their connection
+settings unchanged. For example, switch from Noop to NanoVector with an OpenAI
+embedding model while pointing to the same graph and KV sources:
+
+```bash
+export WORKING_DIR=/data/ontorag/rag_storage
+export WORKSPACE=project_a
+export ONTORAG_GRAPH_STORAGE=NetworkXStorage
+export ONTORAG_KV_STORAGE=JsonKVStorage
+export ONTORAG_VECTOR_STORAGE=NanoVectorDBStorage
+export EMBEDDING_BINDING=openai
+export EMBEDDING_MODEL=text-embedding-3-small
+export EMBEDDING_DIM=1536
+
+ontorag-rebuild-vdb  # Select "Rebuild ALL vector storages"
+```
+
+Replace all example values with the backfill's actual storage settings and the
+production embedding model, dimension, host, and credentials. Backend-specific
+connection variables must remain available. If the same `.env` already contains
+these values, only the vector and embedding entries need to change. Run this in
+a new process or after a restart, then keep the persistent configuration for
+later queries and incremental ingestion.
+
+Rebuild cost and memory grow with the final graph and chunk data. If rebuilding
+fails or is interrupted, keep writers stopped and rerun it with the same
+configuration; the graph and KV sources remain unchanged. Start the server only
+after the tool reports a successful rebuild, for example with
+`ontorag-server`, because OntoRAG has no persisted vector-index readiness
+marker.
+
+See `ontorag/tools/README_REBUILD_VDB.md` for rebuild options and operational
+details.
 
 **DOC_STATUS_STORAGE**
 ```
@@ -551,10 +869,11 @@ See `test_neo4j.py` for a working example.
 
 #### Using PostgreSQL Storage
 
-PostgreSQL can provide a one-stop solution as KV store, VectorDB (pgvector), and GraphDB (apache AGE). PostgreSQL version 16.6 or higher is supported.
+PostgreSQL can provide a one-stop solution as KV store, VectorDB (pgvector), and GraphDB (`PGTableGraphStorage` on plain indexed tables, or `PGGraphStorage` on Apache AGE). PostgreSQL version 16.6 or higher is supported.
 
 - PostgreSQL is lightweight; the whole binary distribution including all necessary plugins can be zipped to 40MB: Ref to [Windows Release](https://github.com/ShanGor/apache-age-windows/releases/tag/PG17%2Fv1.5.0-rc0) as it is easy to install for Linux/Mac.
-- If you prefer Docker, start with this image to avoid hiccups (Default user password: rag/rag): https://hub.docker.com/r/gzdaniel/postgres-for-rag
+- If you prefer Docker and graph storage is `PGTableGraphStorage` (the recommended choice, which needs no Apache AGE), the official pgvector image `pgvector/pgvector:pg18` is all you need.
+- Only `PGGraphStorage` requires an AGE-bundled image; to avoid hiccups there, start with https://hub.docker.com/r/gzdaniel/postgres-for-rag (published for `linux/amd64` and `linux/arm64`). The latest image no longer ships hardcoded credentials; on first start it creates the user, password, and database from the `POSTGRES_USER` / `POSTGRES_PASSWORD` / `POSTGRES_DB` environment variables (these are set automatically when you deploy via the `scripts/setup/setup.sh` wizard, so you can pick any values).
 - How to start: see [examples/ontorag_gemini_postgres_demo.py](https://github.com/machinarii/OntoRAG/blob/main/examples/ontorag_gemini_postgres_demo.py)
 - For high-performance graph database requirements, Neo4j is recommended as Apache AGE's performance is not as competitive.
 
@@ -715,7 +1034,7 @@ curl -sk -u admin:<custom-admin-password> https://localhost:9200/_cat/plugins?v
 
 3. Run unit tests (no OpenSearch required — uses mocks):
 ```bash
-python -m pytest tests/test_opensearch_storage.py -v
+python -m pytest tests/kg/opensearch_impl/test_opensearch_storage.py -v
 ```
 
 4. Run the OpenSearch storage demo:
@@ -758,7 +1077,7 @@ The `workspace` parameter ensures data isolation between different OntoRAG insta
 | `JsonKVStorage`, `JsonDocStatusStorage`, `NetworkXStorage`, `NanoVectorDBStorage`, `FaissVectorDBStorage` | Workspace subdirectories |
 | `RedisKVStorage`, `MilvusVectorDBStorage`, `MongoKVStorage`, `MongoVectorDBStorage`, `MongoGraphStorage`, `PGGraphStorage` | Workspace prefix on collection name |
 | `QdrantVectorDBStorage` | Payload-based partitioning (Qdrant multitenancy) |
-| `PGKVStorage`, `PGVectorStorage`, `PGDocStatusStorage` | `workspace` field in tables |
+| `PGKVStorage`, `PGVectorStorage`, `PGDocStatusStorage`, `PGTableGraphStorage` | `workspace` field in tables |
 | `Neo4JStorage` | Labels |
 | `OpenSearch*` | Index name prefixes |
 
@@ -766,7 +1085,7 @@ The `workspace` parameter ensures data isolation between different OntoRAG insta
 
 Storage-specific workspace environment variables override the common `WORKSPACE` variable: `REDIS_WORKSPACE`, `MILVUS_WORKSPACE`, `QDRANT_WORKSPACE`, `MONGODB_WORKSPACE`, `POSTGRES_WORKSPACE`, `NEO4J_WORKSPACE`, `OPENSEARCH_WORKSPACE`.
 
-For a practical demonstration of managing multiple isolated knowledge bases, see [Workspace Demo](examples/ontorag_gemini_workspace_demo.py).
+For a practical demonstration of managing multiple isolated knowledge bases, see [Workspace Demo](../examples/ontorag_gemini_workspace_demo.py).
 
 
 ## Insert
@@ -792,7 +1111,7 @@ rag = OntoRAG(
 rag.insert(["TEXT1", "TEXT2", "TEXT3", ...])  # Processed in batches of 4
 ```
 
-The `max_parallel_insert` parameter determines the number of documents processed concurrently. Default is **2**. Recommended to keep **below 10**, as the bottleneck typically lies with the LLM.
+The `max_parallel_insert` parameter determines the number of documents processed concurrently. Default is **3**. Recommended to keep **below 10**, as the bottleneck typically lies with the LLM.
 
 * Insert with ID
 
@@ -863,7 +1182,8 @@ product = rag.create_entity("Gmail", {
 relation = rag.create_relation("Google", "Gmail", {
     "description": "Google develops and operates Gmail.",
     "keywords": "develops operates service",
-    "weight": 2.0
+    "source_id": "chunk-google-gmail",
+    "weight": 1.5
 })
 ```
 
@@ -889,6 +1209,62 @@ updated_relation = rag.edit_relation("Google", "Google Mail", {
     "weight": 3.0
 })
 ```
+
+Entity names supplied to `create_entity` and new names supplied during
+`edit_entity` renames use the same normalization rules as extracted entity
+names. When editing an existing entity, OntoRAG first preserves an exact
+legacy name match and otherwise falls back to the normalized name.
+`insert_custom_kg` applies the same rules to declared entity names and both
+endpoints of every relationship before writing any custom KG data.
+`merge_entities` resolves existing exact legacy source/target names first and
+otherwise uses normalized names. The target may be an existing entity or a
+new normalized name created by the merge.
+
+### Relation Weight Contract
+
+Relation `weight` has an evidence-count floor. Each distinct real ID in the
+`source_id` field contributes one unit of evidence, and a larger explicit
+weight is an optional importance boost:
+
+```text
+weight >= len(distinct real source IDs)
+```
+
+Multiple source IDs use the `<SEP>` separator. Empty values and the historical
+no-source placeholders `manual_creation` and `UNKNOWN` are not evidence. When
+a relation has no real source IDs, its evidence count is zero, so a
+non-negative fractional weight is valid. When creating a source-less relation,
+omit `source_id`; when editing an existing relation, set `source_id` to an
+empty string in the same edit that lowers the weight.
+
+`create_relation`, `edit_relation`, and `insert_custom_kg` validate this
+contract before writing graph or vector data; invalid Python API inputs raise
+`ValueError` and the REST graph API returns HTTP 400. Relation edits validate
+the complete post-edit shape, so `source_id` and `weight` can be changed
+together. Existing legacy relations are repaired upward when extraction adds
+evidence, an entity rename rewrites their endpoints, an unrelated relation edit
+rewrites the row, or a relation is rebuilt from surviving chunks (document
+purge, resume, and custom-chunk rollback). `ontorag-rebuild-vdb` is not such a
+repair point: it mirrors each graph edge into the vector storage field for
+field, copying the stored weight verbatim without touching the graph.
+
+A rebuild re-derives the relation from the extraction results cached for the
+surviving chunks, so — like the rebuilt description and keywords — the weight is
+recomputed rather than preserved: it becomes the summed fragment weights lifted
+to the surviving evidence count. Weight therefore follows evidence downward as a
+purge removes chunks, and an importance boost applied through `edit_relation`
+does not survive a rebuild that finds cached fragments. When no cached fragment
+survives, the rebuild keeps the stored weight.
+
+When entity merging redirects multiple relations onto the same endpoint, the
+result is:
+
+```text
+merged weight = max(all input weights, distinct merged real source IDs)
+```
+
+This preserves a larger manual boost while preventing the merged weight from
+falling below its evidence count.
 
 All operations are available in both synchronous and asynchronous versions. Async versions have the prefix "a" (e.g., `acreate_entity`, `aedit_relation`).
 
@@ -1076,7 +1452,8 @@ When merging entities:
 - Duplicate relationships are intelligently merged
 - Self-relationships (loops) are prevented
 - Source entities are removed after merging
-- Relationship weights and attributes are preserved
+- Relationship attributes are merged, and each resulting weight is the larger
+  of every input weight and the distinct merged real-source count
 
 
 ## Troubleshooting

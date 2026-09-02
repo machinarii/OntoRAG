@@ -8,10 +8,10 @@ Four roles are currently supported:
 
 | Role | Purpose |
 | --- | --- |
-| `EXTRACT` | Entity/relation extraction and entity/relation description summarization. |
-| `KEYWORD` | Query keyword extraction for high-level / low-level keyword generation before retrieval. |
-| `QUERY` | Final QA, regular queries, bypass queries, and the query path of the Ollama-compatible API. |
-| `VLM` | Multimodal analysis stage for VLM analysis of images, tables, formulas, and similar content. |
+| `EXTRACT` | The model used during the file insertion stage, mainly for complex entity/relation extraction and summarization. A fast model with thinking mode disabled and the ability to handle complex problems is recommended; a parameter size of 30B or above and a context length of at least 32KB are suggested. |
+| `KEYWORD` | Query-stage keyword extraction for high-level / low-level keyword generation before retrieval. An ultra-fast model with thinking mode disabled is recommended to improve query-stage response speed; a parameter size of 7B or above is suggested. |
+| `QUERY` | The query stage, used to produce the final answer to the question based on the recalled content. A high-quality model with thinking mode enabled is recommended; the stronger the model, the higher the answer quality. A parameter size of 30B or above and a context length of at least 32KB are suggested. |
+| `VLM` | Used during the file insertion stage to analyze images. A high-quality model with image recognition capability is required; a parameter size of 30B or above is suggested. |
 
 If a role has no dedicated configuration, OntoRAG uses the base `LLM_*` configuration.
 
@@ -26,10 +26,10 @@ LLM_BINDING_HOST=https://api.openai.com/v1
 LLM_BINDING_API_KEY=your_api_key
 
 # Default timeout for all LLM requests
-LLM_TIMEOUT=180
+LLM_TIMEOUT=240
 
-# Default maximum concurrency for all LLM calls
-MAX_ASYNC=4
+# Default maximum concurrency for all LLM calls (MAX_ASYNC is still accepted as a deprecated alias)
+MAX_ASYNC_LLM=4
 ```
 
 Common fields:
@@ -41,7 +41,13 @@ Common fields:
 | `LLM_BINDING_HOST` | Base provider endpoint. For SDK default endpoints, use the corresponding sentinel, such as `DEFAULT_GEMINI_ENDPOINT` or `DEFAULT_BEDROCK_ENDPOINT`. |
 | `LLM_BINDING_API_KEY` | Base API key. Bedrock does not use this field. |
 | `LLM_TIMEOUT` | Base LLM timeout. A role inherits it when no role timeout is set. |
-| `MAX_ASYNC` | Base maximum LLM concurrency. A role inherits it when `{ROLE}_MAX_ASYNC_LLM` is not set. |
+| `MAX_ASYNC_LLM` | Base maximum LLM concurrency. A role inherits it when `{ROLE}_MAX_ASYNC_LLM` is not set. `MAX_ASYNC` is still accepted as a deprecated alias. |
+
+### File-processing interaction
+
+`MAX_ASYNC_LLM` is also the base value used by the file-processing scheduler: for one document, chunk entity/relation extraction runs at most this many tasks concurrently, and each entity-merge or relation-merge phase runs at most twice this many tasks. These are pipeline task limits, not a replacement for role-level request limiting.
+
+The Extract role performs both chunk extraction and description summaries during graph merging. `EXTRACT_MAX_ASYNC_LLM`, when set, limits its actual LLM requests; otherwise it inherits `MAX_ASYNC_LLM`. Changing this role override does not change the scheduler's per-document task limits. See [File Processing Pipeline Specification](FileProcessingPipeline.md#86-pipeline-concurrency-parameters) for the complete worker topology.
 
 ## Role Override Variables
 
@@ -64,7 +70,7 @@ Variable format:
 | `{ROLE}_LLM_MODEL` | Overrides the role model name. |
 | `{ROLE}_LLM_BINDING_HOST` | Overrides the role endpoint. |
 | `{ROLE}_LLM_BINDING_API_KEY` | Overrides the role API key. Bedrock does not support it. |
-| `{ROLE}_MAX_ASYNC_LLM` | Overrides the role maximum concurrency. Inherits `MAX_ASYNC` when unset. |
+| `{ROLE}_MAX_ASYNC_LLM` | Overrides the role maximum concurrency. Inherits `MAX_ASYNC_LLM` when unset. |
 | `{ROLE}_LLM_TIMEOUT` | Overrides the role timeout. Inherits `LLM_TIMEOUT` when unset. |
 
 ## Provider Option Overrides
@@ -100,6 +106,10 @@ Common provider prefixes:
 | `bedrock` | `BEDROCK_LLM_*` | `EXTRACT_BEDROCK_LLM_MAX_TOKENS` |
 | `gemini` | `GEMINI_LLM_*` | `VLM_GEMINI_LLM_THINKING_CONFIG` |
 
+This guide covers the role prefix and the inheritance rules. For the `{FIELD}` half —
+every option each prefix accepts, its type, its value syntax, and what the provider
+driver does with it — see [LLM and Embedding Provider Options Reference](./LLMProviderOptions.md).
+
 ## Inheritance Rules
 
 ### Overrides Within the Same Provider
@@ -110,7 +120,7 @@ If a role does not set `{ROLE}_LLM_BINDING`, or sets it to the same value as the
 - Inherits `LLM_BINDING_HOST` when `{ROLE}_LLM_BINDING_HOST` is not set.
 - Inherits `LLM_BINDING_API_KEY` when `{ROLE}_LLM_BINDING_API_KEY` is not set.
 - Inherits `LLM_TIMEOUT` when `{ROLE}_LLM_TIMEOUT` is not set.
-- Inherits `MAX_ASYNC` when `{ROLE}_MAX_ASYNC_LLM` is not set.
+- Inherits `MAX_ASYNC_LLM` when `{ROLE}_MAX_ASYNC_LLM` is not set.
 - Provider options first inherit the base provider options, then apply role-specific provider options.
 
 Therefore, when you only want to change the model within the same provider, you only need to set the model name:
@@ -244,8 +254,8 @@ LLM_BINDING=openai
 LLM_MODEL=gpt-5-mini
 LLM_BINDING_HOST=https://api.openai.com/v1
 LLM_BINDING_API_KEY=your_extract_openai_api_key
-LLM_TIMEOUT=180
-MAX_ASYNC=4
+LLM_TIMEOUT=240
+MAX_ASYNC_LLM=4
 
 ###########################################################################
 # IMPORTANT:
@@ -293,7 +303,7 @@ KEYWORD_OPENAI_LLM_MAX_TOKENS=2048
 # Optional for Qwen-style models served by vLLM when you want to disable thinking.
 KEYWORD_OPENAI_LLM_EXTRA_BODY='{"chat_template_kwargs": {"enable_thinking": false}}'
 KEYWORD_MAX_ASYNC_LLM=4
-KEYWORD_LLM_TIMEOUT=180
+KEYWORD_LLM_TIMEOUT=60
 ```
 
 This pattern is not cross-provider because all three roles use the `openai` binding. OntoRAG passes each role's `*_LLM_BINDING_HOST` and `*_LLM_BINDING_API_KEY` to the OpenAI-compatible client separately.
@@ -374,3 +384,4 @@ Do not set `QUERY_LLM_BINDING_API_KEY`; Bedrock rejects that configuration.
 - Gemini Vertex AI mode is controlled by process-level Google environment variables. In the same OntoRAG process, some roles cannot use Vertex AI while others use AI Studio API keys.
 - In Docker/Compose, `LLM_BINDING_HOST` usually needs to use a container-reachable address such as `host.docker.internal`; role-level hosts follow the same principle.
 - Restart OntoRAG Server after modifying `.env`. Some IDE terminals preload `.env`, so opening a new terminal session is recommended to confirm that environment variables take effect.
+- A thinking-capable Ollama model can silently return empty entities/relations during extraction when its whole generation budget goes to hidden reasoning before any output (issue #3597). If that happens, set `EXTRACT_OLLAMA_LLM_THINK=false` (and `KEYWORD_OLLAMA_LLM_THINK=false` if keyword extraction is affected too). Besides `true`/`false`, this option accepts a reasoning level (`low`/`medium`/`high`, requires an Ollama server that supports levels). Leaving it unset follows the model's own default; an empty value (`OLLAMA_LLM_THINK=`) means `false`, not unset.

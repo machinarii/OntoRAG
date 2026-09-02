@@ -33,7 +33,7 @@ def _emit_deprecated_addon_warnings(params: Mapping[str, Any]) -> None:
             logger.warning(
                 f"addon_params['{key}'] is deprecated and ignored; per-document "
                 f"behaviour is now controlled by filename-hint process_options "
-                f"(see docs/FileProcessingConfiguration-zh.md)."
+                f"(see docs/FileProcessingPipeline.md)."
             )
             _warned_deprecated_keys.add(key)
 
@@ -42,7 +42,7 @@ def default_addon_params() -> dict[str, Any]:
     # Lazy import to avoid the parser_routing → utils → … cycle that
     # would otherwise form when parser_routing imports back into this
     # module via ``OntoRAG`` construction paths.
-    from ontorag.parser_routing import default_chunker_config
+    from ontorag.parser.routing import default_chunker_config
 
     return {
         "language": get_env_value("SUMMARY_LANGUAGE", DEFAULT_SUMMARY_LANGUAGE, str),
@@ -59,7 +59,7 @@ def default_addon_params() -> dict[str, Any]:
 
 def normalize_addon_params(addon_params: Mapping[str, Any] | None) -> dict[str, Any]:
     """Coerce ``addon_params`` to a plain dict with env defaults backfilled."""
-    from ontorag.parser_routing import default_chunker_config
+    from ontorag.parser.routing import default_chunker_config
 
     if addon_params is None:
         normalized = default_addon_params()
@@ -72,8 +72,7 @@ def normalize_addon_params(addon_params: Mapping[str, Any] | None) -> dict[str, 
         }
     else:
         raise TypeError(
-            "addon_params must be a Mapping or None, got "
-            f"{type(addon_params).__name__}"
+            f"addon_params must be a Mapping or None, got {type(addon_params).__name__}"
         )
 
     # When the caller supplies addon_params explicitly, the dataclass
@@ -86,12 +85,22 @@ def normalize_addon_params(addon_params: Mapping[str, Any] | None) -> dict[str, 
         "entity_type_prompt_file",
         get_env_value("ENTITY_TYPE_PROMPT_FILE", "", str),
     )
-    # Build the chunker default lazily — `default_chunker_config()` reads env
-    # vars (e.g. CHUNK_R_SEPARATORS via json.loads) and would raise on a
-    # malformed value, which would prevent an explicit caller-supplied
-    # `chunker` from bypassing a broken environment.
+    # Build the chunker default lazily. An explicit caller-supplied chunker
+    # bypasses the environment entirely, including a malformed environment
+    # value.
     if "chunker" not in normalized:
         normalized["chunker"] = default_chunker_config()
+    elif isinstance(normalized["chunker"], Mapping):
+        from ontorag.parser.routing import normalize_chunker_r_separators
+
+        # Copy semantics on purpose: this runs on a caller-supplied mapping
+        # (``OntoRAG(addon_params=...)``), which must not be mutated. The
+        # in-place mode belongs to the live config owned by the instance.
+        normalized_chunker, corrected = normalize_chunker_r_separators(
+            normalized["chunker"], context="addon_params['chunker']"
+        )
+        if corrected:
+            normalized["chunker"] = dict(normalized_chunker)
     return normalized
 
 

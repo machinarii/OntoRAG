@@ -67,6 +67,7 @@ DEFAULT_RUNTIME_TARGET="host"
 COMPOSE_ONTORAG_WORKING_DIR="/app/data/rag_storage"
 COMPOSE_ONTORAG_INPUT_DIR="/app/data/inputs"
 COMPOSE_ONTORAG_PROMPT_DIR="/app/data/prompts"
+COMPOSE_ONTORAG_UI_TEMPLATES_DIR="/app/data/ui_templates"
 # shellcheck disable=SC2034
 COLOR_RESET=""
 COLOR_BOLD=""
@@ -238,6 +239,33 @@ log_success() {
 
 log_step() {
   echo "${COLOR_BLUE}${COLOR_BOLD}$*${COLOR_RESET}"
+}
+
+# Return success when the given host binds to a loopback interface only.
+# An empty host means "use the server default" (0.0.0.0), i.e. not loopback.
+host_is_loopback() {
+  local host="${1:-}"
+  case "$host" in
+    localhost|127.0.0.1|::1|127.*) return 0 ;;
+  esac
+  return 1
+}
+
+# Print a suggestion (informational only — no logic change) when the server is
+# configured to bind to a non-loopback address without any authentication.
+warn_if_network_exposed_without_auth() {
+  local host="${ENV_VALUES[HOST]:-0.0.0.0}"
+
+  if host_is_loopback "$host"; then
+    return 0
+  fi
+  if [[ -n "${ENV_VALUES[AUTH_ACCOUNTS]:-}" || -n "${ENV_VALUES[ONTORAG_API_KEY]:-}" ]]; then
+    return 0
+  fi
+
+  log_warn "HOST=$host is reachable from the network but no authentication is configured."
+  echo "  Suggestion: set AUTH_ACCOUNTS (with TOKEN_SECRET) or ONTORAG_API_KEY before"
+  echo "  exposing the server, or bind to a loopback address (HOST=127.0.0.1)."
 }
 
 normalize_loopback_uri_for_compose() {
@@ -1118,9 +1146,9 @@ select_storage_backends() {
 
   while true; do
     kv_storage="$(prompt_choice "KV storage" "$kv_default" "${KV_STORAGE_OPTIONS[@]}")"
+    doc_storage="$(prompt_choice "Doc status storage" "$doc_default" "${DOC_STATUS_STORAGE_OPTIONS[@]}")"
     vector_storage="$(prompt_choice "Vector storage" "$vector_default" "${VECTOR_STORAGE_OPTIONS[@]}")"
     graph_storage="$(prompt_choice "Graph storage" "$graph_default" "${GRAPH_STORAGE_OPTIONS[@]}")"
-    doc_storage="$(prompt_choice "Doc status storage" "$doc_default" "${DOC_STATUS_STORAGE_OPTIONS[@]}")"
 
     if check_storage_compatibility "$kv_storage" "$vector_storage" "$graph_storage" "$doc_storage"; then
       break
@@ -1339,21 +1367,15 @@ collect_postgres_config() {
     set_compose_override "POSTGRES_PORT" ""
   fi
 
+  # The bundled postgres image creates its user/password/database from the
+  # POSTGRES_USER/POSTGRES_PASSWORD/POSTGRES_DB env vars on first start, so docker
+  # and host deployments share the same prompts and defaults (rag/rag/ontorag).
   existing_user="${ORIGINAL_ENV_VALUES[POSTGRES_USER]-${ENV_VALUES[POSTGRES_USER]:-}}"
   existing_password="${ORIGINAL_ENV_VALUES[POSTGRES_PASSWORD]-${ENV_VALUES[POSTGRES_PASSWORD]:-}}"
   existing_database="${ORIGINAL_ENV_VALUES[POSTGRES_DATABASE]-${ENV_VALUES[POSTGRES_DATABASE]:-}}"
-  if [[ "$use_docker" == "yes" && -z "$existing_user" && -z "$existing_password" ]]; then
-    user="rag"
-    password="rag"
-  else
-    user="$(prompt_with_default "PostgreSQL user" "${existing_user:-rag}")"
-    password="$(prompt_secret_with_default "PostgreSQL password: " "${existing_password:-rag}")"
-  fi
-  if [[ "$use_docker" == "yes" && -z "$existing_database" ]]; then
-    database="rag"
-  else
-    database="$(prompt_with_default "PostgreSQL database" "${existing_database:-ontorag}")"
-  fi
+  user="$(prompt_with_default "PostgreSQL user" "${existing_user:-rag}")"
+  password="$(prompt_secret_with_default "PostgreSQL password: " "${existing_password:-rag}")"
+  database="$(prompt_with_default "PostgreSQL database" "${existing_database:-ontorag}")"
 
   ENV_VALUES["POSTGRES_HOST"]="$host"
   ENV_VALUES["POSTGRES_PORT"]="$port"
@@ -1745,17 +1767,6 @@ clear_bedrock_credentials() {
   unset 'ENV_VALUES[AWS_REGION]'
 }
 
-bedrock_binding_in_use() {
-  [[ "${ENV_VALUES[LLM_BINDING]:-}" == "bedrock" ||
-    "${ENV_VALUES[EMBEDDING_BINDING]:-}" == "bedrock" ]]
-}
-
-clear_bedrock_credentials_if_unused() {
-  if ! bedrock_binding_in_use; then
-    clear_bedrock_credentials
-  fi
-}
-
 collect_bedrock_credentials() {
   local access_key secret_key session_token region
 
@@ -1939,7 +1950,15 @@ collect_llm_config() {
   ENV_VALUES["LLM_MODEL"]="$model"
   ENV_VALUES["LLM_BINDING_HOST"]="$host"
   store_optional_env_value "LLM_BINDING_API_KEY" "$api_key"
-  clear_bedrock_credentials_if_unused
+
+  # Role-specific LLM models — default to the base LLM_MODEL when unset in .env.
+  local keyword_default query_default keyword_model query_model
+  keyword_default="${ENV_VALUES[KEYWORD_LLM_MODEL]:-$model}"
+  query_default="${ENV_VALUES[QUERY_LLM_MODEL]:-$model}"
+  keyword_model="$(prompt_with_default "Keyword LLM model" "$keyword_default")"
+  query_model="$(prompt_with_default "Query LLM model" "$query_default")"
+  ENV_VALUES["KEYWORD_LLM_MODEL"]="$keyword_model"
+  ENV_VALUES["QUERY_LLM_MODEL"]="$query_model"
 }
 
 collect_embedding_config() {
@@ -2009,7 +2028,6 @@ collect_embedding_config() {
   ENV_VALUES["EMBEDDING_DIM"]="$dim"
   ENV_VALUES["EMBEDDING_BINDING_HOST"]="$host"
   store_optional_env_value "EMBEDDING_BINDING_API_KEY" "$api_key"
-  clear_bedrock_credentials_if_unused
   # User chose a remote provider — clear the Docker deployment marker.
   unset 'ENV_VALUES[ONTORAG_SETUP_EMBEDDING_PROVIDER]'
 }
@@ -2776,6 +2794,7 @@ env_server_flow() {
   echo ""
   log_step "Security configuration"
   collect_security_config "no" "no"
+  warn_if_network_exposed_without_auth
   echo ""
   log_step "SSL configuration"
   collect_ssl_config
@@ -3147,8 +3166,12 @@ security_check_env_file() {
   fi
 
   if [[ -z "$auth_accounts" && -z "$api_key" ]]; then
+    local no_auth_message="No API protection is configured."
+    if ! host_is_loopback "${ENV_VALUES[HOST]:-0.0.0.0}"; then
+      no_auth_message="No API protection is configured while HOST=${ENV_VALUES[HOST]:-0.0.0.0} is reachable from the network."
+    fi
     report_security_issue \
-      "No API protection is configured." \
+      "$no_auth_message" \
       "Set AUTH_ACCOUNTS and TOKEN_SECRET, add ONTORAG_API_KEY, or put the service behind a trusted reverse proxy."
     findings=$((findings + 1))
   fi

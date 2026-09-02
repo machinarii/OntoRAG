@@ -11,6 +11,7 @@ This document describes the **OntoRAG Sidecar** file format that content parsing
 | Table objects | `<doc>.tables.json` | Table objects extracted from the file | Sent to an LLM for analysis; analysis results are written back |
 | Equation objects | `<doc>.equations.json` | Equation objects extracted from the file | Sent to an LLM for analysis; analysis results are written back |
 | Original image assets | `<doc>.blocks.assets/` | Original image files extracted from the document | Sent to a VLM for image analysis |
+| Audit extension (optional) | `<doc>.smart_audit.json` | Smart-heading audit ledger + diverted `parse_warnings` | **Native DOCX smart-heading only** — not produced by other engines. Consumed by no pipeline stage; see [§10](#10-smart_auditjson-optional-native-docx) |
 
 Design intent of sidecars:
 
@@ -25,6 +26,7 @@ inputs/space1/__parsed__/<canonical filename>.parsed/
 ├── <canonical filename>.drawings.json       drawing sidecar (dict container, key = drawing id)
 ├── <canonical filename>.tables.json         table sidecar
 ├── <canonical filename>.equations.json      equation sidecar
+├── <canonical filename>.smart_audit.json    optional; native DOCX smart-heading audit only (see §10)
 └── <canonical filename>.blocks.assets/      original asset directory (image files referenced by drawings.json live here)
     ├── image1.wmf
     ├── image2.wmf
@@ -53,7 +55,6 @@ inputs/space1/__parsed__/<canonical filename>.parsed/
   "equation_file": true,
   "drawing_file": true,
   "asset_dir": true,
-  "split_option": { "fixlevel": 0 },
   "blocks": 39,
   "doc_id": "doc-f1bee60173d067d88595c00e7d9b0ce5",
   "parse_engine": "native",
@@ -72,12 +73,12 @@ inputs/space1/__parsed__/<canonical filename>.parsed/
 | `document_hash` | `"sha256:<hex>"` | Sidecar body fingerprint, defined as `SHA-256(merged_text)`, where `merged_text` is the concatenation of all non-empty content lines' `content` fields joined by `"\n\n"`. Used by external consumers to quickly determine whether two `.parsed/` directories share the same source (without line-by-line body comparison), and serves as a self-describing content checksum for the sidecar file. Note: the OntoRAG ingestion pipeline itself does not read this field; cross-document deduplication is handled separately by `doc_status.content_hash`. |
 | `table_file` / `equation_file` / `drawing_file` | `bool` | Whether the corresponding sidecar files exist (when true, the corresponding file must exist) |
 | `asset_dir` | `bool` | Whether the `blocks.assets` asset directory exists |
-| `split_option` | `object` | Chunking parameters used during file extraction. This field is reserved for the extraction engine itself to record and use |
+| `split_option` | `object` | Optional. Free-form metadata the parsing engine records about itself (e.g. `engine_version`, engine-specific extras). Omitted entirely when the engine recorded nothing (the common native/markdown case). Chunking is NOT performed at the parse stage — it is the downstream chunker's responsibility — so this field never carries chunking parameters. |
 | `blocks` | `int` | Number of content lines (excluding meta) |
 | `doc_id` | `"doc-<md5>"` | Global document ID. Sidecar item IDs (`im-/tb-/eq-`) use the hash portion of `doc_id` with the `doc-` prefix removed, in order to shorten the placeholder tags embedded in body text. |
 | `parse_engine` | `str` | Parsing engine `native/mineru/docling/legacy` |
 | `parse_time` | `str` | Parse completion time; format: ISO-8601 UTC |
-| `doc_title` | `str` | Document title (usually the first H1); optional |
+| `doc_title` | `str` | Document title (usually the first H1); optional. Under docx smart_heading it is the LLM-identified title-block main title, and an empty string when no title block was identified |
 | `doc_summary` | `str` | Document summary; optional |
 | `doc_attributes` | `object` | Document extended attributes object; optional |
 | `bbox_attributes` | `object` | Global bbox position attributes; see [§8](#8-positions) |
@@ -91,9 +92,9 @@ Each content line is the minimum addressable unit of an original document "block
 ```json
 {
   "type": "content",
-  "blockid": "462c6364584a7ba4bdae6853f85ac429",
+  "blockid": "652e5de55805d1d449b400c0d4a95ca8",
   "format": "plain_text",
-  "content": "1 Product Purpose and Functions\nThe MI012 module is used to support the oxygen-supply and anti-gravity control function of the oxygen-supply and anti-gravity regulator...",
+  "content": "# 1 Product Purpose and Functions\nThe MI012 module is used to support the oxygen-supply and anti-gravity control function of the oxygen-supply and anti-gravity regulator...",
   "heading": "1 Product Purpose and Functions",
   "parent_headings": [],
   "level": 1,
@@ -113,8 +114,8 @@ Each content line is the minimum addressable unit of an original document "block
 | `type` | `"content"` |
 | `blockid` | Globally unique Block ID |
 | `format` | Content form, currently fixed to `"plain_text"` |
-| `content` | Text content; **equations and images appear as placeholder tags here, tables appear as JSON or HTML wrapped in table tags** (see §3.3) |
-| `heading` | The top-most-level heading of the section containing this content. When `heading` is real, it should also appear at the beginning of `content`; if a heading is immediately followed by a heading at the next level, the next-level heading should be treated as body text. The goal is to ensure that concatenating the `content` fields of all blocks reconstructs the complete original text. |
+| `content` | Text content; **equations and images appear as placeholder tags here, tables appear as JSON or HTML wrapped in table tags** (see §3.3). The heading line is rendered with a markdown `#` prefix (plus a space) matching `level`: level 1 → one `#`, level 2 → two `#`, …, capped at 6 (a level ≥ 7 heading still renders `######`). If the source heading text already begins with a markdown prefix (1–6 `#` followed by a space), it is kept verbatim and not prefixed again. Note the `heading` field itself stays clean (no `#`). |
+| `heading` | The top-most-level heading of the section containing this content. When `heading` is real, it should also appear at the beginning of `content` as the markdown-rendered heading line. **Every recognized heading starts its own block**: if a heading is immediately followed by body text, that body is merged into the same block (content = markdown-rendered heading line + body); if a heading has no following body (e.g., it is immediately followed by a heading at the next level), it still becomes a standalone block whose content is just the markdown-rendered heading line. This ensures that concatenating the `content` fields of all blocks still reconstructs the complete original text without overlap. |
 | `parent_headings` | String array: the top-down list of ancestor headings, excluding the current `heading` |
 | `level` | Integer: the level of `heading` in the document outline (`1` = H1 / first-level heading; `0` means no heading) |
 | `session_type` | The region the block belongs to: `body` `preface` `TOC` `references` `appendix` |
@@ -132,7 +133,7 @@ To let the P chunking strategy split body text without breaking multimodal objec
 | Tag | Meaning | Tag attributes |
 |---|---|---|
 | `<table id="tb-…" format="json">…</table>` | Table placeholder; the body is the raw table JSON / HTML | `id` points to the corresponding item in `tables.json`; `format` ∈ `json` / `html` |
-| `<drawing id="im-…" format="png" path="…" src="…" caption="…" />` | Self-closing drawing placeholder | `id` points to `drawings.json`; `path` is relative to the `*.parsed/` directory; `src` is the reference name in the original document |
+| `<drawing id="im-…" format="png" path="…" src="…" caption="…" />` | Self-closing drawing placeholder | `id` points to `drawings.json`; `path` is relative to the `*.parsed/` directory — empty string `""` when the image bytes were not materialized (external link not downloaded / download failed); `src` is the original reference from the source document (remote URL, external link target) |
 | `<equation id="eq-…" format="latex" caption="…">…</equation>` | Equation placeholder | Inline equations also use `<equation format="latex">`, but **without** `id`, and are not written to the sidecar; only block equations (occupying one or more entire lines) carry an `id` |
 
 When the text is fed to the LLM during entity/relation extraction, internal attributes such as `id / path / src` are stripped, but key attributes (`format / caption`) are preserved. The goal is to avoid extracting entities that are invisible in the article and injecting too much noise into the extraction results.
@@ -142,7 +143,7 @@ When the text is fed to the LLM during entity/relation extraction, internal attr
 When a sidecar file exists, the chunking strategies attach `sidecar = {"type": "block", "id": <primary source blockid>, "refs": [{"type": "block", "id": <blockid>}, …]}` to each output chunk, where:
 
 - Unmerged chunk → `sidecar.refs` has only one element, equal to the `blockid` of the blocks.jsonl line the chunk came from;
-- Chunk merged in Stage D → `refs` preserves the order of all source `blockid`s (deduplicated);
+- Chunk merged in LevelMerge → `refs` preserves the order of all source `blockid`s (deduplicated);
 - Sub-chunks after hard fallback split → share the parent chunk's `sidecar`.
 
 This linkage is the basis for document-level traceability (chunk ↔ block ↔ original paragraph paraId).
@@ -156,6 +157,7 @@ The top level is a dict container of the form `{"version": "1.0", "drawings": { 
   "id": "im-f1bee60173d067d88595c00e7d9b0ce5-0004",
   "blockid": "2f52b70839d13a936d97955916820147",
   "heading": "2.3 Structural Dimensions and Weight",
+  "parent_headings": ["2 Product Description"],
   "format": "png",
   "path": "m012-manual.blocks.assets/image4.png",
   "src": "",
@@ -188,9 +190,10 @@ The top level is a dict container of the form `{"version": "1.0", "drawings": { 
 | `id` | Form `im-<doc_hash>-<NNNN>` (`doc_hash` is the 32-character md5 portion of `doc_id` with the `doc-` prefix removed) |
 | `blockid` | Points to the content line that produced this drawing |
 | `heading` | The section heading the drawing belongs to |
+| `parent_headings` | String array: the top-down list of ancestor headings, excluding the current `heading` (mirrors the `blocks.jsonl` field of the same name on the block this drawing belongs to) |
 | `format` | Original extension (no dot): `png` / `jpeg` / `gif` / `webp` / `wmf` / `emf` / … |
-| `path` | Resource path relative to the `*.parsed/` directory; **always** points to a file inside `*.blocks.assets/` |
-| `src` | The reference alias of the drawing in the original document (empty in most cases) |
+| `path` | Resource path relative to the `*.parsed/` directory; when non-empty it **always** points to a file inside `*.blocks.assets/`. Empty string `""` ⇒ the image bytes were not cached locally (external link not downloaded / download failed) |
+| `src` | The original reference of the drawing in the source document (remote URL, external link target); empty in most cases |
 | `caption` | Visible caption (the parser may leave it empty) |
 | `footnotes` | List of footnote strings |
 | `surrounding` | Context object: see [§7](#7-surrounding) |
@@ -219,6 +222,7 @@ The top level is a dict container of the form `{"version": "1.0", "tables": { <i
   "id": "tb-f1bee60173d067d88595c00e7d9b0ce5-0007",
   "blockid": "3f33897b5e105d254addc655f1efbf8c",
   "heading": "2.4.4 Temperature-Humidity-Altitude (run with the system)",
+  "parent_headings": ["2 Product Description", "2.4 Environmental Adaptability"],
   "dimension": [16, 8],
   "format": "json",
   "content": "[[\"Step\", \"Temperature (°C)\", \"Altitude (m)\", \"Relative humidity\", \"Time (min)\", \"Auxiliary cooling\", \"System power\", \"Functional/performance check\"],…",
@@ -242,7 +246,7 @@ The top level is a dict container of the form `{"version": "1.0", "tables": { <i
 }
 ```
 
-The `blockid` / `heading` / `surrounding` / `llm_analyze_result` fields of tables.json have the same meaning as in drawings.json. Different or newly added fields are described below:
+The `blockid` / `heading` / `parent_headings` / `surrounding` / `llm_analyze_result` fields of tables.json have the same meaning as in drawings.json. Different or newly added fields are described below:
 
 | Field | Description |
 |---|---|
@@ -264,6 +268,7 @@ The top level is a dict container of the form `{"version": "1.0", "equations": {
   "id": "eq-f1bee60173d067d88595c00e7d9b0ce5-0001",
   "blockid": "2f52b70839d13a936d97955916820147",
   "heading": "2.3 Structural Dimensions and Weight",
+  "parent_headings": ["2 Product Description"],
   "format": "latex",
   "content": "C=2∗\\frac{P∗T}{\\left( {V}_{H}^{2}−{V}_{L}^{2} \\right)∗η}",
   "caption": "",
@@ -286,7 +291,7 @@ The top level is a dict container of the form `{"version": "1.0", "equations": {
 }
 ```
 
-The `blockid` / `heading` / `surrounding` / `llm_analyze_result` fields of equations.json have the same meaning as in drawings.json. Different or newly added fields are described below:
+The `blockid` / `heading` / `parent_headings` / `surrounding` / `llm_analyze_result` fields of equations.json have the same meaning as in drawings.json. Different or newly added fields are described below:
 
 | Field | Description |
 |---|---|
@@ -397,3 +402,28 @@ Additional notes:
 - Items for enabled modalities are recomputed on each `analyze_multimodal` run, and the current run overwrites any prior `llm_analyze_result` (`success`, `skipped`, or `failure`). This allows operators to fix VLM/EXTRACT configuration and retry without manually clearing stale sidecar results. LLM calls still use the analysis cache: if the cache key matches, the provider is not called and semantic fields usually remain the same, though runtime fields such as `analyze_time` are rewritten. A cache miss, for example after changing the effective role model/binding/host, prompt inputs, or image metadata, can produce different saved content.
 
 Drawing `type` is constrained to a 12-value enum (see [`IMAGE_TYPE_ENUM`](../ontorag/prompt_multimodal.py): `Photo / Illustration / Screenshot / Icon / Chart / Table / Infographic / Flowchart / Chat Log / Wireframe / Texture / Other`); values returned by the model outside the enum are normalized to `Other` rather than failing.
+
+## 10. `smart_audit.json` (optional, native DOCX)
+
+An **optional** audit artifact written **only** by the built-in native DOCX engine when smart-heading is active. Other engines (markdown, mineru, docling, legacy) never produce it, so consumers must treat its absence as normal. No OntoRAG pipeline stage reads it — it exists purely for post-mortem inspection of the smart-heading decisions.
+
+It is written deterministically: `ensure_ascii=False, indent=2, sort_keys=True`, no timestamps, so re-parsing the same document (with the entity-extract cache on) yields a byte-identical file (the I4 determinism property).
+
+The file is a single JSON object. Its keys are the smart-heading audit ledger (breaker ledgers, `shadow_diff`, `fallback_sub_documents`, demotion/anchor records, … — internal diagnostics, subject to change) plus one well-known key:
+
+| Field | Type | Description |
+|---|---|---|
+| `parse_warnings` | `object` | The document's smart-heading warning counters (keys prefixed `smart_` / `title_block_`, e.g. `smart_cb1_tripped`, `smart_toc_removed_lines`, `smart_i4_cache_disabled`). These are **diverted here instead of `doc_status.metadata`**; non-smart warnings (`missing_paraid_count`, `heading_softbreak_split_count`, …) stay on doc_status. Absent when the run produced no smart-heading warnings. |
+
+Example:
+
+```json
+{
+  "fallback_sub_documents": [],
+  "parse_warnings": {
+    "smart_cb1_tripped": 2,
+    "smart_toc_removed_lines": 5
+  },
+  "shadow_diff": { }
+}
+```

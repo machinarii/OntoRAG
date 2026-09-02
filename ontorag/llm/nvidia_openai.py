@@ -1,5 +1,4 @@
 import sys
-import os
 
 if sys.version_info < (3, 9):
     pass
@@ -53,16 +52,21 @@ async def nvidia_openai_embed(
     trunc: str = "NONE",  # NONE or START or END
     encode: str = "float",  # float or base64
 ) -> np.ndarray:
+    client_kwargs = {}
+    if base_url is not None:
+        client_kwargs["base_url"] = base_url
     if api_key:
-        os.environ["OPENAI_API_KEY"] = api_key
+        client_kwargs["api_key"] = api_key
 
-    openai_async_client = (
-        AsyncOpenAI() if base_url is None else AsyncOpenAI(base_url=base_url)
-    )
-    response = await openai_async_client.embeddings.create(
-        model=model,
-        input=texts,
-        encoding_format=encode,
-        extra_body={"input_type": input_type, "truncate": trunc},
-    )
-    return np.array([dp.embedding for dp in response.data])
+    openai_async_client = AsyncOpenAI(**client_kwargs)
+    # Hold the client in an async-with so its httpx connection pool is
+    # released on every exit path (success, error, and each @retry attempt),
+    # instead of leaking one pool per call until GC. Mirrors ``openai_embed``.
+    async with openai_async_client:
+        response = await openai_async_client.embeddings.create(
+            model=model,
+            input=texts,
+            encoding_format=encode,
+            extra_body={"input_type": input_type, "truncate": trunc},
+        )
+        return np.array([dp.embedding for dp in response.data])

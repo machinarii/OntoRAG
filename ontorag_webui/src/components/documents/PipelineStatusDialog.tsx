@@ -73,12 +73,26 @@ export default function PipelineStatusDialog({
   useEffect(() => {
     if (!open) return
 
+    // The 2s cadence is shorter than the request timeout, so without these two
+    // guards a stalled backend would pile up one in-flight request and one
+    // error toast per tick.
+    let inFlight = false
+    let failureNotified = false
+
     const fetchStatus = async () => {
+      if (inFlight) return
+      inFlight = true
       try {
         const data = await getPipelineStatus()
         setStatus(data)
+        failureNotified = false
       } catch (err) {
-        toast.error(t('documentPanel.pipelineStatus.errors.fetchFailed', { error: errorMessage(err) }))
+        if (!failureNotified) {
+          failureNotified = true
+          toast.error(t('documentPanel.pipelineStatus.errors.fetchFailed', { error: errorMessage(err) }))
+        }
+      } finally {
+        inFlight = false
       }
     }
 
@@ -173,10 +187,6 @@ export default function PipelineStatusDialog({
               <div className="flex items-center gap-2">
                 <div className="text-sm font-medium">{t('documentPanel.pipelineStatus.busy')}:</div>
                 <div className={`h-2 w-2 rounded-full ${status?.busy ? 'bg-green-500' : 'bg-gray-300'}`} />
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="text-sm font-medium">{t('documentPanel.pipelineStatus.requestPending')}:</div>
-                <div className={`h-2 w-2 rounded-full ${status?.request_pending ? 'bg-green-500' : 'bg-gray-300'}`} />
               </div>
               {/* Only show cancellation status when it's requested */}
               {status?.cancellation_requested && (
