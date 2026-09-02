@@ -386,13 +386,6 @@ _DOC_STATUS_METADATA_CARRY_OVER_KEYS: tuple[str, ...] = (
     # deletion can purge them (delete_llm_cache=True).
     "smartheading_llm_cache_ids",
     "analyzing_start_time",
-    # Converter engines (pdf2md): the bundle became the document of record.
-    "source_file_original",
-    "bibliographic",
-    "doc_type",
-    "doc_scores",
-    "ocr",
-    "converter",
     "analyzing_end_time",
     "analyzing_stage_skipped",
     # Custom-chunk patch journal: the durable recovery anchor for an
@@ -416,6 +409,17 @@ _DOC_STATUS_METADATA_CARRY_OVER_KEYS: tuple[str, ...] = (
     # and since a repair deliberately keeps the row's content and status, that
     # row is a normal document the pipeline will happily transition.
     *DUPLICATE_DEMOTION_METADATA_KEYS,
+    # Converter engines (pdf2md) — NOT stage fields, so they sit after the
+    # stage groups. ``source_file_original`` is what lets a re-scan recognise
+    # the original of a document whose record now names the generated
+    # bundle; the rest is the catalog (bibliographic, doc_type, doc_scores,
+    # ocr provenance, converter versions) carried to every later status.
+    "source_file_original",
+    "bibliographic",
+    "doc_type",
+    "doc_scores",
+    "ocr",
+    "converter",
 )
 
 

@@ -422,6 +422,14 @@ def test_carry_over_keys_grouped_by_stage():
         "is_duplicate",
         "duplicate_kind",
         "original_doc_id",
+        # Converter engines (pdf2md) — non-stage tail: re-scan identity of the
+        # original plus the catalog fields.
+        "source_file_original",
+        "bibliographic",
+        "doc_type",
+        "doc_scores",
+        "ocr",
+        "converter",
     )
 
 
