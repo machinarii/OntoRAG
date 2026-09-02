@@ -468,3 +468,67 @@ def test_identity_unknown_keeps_both_the_file_and_the_row(tmp_path, monkeypatch)
         assert rag.process_calls == 1
 
     asyncio.run(_run())
+
+
+# ---------------------------------------------------------------------------
+# CONVERTED_SOURCE: a converter engine (pdf2md) already turned this file into
+# its <stem>.textpack document of record; the original stays in place.
+# ---------------------------------------------------------------------------
+
+
+def test_converted_original_is_skipped_without_archive():
+    doc_id = f"doc-{uuid4().hex}"
+    row = _row(
+        doc_id,
+        DocStatus.PROCESSED,
+        {"source_file": "book.textpack", "source_file_original": "book.pdf"},
+    )
+    doc_status = _ResolverDocStatus(
+        {
+            "book.pdf": SourceAbsent(),
+            "book.textpack": SourceUnique(doc_id=doc_id, doc=row),
+        },
+        rows={doc_id: row},
+    )
+    rag = SimpleNamespace(doc_status=doc_status, workspace="")
+    decision = asyncio.run(classify_scan_file(rag, Path("/in/book.pdf"), "book.pdf"))
+    assert decision.kind is _ScanFileClass.CONVERTED_SOURCE
+    assert decision.doc_id == doc_id
+
+
+def test_textpack_document_with_different_original_does_not_claim_this_file():
+    doc_id = f"doc-{uuid4().hex}"
+    row = _row(
+        doc_id,
+        DocStatus.PROCESSED,
+        {"source_file": "book.textpack", "source_file_original": "book.epub"},
+    )
+    doc_status = _ResolverDocStatus(
+        {
+            "book.pdf": SourceAbsent(),
+            "book.textpack": SourceUnique(doc_id=doc_id, doc=row),
+        },
+        rows={doc_id: row},
+    )
+    rag = SimpleNamespace(doc_status=doc_status, workspace="")
+    decision = asyncio.run(classify_scan_file(rag, Path("/in/book.pdf"), "book.pdf"))
+    assert decision.kind is _ScanFileClass.CLAIMED_NEW
+
+
+def test_failed_textpack_document_does_not_skip_the_original():
+    doc_id = f"doc-{uuid4().hex}"
+    row = _row(
+        doc_id,
+        DocStatus.FAILED,
+        {"source_file": "book.textpack", "source_file_original": "book.pdf"},
+    )
+    doc_status = _ResolverDocStatus(
+        {
+            "book.pdf": SourceAbsent(),
+            "book.textpack": SourceUnique(doc_id=doc_id, doc=row),
+        },
+        rows={doc_id: row},
+    )
+    rag = SimpleNamespace(doc_status=doc_status, workspace="")
+    decision = asyncio.run(classify_scan_file(rag, Path("/in/book.pdf"), "book.pdf"))
+    assert decision.kind is _ScanFileClass.CLAIMED_NEW
