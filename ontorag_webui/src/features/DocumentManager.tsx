@@ -18,6 +18,7 @@ import UploadDocumentsDialog from '@/components/documents/UploadDocumentsDialog'
 import ClearDocumentsDialog from '@/components/documents/ClearDocumentsDialog'
 import DeleteDocumentsDialog from '@/components/documents/DeleteDocumentsDialog'
 import PaginationControls from '@/components/ui/PaginationControls'
+import { bibliographicAuthors, bibliographicTitle } from './documentDisplayName'
 import {
   Dialog,
   DialogContent,
@@ -1686,13 +1687,18 @@ export default function DocumentManager() {
                                   <Tooltip>
                                     <TooltipTrigger asChild>
                                       <div className="truncate">
-                                        {getDisplayFileName(doc, 30)}
+                                        {bibliographicTitle(doc) ?? getDisplayFileName(doc, 30)}
                                       </div>
                                     </TooltipTrigger>
                                     <TooltipContent side="top" className="max-w-[min(42rem,calc(100vw-2rem))]">
                                       {doc.file_path}
                                     </TooltipContent>
                                   </Tooltip>
+                                  {bibliographicAuthors(doc) && (
+                                    <div className="text-xs text-gray-500 truncate">
+                                      {bibliographicAuthors(doc)}
+                                    </div>
+                                  )}
                                   <div className="text-xs text-gray-500">{doc.id}</div>
                                 </>
                               ) : (
