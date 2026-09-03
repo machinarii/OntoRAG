@@ -106,7 +106,7 @@ async def test_parse_image_only_pdf_runs_ocr_first(
 
     monkeypatch.setattr(p2m, "ocr_in_place", fake_ocr)
     monkeypatch.setattr(p2m, "convert_source", _fake_convert())
-    monkeypatch.setattr(p2m, "check_ocr_available", lambda: None)
+    monkeypatch.setattr(p2m, "check_ocr_available", lambda *a, **k: None)
     result = await Pdf2MdParser().parse(_ctx(_FakeRag(), image_pdf, "doc-2"))
     assert seen["source"] == image_pdf
     assert result.document_metadata["ocr"]["applied"] is True
@@ -121,7 +121,7 @@ async def test_parse_image_only_pdf_without_ocr_prereqs_fails_clearly(
     monkeypatch.setattr(
         p2m,
         "check_ocr_available",
-        lambda: "OCR for scanned PDFs is unavailable; missing: tesseract",
+        lambda *a, **k: "OCR for scanned PDFs is unavailable; missing: tesseract",
     )
     with pytest.raises(ValueError, match="missing: tesseract"):
         await Pdf2MdParser().parse(_ctx(_FakeRag(), image_pdf, "doc-3"))
@@ -166,3 +166,69 @@ async def test_real_conversion_of_synthesised_pdf(text_pdf: Path, archived):
     assert result.canonical_source == "book.textpack"
     blocks = Path(result.blocks_path).read_text(encoding="utf-8")
     assert "Body text of the page" in blocks
+
+
+async def test_ocr_skip_fails_document_with_reason(image_pdf: Path, monkeypatch):
+    """An encrypted/signed scan cannot be OCR'd and therefore cannot be
+    converted: the document fails with the skip reason, source untouched."""
+    original = image_pdf.read_bytes()
+
+    def fake_ocr(source, **kw):
+        raise p2m.OcrSkippedError(f"{source.name}: encrypted PDF; OCR not applied")
+
+    monkeypatch.setattr(p2m, "ocr_in_place", fake_ocr)
+    monkeypatch.setattr(p2m, "check_ocr_available", lambda *a, **k: None)
+    with pytest.raises(ValueError, match="encrypted PDF"):
+        await Pdf2MdParser().parse(_ctx(_FakeRag(), image_pdf, "doc-skip"))
+    assert image_pdf.read_bytes() == original
+
+
+def test_settings_from_env_reads_hardening_vars(monkeypatch):
+    for k, v in {
+        "PDF_OCR_MODE": "redo",
+        "PDF_OCR_ROTATE_PAGES": "false",
+        "PDF_OCR_ROTATE_PAGES_THRESHOLD": "5",
+        "PDF_OCR_CLEAN": "clean-final",
+        "PDF_OCR_OUTPUT_TYPE": "pdfa-2",
+        "PDF_OCR_MAX_IMAGE_MPIXELS": "64",
+        "PDF_OCR_IMAGE_DPI": "300",
+        "PDF_OCR_USER_ARGS": '["--tesseract-timeout", "60"]',
+    }.items():
+        monkeypatch.setenv(k, v)
+    s = p2m.Pdf2MdSettings.from_env()
+    assert s.ocr_mode == "redo"
+    assert s.ocr_rotate_pages is False and s.ocr_rotate_pages_threshold == 5
+    assert s.ocr_clean == "clean-final" and s.ocr_output_type == "pdfa-2"
+    assert s.ocr_max_image_mpixels == 64.0 and s.ocr_image_dpi == 300
+    assert s.ocr_user_args == ("--tesseract-timeout", "60")
+
+
+async def test_ocr_settings_are_forwarded_to_ocr_in_place(
+    image_pdf: Path, archived, monkeypatch
+):
+    seen = {}
+
+    def fake_ocr(source, **kw):
+        seen.update(kw)
+        make_text_pdf(source)
+        return p2m.OcrResult(
+            applied=True,
+            backup=source.parent / "__originals__" / source.name,
+            engine="tesseract",
+            languages="eng",
+            mode_used="redo",
+            output_type="pdfa-2",
+            retried=False,
+            sidecar_chars=12,
+        )
+
+    monkeypatch.setenv("PDF_OCR_MODE", "redo")
+    monkeypatch.setenv("PDF_OCR_OUTPUT_TYPE", "pdfa-2")
+    monkeypatch.setattr(p2m, "ocr_in_place", fake_ocr)
+    monkeypatch.setattr(p2m, "convert_source", _fake_convert())
+    monkeypatch.setattr(p2m, "check_ocr_available", lambda *a, **k: None)
+    result = await Pdf2MdParser().parse(_ctx(_FakeRag(), image_pdf, "doc-fwd"))
+    assert seen["mode"] == "redo" and seen["output_type"] == "pdfa-2"
+    ocr_meta = result.document_metadata["ocr"]
+    assert ocr_meta["mode"] == "redo" and ocr_meta["output_type"] == "pdfa-2"
+    assert ocr_meta["sidecar_chars"] == 12

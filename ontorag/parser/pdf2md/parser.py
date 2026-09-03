@@ -30,7 +30,14 @@ from ontorag.constants import (
 from ontorag.parser.base import BaseParser, ParseContext, ParseResult
 from ontorag.parser.pdf2md.census import pdf_text_layer_census
 from ontorag.parser.pdf2md.convert import Pdf2MdConversionError, convert_source
-from ontorag.parser.pdf2md.ocr import OcrError, OcrResult, ocr_in_place
+from ontorag.parser.pdf2md.ocr import (
+    OcrError,
+    OcrResult,
+    OcrSettings,
+    OcrSkippedError,
+    ocr_in_place,
+    parse_user_args,
+)
 from ontorag.parser.pdf2md.probe import check_ocr_available, check_soffice_available
 from ontorag.parser.pdf2md.textpack import (
     MANIFEST_NAME,
@@ -40,7 +47,7 @@ from ontorag.parser.pdf2md.textpack import (
 )
 from ontorag.utils import logger
 
-__all__ = ["Pdf2MdParser", "Pdf2MdSettings", "OcrResult"]
+__all__ = ["Pdf2MdParser", "Pdf2MdSettings", "OcrResult", "OcrSkippedError"]
 
 SUPPORTED_SUFFIXES = frozenset({".pdf", ".epub", ".docx", ".doc", ".odt", ".rtf"})
 _SOFFICE_SUFFIXES = frozenset({".doc", ".odt", ".rtf"})
@@ -52,6 +59,14 @@ class Pdf2MdSettings:
     ocr_languages: str = "eng"
     ocr_deskew: bool = True
     ocr_timeout: int = 1800
+    ocr_mode: str = "auto"
+    ocr_rotate_pages: bool = True
+    ocr_rotate_pages_threshold: int = 12
+    ocr_clean: str = "none"
+    ocr_output_type: str = "pdf"
+    ocr_max_image_mpixels: float | None = None
+    ocr_image_dpi: int | None = None
+    ocr_user_args: tuple[str, ...] = ()
     originals_dirname: str = "__originals__"
     soffice: str | None = None
     figure_dpi: int = 200
@@ -71,11 +86,34 @@ class Pdf2MdSettings:
             except ValueError:
                 return default
 
+        def _float_or_none(name: str) -> float | None:
+            raw = (os.getenv(name) or "").strip()
+            try:
+                return float(raw) if raw else None
+            except ValueError:
+                return None
+
+        def _int_or_none(name: str) -> int | None:
+            raw = (os.getenv(name) or "").strip()
+            try:
+                return int(raw) if raw else None
+            except ValueError:
+                return None
+
         return cls(
             ocr_engine=(os.getenv("PDF_OCR_ENGINE") or "").strip() or "tesseract",
             ocr_languages=(os.getenv("PDF_OCR_LANGUAGES") or "").strip() or "eng",
             ocr_deskew=_bool("PDF_OCR_DESKEW", True),
             ocr_timeout=_int("PDF_OCR_TIMEOUT", 1800),
+            ocr_mode=(os.getenv("PDF_OCR_MODE") or "").strip().lower() or "auto",
+            ocr_rotate_pages=_bool("PDF_OCR_ROTATE_PAGES", True),
+            ocr_rotate_pages_threshold=_int("PDF_OCR_ROTATE_PAGES_THRESHOLD", 12),
+            ocr_clean=(os.getenv("PDF_OCR_CLEAN") or "").strip().lower() or "none",
+            ocr_output_type=(os.getenv("PDF_OCR_OUTPUT_TYPE") or "").strip().lower()
+            or "pdf",
+            ocr_max_image_mpixels=_float_or_none("PDF_OCR_MAX_IMAGE_MPIXELS"),
+            ocr_image_dpi=_int_or_none("PDF_OCR_IMAGE_DPI"),
+            ocr_user_args=parse_user_args(os.getenv("PDF_OCR_USER_ARGS")),
             originals_dirname=(os.getenv("PDF2MD_ORIGINALS_DIRNAME") or "").strip()
             or "__originals__",
             soffice=(os.getenv("PDF2MD_SOFFICE") or "").strip() or None,
@@ -97,6 +135,23 @@ def _bundle_matches_source(bundle: Path, source: Path) -> bool:
 class Pdf2MdParser(BaseParser):
     engine_name = PARSER_ENGINE_PDF2MD
 
+    @staticmethod
+    def _ocr_settings(settings: Pdf2MdSettings) -> OcrSettings:
+        return OcrSettings(
+            engine=settings.ocr_engine,
+            languages=settings.ocr_languages,
+            deskew=settings.ocr_deskew,
+            timeout=settings.ocr_timeout,
+            mode=settings.ocr_mode,
+            rotate_pages=settings.ocr_rotate_pages,
+            rotate_pages_threshold=settings.ocr_rotate_pages_threshold,
+            clean=settings.ocr_clean,
+            output_type=settings.ocr_output_type,
+            max_image_mpixels=settings.ocr_max_image_mpixels,
+            image_dpi=settings.ocr_image_dpi,
+            user_args=settings.ocr_user_args,
+        )
+
     def _convert_to_bundle(
         self, source: Path, bundle: Path, settings: Pdf2MdSettings
     ) -> dict[str, Any]:
@@ -106,21 +161,34 @@ class Pdf2MdParser(BaseParser):
         ocr_info: dict[str, Any] | None = None
 
         if suffix == ".pdf" and pdf_text_layer_census(source).image_only:
-            problem = check_ocr_available()
+            ocr_settings = self._ocr_settings(settings)
+            problem = check_ocr_available(ocr_settings)
             if problem:
                 raise ValueError(f"{source.name}: image-only PDF and {problem}")
             result: OcrResult = ocr_in_place(
                 source,
                 originals_dirname=settings.originals_dirname,
-                engine=settings.ocr_engine,
-                languages=settings.ocr_languages,
-                deskew=settings.ocr_deskew,
-                timeout=settings.ocr_timeout,
+                engine=ocr_settings.engine,
+                languages=ocr_settings.languages,
+                deskew=ocr_settings.deskew,
+                timeout=ocr_settings.timeout,
+                mode=ocr_settings.mode,
+                rotate_pages=ocr_settings.rotate_pages,
+                rotate_pages_threshold=ocr_settings.rotate_pages_threshold,
+                clean=ocr_settings.clean,
+                output_type=ocr_settings.output_type,
+                max_image_mpixels=ocr_settings.max_image_mpixels,
+                image_dpi=ocr_settings.image_dpi,
+                user_args=ocr_settings.user_args,
             )
             ocr_info = {
                 "applied": result.applied,
                 "engine": result.engine,
                 "languages": result.languages,
+                "mode": result.mode_used,
+                "output_type": result.output_type,
+                "retried": result.retried,
+                "sidecar_chars": result.sidecar_chars,
                 "original_backup": f"{settings.originals_dirname}/{result.backup.name}",
             }
         if suffix in _SOFFICE_SUFFIXES:
