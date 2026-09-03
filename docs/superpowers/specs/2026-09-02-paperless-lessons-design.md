@@ -1,6 +1,6 @@
 # Lessons from paperless-ngx — design and plan
 
-**Status:** approved 2026-09-02 ("do 1 through 3 and save 4 for future"); executed on branch `sync/lightrag-1.5.7` right after the pdf2md intake.
+**Status:** implemented 2026-09-02 on branch `sync/lightrag-1.5.7` (§1 `5f4774f`, `e98ff4f`; §2 `8f50613`; §3 `763059f`, `e2973d5`, `c3e1823`). §4 deferred as listed.
 **Source reviewed:** [paperless-ngx](https://github.com/paperless-ngx/paperless-ngx) (`dev`, GPL-3.0). **Nothing is copied**; OntoRAG is MIT, so only designs and configuration surfaces are borrowed.
 
 ## 1. OCR stage hardening (`ontorag/parser/pdf2md/ocr.py`, `probe.py`, `parser.py`)

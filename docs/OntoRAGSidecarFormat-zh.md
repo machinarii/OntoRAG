@@ -471,7 +471,7 @@ charspan: 内容从标定段落的m个字符开始到底n个字符结束（可�
 | `source` | 生成该包所用文件的名称、格式和 SHA-256。只有该摘要与当前源文件字节一致时，引擎才会复用已有的包。 |
 | `bibliographic` | 只包含 pdf2md 实际找到的键；`year` 为整数，`isbn` 与 `arxiv` 保持字符串。 |
 | `doc_type` / `doc_scores` | pdf2md 的文档类型判定及其证据分数。 |
-| `ocr` | 带文字层的源文件为 `null`；否则为 `{"applied": true, "engine": "tesseract", "languages": "eng", "original_backup": "__originals__/book.pdf"}` —— OCR 前的原文件保存在源文件旁的该路径。 |
+| `ocr` | 带文字层的源文件为 `null`；否则为 `{"applied": true, "engine": "tesseract", "languages": "eng", "mode": "auto", "output_type": "pdf", "retried": false, "sidecar_chars": 12345, "original_backup": "__originals__/book.pdf"}` —— OCR 前的原文件保存在源文件旁的该路径；`mode`/`output_type` 是实际运行（含重试后）的取值，`sidecar_chars` 是 OCRmyPDF 识别出的文字长度。 |
 | `converter` | 内置 pdf2md 构建与 OntoRAG 的版本。 |
 
 同样的 `bibliographic` / `doc_type` / `doc_scores` / `ocr` / `converter` 值会在 PARSING 转换时镜像到 `doc_status.metadata`（另加 `source_file_original`，即入队时的文件名），因此数据库与归档包对文档的描述完全一致。手工制作、不含 `pdf2md.json` 的 `.textpack` 仍是 Markdown 引擎的合法输入，只是没有目录记录。
