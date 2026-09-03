@@ -79,6 +79,7 @@ from ontorag.exceptions import (
 from ontorag.constants import (
     PARSER_ENGINE_PDF2MD,
     DEFAULT_SCAN_ENQUEUE_BATCH_SIZE,
+    DEFAULT_SCAN_STABILITY_DELAY,
     FILE_EXTRACTION_SUMMARY_PREFIX,
     FULL_DOCS_FORMAT_PENDING_PARSE,
     MAX_R_SEPARATOR_CHARS,
@@ -3183,6 +3184,21 @@ async def classify_scan_file(
     )
 
 
+def _scan_stability_delay() -> float:
+    """Seconds a file must be unmodified before this scan consumes it.
+
+    ``0`` (the default) keeps the historical behaviour. Read per scan, like
+    the batch size; a rig without the field (older SimpleNamespace doubles)
+    gets the default rather than an AttributeError.
+    """
+    configured = getattr(
+        global_args, "scan_stability_delay", DEFAULT_SCAN_STABILITY_DELAY
+    )
+    if isinstance(configured, bool) or not isinstance(configured, (int, float)):
+        return DEFAULT_SCAN_STABILITY_DELAY
+    return max(0.0, float(configured))
+
+
 def _scan_enqueue_batch_size() -> int:
     """How many claimed files one streaming scan batch holds (LR2 §8.2).
 
@@ -3779,6 +3795,7 @@ async def run_scanning_process(
         # re-enqueued as new next time, but its preserved-for-review FAILED stub
         # is gone.
         batch_size = _scan_enqueue_batch_size()
+        stability_delay = _scan_stability_delay()
         discovered = 0
         enqueued_count = 0
         resumed_count = 0
@@ -3850,6 +3867,22 @@ async def run_scanning_process(
                 # rewriting it or hiding it in __parsed__. Being first also means
                 # no later exit ever formats the raw name into a warning, a job
                 # sample or a doc_status row.
+                # Stability delay (paperless-ngx CONSUMER_STABILITY_DELAY): a
+                # file modified within the last N seconds may still be being
+                # copied in. Defer it — no claim, no archive — so the next scan
+                # sees the finished file. Counted so the job report explains
+                # why a visible file was not consumed.
+                if stability_delay > 0:
+                    try:
+                        file_stat = await asyncio.to_thread(file_path.stat)
+                        age = time.time() - file_stat.st_mtime
+                    except OSError:
+                        age = None
+                    if age is not None and age < stability_delay:
+                        reporter.count("unstable")
+                        reporter.sample("unstable", filename)
+                        continue
+
                 unsafe_char = find_unsafe_document_source_character(filename)
                 if unsafe_char is not None:
                     unsafe_detail = (

@@ -40,6 +40,7 @@ from ontorag.constants import (
     DEFAULT_MAX_REQUEST_BODY_BYTES,
     DEFAULT_MAX_TEXTS_PER_REQUEST,
     DEFAULT_SCAN_ENQUEUE_BATCH_SIZE,
+    DEFAULT_SCAN_STABILITY_DELAY,
     DEFAULT_SUMMARY_MAX_TOKENS,
     DEFAULT_SUMMARY_LENGTH_RECOMMENDED,
     DEFAULT_SUMMARY_CONTEXT_SIZE,
@@ -199,6 +200,18 @@ def validate_scan_batch_configuration(args: argparse.Namespace) -> None:
         raise ValueError(
             "SCAN_ENQUEUE_BATCH_SIZE must be a positive integer (it bounds how "
             f"many discovered files one scan batch holds); got {batch_size!r}"
+        )
+
+
+def validate_scan_stability_delay(args: argparse.Namespace) -> None:
+    """Reject a negative ``SCAN_STABILITY_DELAY``; ``0`` disables the check."""
+    if not hasattr(args, "scan_stability_delay"):
+        return
+    delay = args.scan_stability_delay
+    if isinstance(delay, bool) or not isinstance(delay, (int, float)) or delay < 0:
+        raise ValueError(
+            "SCAN_STABILITY_DELAY must be a non-negative number of seconds "
+            f"(0 disables the stability check); got {delay!r}"
         )
 
 
@@ -657,6 +670,13 @@ def parse_args() -> argparse.Namespace:
         "SCAN_ENQUEUE_BATCH_SIZE", DEFAULT_SCAN_ENQUEUE_BATCH_SIZE, int
     )
 
+    # Seconds a file must be unmodified before /documents/scan consumes it
+    # (paperless-ngx's CONSUMER_STABILITY_DELAY). 0 disables the check;
+    # validated non-negative below.
+    args.scan_stability_delay = get_env_value(
+        "SCAN_STABILITY_DELAY", DEFAULT_SCAN_STABILITY_DELAY, float
+    )
+
     # Where /documents/scan puts its disposable candidate spool, which holds the
     # O(files-in-INPUT_DIR) ordering state that keeps scan memory bounded (LR2
     # §8.2). Empty → WORKING_DIR/scan_spool. Set this when WORKING_DIR is a
@@ -1042,6 +1062,7 @@ def initialize_config(args=None, force=False):
     validate_auth_configuration(resolved_args)
     validate_bedrock_auth_configuration(resolved_args)
     validate_scan_batch_configuration(resolved_args)
+    validate_scan_stability_delay(resolved_args)
     validate_admission_configuration(resolved_args)
     _global_args = resolved_args
     _initialized = True

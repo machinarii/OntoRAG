@@ -534,6 +534,9 @@ DEFAULT_PIPELINE_REQUIRE_STRICT_STORAGE_READS = False
 # value: a non-positive setting is a configuration error (an unbounded scan
 # batch is exactly what the streaming rework removes), so startup fails fast.
 DEFAULT_SCAN_ENQUEUE_BATCH_SIZE = 100
+# Seconds a file must be unmodified before /documents/scan consumes it
+# (0 = off). Guards a watched folder against ingesting a half-copied file.
+DEFAULT_SCAN_STABILITY_DELAY = 0.0
 
 # Admission capacity: how many documents may be active (PENDING / PARSING /
 # ANALYZING / PROCESSING) or reserved before new uploads / text inserts are
