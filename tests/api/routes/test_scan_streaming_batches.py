@@ -331,3 +331,72 @@ def test_batch_size_falls_back_when_unconfigured(monkeypatch):
 
     _batch_size(monkeypatch, 7)
     assert _document_routes._scan_enqueue_batch_size() == 7
+
+
+# ---------------------------------------------------------------------------
+# SCAN_STABILITY_DELAY (paperless-ngx CONSUMER_STABILITY_DELAY): a file still
+# being written is deferred to the next scan instead of consumed half-copied.
+# ---------------------------------------------------------------------------
+
+
+def _scan_settings(monkeypatch, *, batch_size: int = 10, stability_delay: float = 0.0):
+    monkeypatch.setattr(
+        _document_routes,
+        "global_args",
+        SimpleNamespace(
+            scan_enqueue_batch_size=batch_size, scan_stability_delay=stability_delay
+        ),
+    )
+
+
+def test_recently_modified_file_is_deferred_until_stable(tmp_path, monkeypatch):
+    async def _run():
+        rag = _StreamRag()
+        doc_manager = DocumentManager(str(tmp_path))
+        _scan_settings(monkeypatch, stability_delay=60.0)
+
+        stable = tmp_path / "stable.txt"
+        stable.write_text("old", encoding="utf-8")
+        os.utime(stable, (1_600_000_000, 1_600_000_000))
+        fresh = tmp_path / "fresh.txt"
+        fresh.write_text("still being copied", encoding="utf-8")  # mtime = now
+
+        doc_manager.iter_new_files = lambda: iter([stable, fresh])
+        flushed: list[str] = []
+
+        async def _capture_batch(_rag, candidates, _track_id):
+            flushed.extend(c.path.name for c in candidates)
+            return len(candidates)
+
+        monkeypatch.setattr(
+            _document_routes, "pipeline_enqueue_scan_batch", _capture_batch
+        )
+        await run_scanning_process(rag, doc_manager, "track-stability")
+
+        assert flushed == ["stable.txt"]
+        assert fresh.exists()  # not archived, not moved: next scan will see it
+
+    asyncio.run(_run())
+
+
+def test_zero_stability_delay_consumes_fresh_files(tmp_path, monkeypatch):
+    async def _run():
+        rag = _StreamRag()
+        doc_manager = DocumentManager(str(tmp_path))
+        _scan_settings(monkeypatch, stability_delay=0.0)
+        fresh = tmp_path / "fresh.txt"
+        fresh.write_text("x", encoding="utf-8")
+        doc_manager.iter_new_files = lambda: iter([fresh])
+        flushed: list[str] = []
+
+        async def _capture_batch(_rag, candidates, _track_id):
+            flushed.extend(c.path.name for c in candidates)
+            return len(candidates)
+
+        monkeypatch.setattr(
+            _document_routes, "pipeline_enqueue_scan_batch", _capture_batch
+        )
+        await run_scanning_process(rag, doc_manager, "track-nodelay")
+        assert flushed == ["fresh.txt"]
+
+    asyncio.run(_run())
