@@ -840,6 +840,7 @@ def display_splash_screen(args: argparse.Namespace) -> None:
 
     _warn_about_body_limits(args)
     _warn_about_svg_rasterizer()
+    _warn_about_pdf2md_ocr()
 
     # Ensure splash output flush to system log
     sys.stdout.flush()
@@ -884,6 +885,56 @@ def _warn_about_body_limits(args) -> None:
     request-body ceiling to derive and accepts a body of any size. Set
     MAX_UPLOAD_SIZE to the largest file you intend to accept.
     """)
+
+
+def _warn_about_pdf2md_ocr() -> None:
+    """Report pdf2md OCR misconfiguration once at startup (paperless-ngx style).
+
+    Only when the ``[pdf2md]`` extra is installed: binaries the configured
+    settings need, enum-valued settings, and Tesseract language packs. A
+    missing language pack would otherwise fail every scanned document with
+    the same OCRmyPDF error; here it is one line an operator can act on.
+    """
+    from ontorag.parser.pdf2md import probe
+
+    if not probe.check_pdf2md_available():
+        return
+    from ontorag.parser.pdf2md.ocr import OcrSettings
+    from ontorag.parser.pdf2md.parser import Pdf2MdSettings
+
+    try:
+        cfg = Pdf2MdSettings.from_env()
+    except ValueError as exc:
+        ASCIIColors.yellow("\n⚠️  pdf2md OCR Configuration Warning:")
+        ASCIIColors.white(f"    {exc}\n")
+        return
+    settings = OcrSettings(
+        engine=cfg.ocr_engine,
+        languages=cfg.ocr_languages,
+        deskew=cfg.ocr_deskew,
+        timeout=cfg.ocr_timeout,
+        mode=cfg.ocr_mode,
+        rotate_pages=cfg.ocr_rotate_pages,
+        rotate_pages_threshold=cfg.ocr_rotate_pages_threshold,
+        clean=cfg.ocr_clean,
+        output_type=cfg.ocr_output_type,
+        max_image_mpixels=cfg.ocr_max_image_mpixels,
+        image_dpi=cfg.ocr_image_dpi,
+        user_args=cfg.ocr_user_args,
+    )
+    problems = probe.validate_ocr_settings(settings)
+    for check in (
+        probe.check_ocr_available(settings),
+        probe.check_tesseract_languages(settings.languages),
+    ):
+        if check:
+            problems.append(check)
+    if not problems:
+        return
+    ASCIIColors.yellow("\n⚠️  pdf2md OCR Warning (scanned PDFs will fail until fixed):")
+    for problem in problems:
+        ASCIIColors.white(f"    - {problem}")
+    ASCIIColors.white("")
 
 
 def _warn_about_svg_rasterizer() -> None:
