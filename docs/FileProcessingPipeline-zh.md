@@ -520,6 +520,8 @@ ONTORAG_PARSER=pdf:mineru(language=en);*:legacy-R                       # 规则
 
 **扫描版（纯图片）PDF 会就地 OCR。** 当没有任何页面带文字层时，OntoRAG 先把原文件复制到 `<folder>/__originals__/<name>.pdf`（在文件旁创建；已存在的备份绝不会被覆盖），再用 OCRmyPDF 输出到临时文件，最后原子地把 `<folder>/<name>.pdf` 替换为可检索的 PDF —— 你的资料库被升级而不是被消耗。`PDF_OCR_ENGINE` 会传给 OCRmyPDF 的 `--ocr-engine`：默认 Tesseract，`ocrmypdf-appleocr`（macOS Vision）、`ocrmypdf-easyocr`（GPU）、`ocrmypdf-paddleocr` 等插件会注册各自的引擎名，因此换一个更好的识别器只是一次 `pip install` 加一个变量。`PDF_OCR_LANGUAGES`（逗号分隔的 Tesseract 语言代码）、`PDF_OCR_DESKEW`、`PDF_OCR_TIMEOUT` 用于调节。EPUB/DOCX/DOC 不需要 OCR。
 
+**OCR 模式与参数**（借鉴 paperless-ngx 的 OCRmyPDF 驱动）。`PDF_OCR_MODE`：`auto`（默认；只对无文字的页面 OCR，`--skip-text`）、`force`（全部栅格化重识别，`--force-ocr`）、`redo`（替换已有的或损坏的文字层，`--redo-ocr`；此时不再传 deskew，OCRmyPDF 禁止二者同用）。`PDF_OCR_ROTATE_PAGES` / `PDF_OCR_ROTATE_PAGES_THRESHOLD`（默认开 / 12）纠正旋转的扫描页；`PDF_OCR_CLEAN`（`none` / `clean` / `clean-final`，需要 `unpaper`）识别前去噪；`PDF_OCR_OUTPUT_TYPE`（默认 `pdf`，或 `pdfa`、`pdfa-1..3`）生成归档级 PDF/A，转换失败时自动回退一次到 `pdf`；`PDF_OCR_MAX_IMAGE_MPIXELS` 与 `PDF_OCR_IMAGE_DPI` 约束超大页面；`PDF_OCR_USER_ARGS`（JSON 数组或 shell 风格字符串）原样追加任意其他 OCRmyPDF 选项。总是请求 OCRmyPDF 的 `--sidecar` 文本，它是"OCR 确实产出了文字"的首要依据（页面普查为后备）。退出码策略，最多重试一次：`auto` 模式下发现已有文字层则改用 `force` 重试；**加密**或**数字签名**的 PDF 会被*跳过*（OCR 会被拒绝或使签名失效），文档以该原因失败，源文件不动；缺少工具时点名提示。服务启动时会一次性校验这些设置、所需工具以及 Tesseract 语言包（`tesseract --list-langs`）——缺少语言包只是一条警告，而不是每个文档都失败。
+
 **目录元数据。** `doc_status.metadata` 新增 `bibliographic`（`title`、`authors`、`year`、`publisher`、`edition`、`isbn`、`arxiv`、`language`，只包含 pdf2md 实际找到的键）、`doc_type`（`book` / `paper` / `deck` / `document`）及 `doc_scores`、`ocr`（`null`，或 `{applied, engine, languages, original_backup}`）以及 `converter` 版本。`/documents` 会返回它们；WebUI 的文档列表显示书目标题与作者。同一份记录也以 `pdf2md.json` 存放在包内（见 sidecar 格式说明），因此归档后的 `.textpack` 是自描述的。
 
 **失败行为。**
@@ -530,6 +532,8 @@ ONTORAG_PARSER=pdf:mineru(language=en);*:legacy-R                       # 规则
 | 纯图片 PDF，但缺少 `ocrmypdf` / `tesseract` / `gs` | 文档 FAILED，消息指明缺少什么；带文字层的 PDF 仍可转换。 |
 | OCRmyPDF 出错或超过 `PDF_OCR_TIMEOUT` | 删除临时输出，原文件不动（`__originals__/` 中的副本保留），FAILED 并附 OCRmyPDF 的消息；扫描重试会重新 OCR。 |
 | OCR 输出仍无文字层 | FAILED `OCR produced no text layer`；OCR 后的文件留在原处。 |
+| 加密或数字签名的扫描件 | 按策略跳过 OCR；以该原因 FAILED；源文件不动（签名的 PDF 不能被改写）。 |
+| PDF/A 转换失败 | 用 `--output-type pdf` 重试一次；仍失败则 FAILED。 |
 | DOC/ODT/RTF 但没有 LibreOffice | FAILED 并提示安装 LibreOffice。 |
 | pdf2md 拒绝或崩溃 | FAILED 并附其消息；工作目录之外不写任何东西。 |
 | 委托的 Markdown 解析失败 | 按 native 引擎的语义处理；`.textpack` 保留，重试时跳过转换。 |
@@ -943,6 +947,9 @@ __parsed__/<base>.docling_raw/
 - **`SCAN_SPOOL_DIR` 必须指向真实可写的本地磁盘。** 扫描期间的候选清单落在 `SCAN_SPOOL_DIR`，未设置时取 `WORKING_DIR/scan_spool`，两者都再按 workspace 分子目录。不要指向 tmpfs（很多 Linux 主机上 `/tmp` 是内存盘）；`WORKING_DIR` 本身是网络卷时应显式设置这个变量。目录不可用时扫描**直接失败且一条都不入队**，错误信息会点名该变量，输入文件原封不动，改完配置重扫不丢任何东西。
 
 ## 8. 运行控制：边跑边传、停止与重试
+
+**稳定延迟。** `SCAN_STABILITY_DELAY`（秒，默认 `0` = 关闭；借鉴 paperless-ngx 的消费器）让扫描*推迟*最近 N 秒内被修改过的文件——在扫描报告中计为 `unstable`，既不认领也不归档——因此正在拷入输入目录的文件绝不会被"半截"消费。下一次扫描会处理它。
+
 
 本章回答三个运行期问题：流水线跑起来之后还能不能继续上传、怎么把它停下来、以及文档失败之后该怎么重试。并发调优参数与请求准入限制放在本章末尾两节。
 

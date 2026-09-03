@@ -471,7 +471,7 @@ The `pdf2md` engine (see *FileProcessingPipeline* §3.8) converts PDF / EPUB / D
 | `source` | Name, format and SHA-256 of the file the bundle was built from. The engine reuses an existing bundle only while this digest matches the current source bytes. |
 | `bibliographic` | Only the keys pdf2md found; `year` is an integer, `isbn` and `arxiv` stay strings. |
 | `doc_type` / `doc_scores` | pdf2md's document-type classification and its evidence scores. |
-| `ocr` | `null` for text-layer sources; otherwise `{"applied": true, "engine": "tesseract", "languages": "eng", "original_backup": "__originals__/book.pdf"}` — the pre-OCR original lives at that path beside the source. |
+| `ocr` | `null` for text-layer sources; otherwise `{"applied": true, "engine": "tesseract", "languages": "eng", "mode": "auto", "output_type": "pdf", "retried": false, "sidecar_chars": 12345, "original_backup": "__originals__/book.pdf"}` — the pre-OCR original lives at that path beside the source; `mode`/`output_type` are what actually ran (after any retry), `sidecar_chars` the length of the text OCRmyPDF recognised. |
 | `converter` | Versions of the vendored pdf2md build and of OntoRAG. |
 
 The same `bibliographic` / `doc_type` / `doc_scores` / `ocr` / `converter` values are mirrored into `doc_status.metadata` (plus `source_file_original`, the enqueued file name) at the PARSING transition, so the database and the archived bundle describe the document identically. A hand-made `.textpack` without `pdf2md.json` is still a valid input for the Markdown engine; it simply carries no catalog record.

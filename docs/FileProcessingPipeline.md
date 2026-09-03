@@ -520,6 +520,8 @@ Each bundle records the engine version and the effective parameter signature in 
 
 **Scanned (image-only) PDFs are OCR'd in place.** When no page carries a text layer, OntoRAG copies the original to `<folder>/__originals__/<name>.pdf` (created beside the file; an existing backup is never overwritten), runs OCRmyPDF to a temporary file and atomically replaces `<folder>/<name>.pdf` with the searchable PDF — your library is upgraded, not consumed. `PDF_OCR_ENGINE` is passed to OCRmyPDF's `--ocr-engine`; Tesseract is the default, and the `ocrmypdf-appleocr` (macOS Vision), `ocrmypdf-easyocr` (GPU) and `ocrmypdf-paddleocr` plugins register their own engine names, so a better recogniser is a `pip install` plus one variable. `PDF_OCR_LANGUAGES` (comma-separated Tesseract codes), `PDF_OCR_DESKEW` and `PDF_OCR_TIMEOUT` tune the run. EPUB/DOCX/DOC never need OCR.
 
+**OCR modes and knobs** (borrowed from paperless-ngx's OCRmyPDF driver). `PDF_OCR_MODE`: `auto` (default; OCR only pages without text, `--skip-text`), `force` (rasterize everything, `--force-ocr`), `redo` (replace an existing or garbage text layer, `--redo-ocr`; deskew is dropped because OCRmyPDF forbids the pair). `PDF_OCR_ROTATE_PAGES` / `PDF_OCR_ROTATE_PAGES_THRESHOLD` (default on / 12) fix rotated scans; `PDF_OCR_CLEAN` (`none` / `clean` / `clean-final`, needs `unpaper`) de-speckles before recognition; `PDF_OCR_OUTPUT_TYPE` (`pdf` default, or `pdfa`, `pdfa-1..3`) produces archival PDF/A and falls back to plain `pdf` once if the conversion fails; `PDF_OCR_MAX_IMAGE_MPIXELS` and `PDF_OCR_IMAGE_DPI` bound huge pages; `PDF_OCR_USER_ARGS` (JSON array or shell-style string) appends any other OCRmyPDF option verbatim. OCRmyPDF's `--sidecar` text is always requested and is the primary proof that OCR produced text (the page census is the fallback). Exit-code policy, one retry at most: a text layer found in `auto` mode retries with `force`; an **encrypted** PDF or a **digitally signed** PDF is *skipped* (OCR would be refused or would invalidate the signature) and the document fails with that reason, source untouched; a missing tool is named. At startup the server validates these settings, the tools they need and the Tesseract language packs (`tesseract --list-langs`) once — a missing language pack is one warning, not one failure per document.
+
 **Catalog metadata.** `doc_status.metadata` gains `bibliographic` (`title`, `authors`, `year`, `publisher`, `edition`, `isbn`, `arxiv`, `language` — only the keys pdf2md found), `doc_type` (`book` / `paper` / `deck` / `document`) with `doc_scores`, `ocr` (`null`, or `{applied, engine, languages, original_backup}`) and `converter` versions. `/documents` returns them; the WebUI shows the bibliographic title and authors in the document list. The same record is stored inside the bundle as `pdf2md.json` (see the sidecar format guide), so an archived `.textpack` is self-describing.
 
 **Failure behaviour.**
@@ -530,6 +532,8 @@ Each bundle records the engine version and the effective parameter signature in 
 | Image-only PDF, but `ocrmypdf` / `tesseract` / `gs` missing | Document FAILED with the probe's message naming what is missing; text-layer PDFs still convert. |
 | OCRmyPDF error or `PDF_OCR_TIMEOUT` exceeded | Temporary output removed, original untouched (its `__originals__/` copy is kept), FAILED with OCRmyPDF's message; a scan retry re-runs OCR. |
 | OCR output still has no text layer | FAILED `OCR produced no text layer`; the OCR'd file stays in place. |
+| Encrypted or digitally signed scan | OCR skipped by policy; FAILED with the reason; source untouched (a signed PDF must not be rewritten). |
+| PDF/A conversion fails | One retry with `--output-type pdf`; then FAILED. |
 | DOC/ODT/RTF without LibreOffice | FAILED with the LibreOffice hint. |
 | pdf2md refuses or crashes | FAILED with its message; nothing written outside the work directory. |
 | Delegated Markdown parse fails | Native engine semantics; the `.textpack` stays so a retry skips conversion. |
@@ -943,6 +947,9 @@ Two operational notes:
 - **`SCAN_SPOOL_DIR` must point at real, writable local disk.** The candidate list built during a scan is stored under `SCAN_SPOOL_DIR`, falling back to `WORKING_DIR/scan_spool`, both further split per workspace. Do not point it at tmpfs (on many Linux hosts `/tmp` is RAM-backed); set it explicitly when `WORKING_DIR` itself is a network volume. If the directory is unusable the scan **fails outright and enqueues nothing**, and the error names the variable; input files are untouched, so nothing is lost by fixing the configuration and scanning again.
 
 ## 8. Operating the Pipeline: Uploading While It Runs, Stopping, Retrying
+
+**Stability delay.** `SCAN_STABILITY_DELAY` (seconds, default `0` = off; borrowed from paperless-ngx's consumer) makes a scan *defer* any file modified within the last N seconds — counted as `unstable` in the scan report, neither claimed nor archived — so a file still being copied into the input folder is never consumed half-written. The next scan picks it up.
+
 
 This chapter answers three runtime questions: whether you can keep uploading once the pipeline is running, how to stop it, and what to do after a document fails. Concurrency tuning and request admission limits close the chapter.
 
