@@ -24,4 +24,17 @@ DEFAULT_WORKING_VOCABULARY_SIZE = 200
 
 DEFAULT_CANDIDATE_COUNT = 20
 
+# Neighbour-label candidates (paperless-ngx lesson): how many similar
+# already-classified documents vote, and how their votes weigh against the
+# class-index similarity when merged.
+DEFAULT_NEIGHBOR_TOP_K = 15
+DEFAULT_NEIGHBOR_WEIGHT = 1.0
+
+# Free-form names the LLM suggests are reconciled to candidate labels with
+# difflib at this cutoff (one-to-one); the rest surface as ``unmatched_names``.
+DEFAULT_NAME_MATCH_CUTOFF = 0.8
+
+# A supervised prior confident above this probability skips the LLM call.
+DEFAULT_PRIOR_SKIP_THRESHOLD = 0.9
+
 LABEL_LANGUAGE = "en"
