@@ -6318,13 +6318,19 @@ async def process_chunks_unified(
     if not unique_chunks:
         return []
 
+    from ontorag.retrieval.runtime import select_diverse
+
     origin_count = len(unique_chunks)
+    if query_param.rerank_top_k:
+        unique_chunks = unique_chunks[: query_param.rerank_top_k]
 
     # 1. Apply reranking if enabled and query is provided
     if query_param.enable_rerank and query and unique_chunks:
         if progress_callback:
             await progress_callback("reranking")
-        rerank_top_k = query_param.chunk_top_k or len(unique_chunks)
+        rerank_top_k = (
+            query_param.rerank_top_k or query_param.chunk_top_k or len(unique_chunks)
+        )
         unique_chunks = await apply_rerank_if_enabled(
             query=query,
             retrieved_docs=unique_chunks,
@@ -6357,6 +6363,14 @@ async def process_chunks_unified(
                 )
             if not unique_chunks:
                 return []
+
+    if query_param.diversify_context:
+        unique_chunks = select_diverse(unique_chunks, query)
+    runtime = global_config.get("_retrieval_runtime")
+    if runtime and query_param.context_neighbors:
+        unique_chunks = await runtime.expand(
+            unique_chunks[: query_param.chunk_top_k or 20], query_param
+        )
 
     # 3. Apply chunk_top_k limiting if specified
     if query_param.chunk_top_k is not None and query_param.chunk_top_k > 0:
@@ -6944,6 +6958,19 @@ def convert_to_user_format(
             "file_path": chunk.get("file_path", "unknown_source"),
             "chunk_id": chunk.get("chunk_id", ""),
         }
+        for key in (
+            "full_doc_id",
+            "heading",
+            "sidecar",
+            "document_metadata",
+            "retrieval_sources",
+            "fusion_score",
+            "visual_matches",
+            "rerank_score",
+            "source_type",
+        ):
+            if key in chunk:
+                chunk_data[key] = chunk[key]
         formatted_chunks.append(chunk_data)
 
     logger.debug(
@@ -7056,6 +7083,10 @@ def render_chunks_context_text(chunks_with_reference_ids: list[dict]) -> str:
         }
         if chunk.get("content_headings"):
             entry["content_headings"] = chunk["content_headings"]
+        if chunk.get("document_metadata"):
+            entry["document_metadata"] = chunk["document_metadata"]
+        if chunk.get("visual_matches"):
+            entry["visual_matches"] = chunk["visual_matches"]
         chunks_context.append(entry)
     return "\n".join(
         json.dumps(text_unit, ensure_ascii=False) for text_unit in chunks_context

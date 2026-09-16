@@ -992,6 +992,19 @@ class OntoRAG(_RoleLLMMixin, _StorageMigrationMixin, _PipelineMixin):
     `QueryParam.disable_user_prompt_prefix`, but can never read or replace it.
     """
 
+    enable_lexical_index: bool = field(
+        default_factory=lambda: get_env_value("ENABLE_LEXICAL_INDEX", False, bool)
+    )
+    enable_contextual_embeddings: bool = field(
+        default_factory=lambda: get_env_value(
+            "ENABLE_CONTEXTUAL_EMBEDDINGS", False, bool
+        )
+    )
+
+    enable_visual_search: bool = field(
+        default_factory=lambda: get_env_value("ENABLE_VISUAL_SEARCH", False, bool)
+    )
+
     def _mark_addon_params_dirty(self) -> None:
         self._addon_params_dirty = True
 
@@ -1232,6 +1245,7 @@ class OntoRAG(_RoleLLMMixin, _StorageMigrationMixin, _PipelineMixin):
             )
             for spec in ROLES
         }
+        global_config["_retrieval_runtime"] = getattr(self, "_retrieval_runtime", None)
         return global_config
 
     def _build_role_llm_cache_identity(
@@ -1633,6 +1647,57 @@ class OntoRAG(_RoleLLMMixin, _StorageMigrationMixin, _PipelineMixin):
             enforce_strict_storage_capabilities(
                 self.doc_status,
                 require=bool(self.pipeline_require_strict_storage_reads),
+            )
+
+            from pathlib import Path
+            from ontorag.retrieval.index import (
+                LexicalIndex,
+                IndexedChunks,
+                ContextualVectors,
+            )
+            from ontorag.retrieval.runtime import RetrievalRuntime
+
+            index = None
+            if self.enable_lexical_index:
+                index = LexicalIndex(
+                    Path(self.working_dir) / self.workspace / "retrieval.sqlite3"
+                )
+                new_index = not index.path.exists()
+                await index.initialize()
+                if new_index:
+                    from ontorag.base import CURSOR_START
+
+                    page = await self.doc_status.get_docs_by_statuses_page(
+                        list(DocStatus), limit=1, position=CURSOR_START, strict=True
+                    )
+                    if page.docs:
+                        await index.set_ready(False)
+                self.text_chunks = IndexedChunks(self.text_chunks, index)
+            if self.enable_contextual_embeddings:
+                self.chunks_vdb = ContextualVectors(self.chunks_vdb)
+            if self.enable_visual_search:
+                from ontorag.visual.client import VisualClient
+                from ontorag.visual.index import VisualIndex
+                from ontorag.visual.runtime import VisualRuntime, VisualChunks
+                from ontorag.base import CURSOR_START
+
+                client = VisualClient()
+                visual_index = VisualIndex(
+                    Path(self.working_dir) / self.workspace / "visual.sqlite3"
+                )
+                new_visual_index = not visual_index.path.exists()
+                await visual_index.initialize()
+                if new_visual_index:
+                    page = await self.doc_status.get_docs_by_statuses_page(
+                        list(DocStatus), limit=1, position=CURSOR_START, strict=True
+                    )
+                    if page.docs:
+                        await visual_index.set_ready(False)
+                self._visual_runtime = VisualRuntime(self, visual_index, client)
+                self.text_chunks = VisualChunks(self.text_chunks, self._visual_runtime)
+            self._retrieval_runtime = RetrievalRuntime(self, index)
+            self.text_chunks.global_config["_retrieval_runtime"] = (
+                self._retrieval_runtime
             )
 
             self._storages_status = StoragesStatus.INITIALIZED
@@ -3431,6 +3496,10 @@ class OntoRAG(_RoleLLMMixin, _StorageMigrationMixin, _PipelineMixin):
         self, pipeline_status=None, pipeline_status_lock=None
     ) -> None:
         await self._flush_storages(self._index_storages())
+        runtime = getattr(self, "_retrieval_runtime", None)
+        if runtime and runtime.index:
+            # Invalidate across workers AFTER all vector writes become visible.
+            await runtime.index.touch()
 
         log_message = "In memory DB persist to disk"
         logger.info(log_message)
@@ -4115,24 +4184,12 @@ class OntoRAG(_RoleLLMMixin, _StorageMigrationMixin, _PipelineMixin):
         global_config = self._build_global_config()
 
         # Create a copy of param to avoid modifying the original
-        data_param = QueryParam(
-            mode=param.mode,
-            only_need_context=True,  # Skip LLM generation, only get context and data
-            only_need_prompt=False,
-            response_type=param.response_type,
-            stream=False,  # Data retrieval doesn't need streaming
-            top_k=param.top_k,
-            chunk_top_k=param.chunk_top_k,
-            max_entity_tokens=param.max_entity_tokens,
-            max_relation_tokens=param.max_relation_tokens,
-            max_total_tokens=param.max_total_tokens,
-            hl_keywords=param.hl_keywords,
-            ll_keywords=param.ll_keywords,
-            conversation_history=param.conversation_history,
-            user_prompt=param.user_prompt,
-            disable_user_prompt_prefix=param.disable_user_prompt_prefix,
-            enable_rerank=param.enable_rerank,
+        from ontorag.retrieval.runtime import prepare_query
+
+        data_param = replace(
+            param, only_need_context=True, only_need_prompt=False, stream=False
         )
+        data_param = await prepare_query(query, data_param, global_config)
 
         query_result = None
 
@@ -4240,6 +4297,9 @@ class OntoRAG(_RoleLLMMixin, _StorageMigrationMixin, _PipelineMixin):
         global_config = self._build_global_config()
 
         try:
+            from ontorag.retrieval.runtime import prepare_query
+
+            param = await prepare_query(query, param, global_config)
             query_result = None
 
             if param.mode in ["local", "global", "hybrid", "mix"]:
@@ -4336,6 +4396,35 @@ class OntoRAG(_RoleLLMMixin, _StorageMigrationMixin, _PipelineMixin):
                     },
                 }
 
+            verification = (
+                (query_result.raw_data or {})
+                .get("metadata", {})
+                .get("verification", {})
+            )
+            if (
+                param.retry_missing_evidence
+                and param.verify_answer
+                and verification.get("supported") is False
+                and not verification.get("conflicting")
+                and verification.get("missing_evidence")
+            ):
+                retry_param = replace(
+                    param,
+                    retry_missing_evidence=False,
+                    rewrite_followups=False,
+                    retrieval_top_k=min(
+                        1000, 2 * (param.retrieval_top_k or param.chunk_top_k or 20)
+                    ),
+                )
+                retry_param._retrieval_query = (
+                    query + " " + verification["missing_evidence"]
+                )
+                retried = await self.aquery_llm(
+                    query, retry_param, system_prompt, progress_callback
+                )
+                retried.setdefault("metadata", {})["retrieval_retries"] = 1
+                return retried
+
             # Extract structured data from query result
             raw_data = query_result.raw_data or {}
             raw_data["llm_response"] = {
@@ -4358,7 +4447,7 @@ class OntoRAG(_RoleLLMMixin, _StorageMigrationMixin, _PipelineMixin):
                 "status": "failure",
                 "message": f"Query failed: {str(e)}",
                 "data": {},
-                "metadata": {},
+                "metadata": {"failure_reason": "retrieval_error"},
                 "llm_response": {
                     "content": None,
                     "response_iterator": None,
@@ -4366,6 +4455,43 @@ class OntoRAG(_RoleLLMMixin, _StorageMigrationMixin, _PipelineMixin):
                     "llm_generated": False,
                 },
             }
+
+    async def arebuild_visual_index(self):
+        """Rebuild derived figure embeddings under an exclusive reservation."""
+        runtime = getattr(self, "_visual_runtime", None)
+        if runtime is None:
+            raise ValueError(
+                "ENABLE_VISUAL_SEARCH=true and initialized storages are required"
+            )
+        return await runtime.rebuild()
+
+    async def avisual_search(self, query: str, param: QueryParam):
+        """Retrieve figure-linked source passages without text search or generation."""
+        from ontorag.retrieval.runtime import validate_options
+
+        validate_options(param)
+        if not param.enable_visual:
+            raise ValueError("enable_visual=true is required")
+        if not query.strip() and not param.visual_references:
+            raise ValueError("Provide a visual text query or reference images")
+        runtime = getattr(self, "_visual_runtime", None)
+        if runtime is None:
+            raise ValueError(
+                "ENABLE_VISUAL_SEARCH=true and initialized storages are required"
+            )
+        return await runtime.search(query, param)
+
+    async def arebuild_retrieval_index(self):
+        """Rebuild the optional lexical index under the workspace reservation."""
+        from ontorag.retrieval.maintenance import rebuild_index
+
+        return await rebuild_index(self)
+
+    async def aset_document_retrieval_metadata(self, doc_id: str, metadata: dict):
+        """Replace explicit revision/date metadata used by retrieval filters."""
+        from ontorag.retrieval.maintenance import set_document_metadata
+
+        return await set_document_metadata(self, doc_id, metadata)
 
     def query_llm(
         self,
@@ -6022,6 +6148,9 @@ class OntoRAG(_RoleLLMMixin, _StorageMigrationMixin, _PipelineMixin):
                     # doc_status record is already gone so the retry finds no record and
                     # treats the document as already deleted rather than creating a zombie.
                     deletion_stage = "delete_doc_entries"
+                    runtime = getattr(self, "_retrieval_runtime", None)
+                    if runtime and runtime.index:
+                        await runtime.index.set_document_metadata(doc_id, {})
                     await self.doc_status.delete([doc_id])
                     await self.full_docs.delete([doc_id])
                 except Exception as e:
@@ -6220,6 +6349,9 @@ class OntoRAG(_RoleLLMMixin, _StorageMigrationMixin, _PipelineMixin):
             try:
                 deletion_stage = "delete_doc_entries"
                 in_final_delete_stage = True
+                runtime = getattr(self, "_retrieval_runtime", None)
+                if runtime and runtime.index:
+                    await runtime.index.set_document_metadata(doc_id, {})
                 await self.doc_status.delete([doc_id])
                 await self.full_docs.delete([doc_id])
             except Exception as e:
