@@ -3,6 +3,13 @@ from dataclasses import dataclass, field
 from functools import partial
 from pathlib import Path
 
+from ontorag.retrieval.runtime import (
+    evidence_fingerprint,
+    fuse_rankings,
+    gather_strict,
+    verified_model,
+)
+
 import asyncio
 import json
 import logging
@@ -4566,7 +4573,7 @@ async def extract_entities(
 # text filed under a history-blind key, and entries record no history, so a
 # tainted entry cannot be told apart from a clean one. Only the answer cache is
 # versioned; keyword/extract/summary entries never see conversation_history.
-_ANSWER_CACHE_POLICY_VERSION = "query-answer-cache-v2"
+_ANSWER_CACHE_POLICY_VERSION = "query-answer-cache-v3"
 
 
 def _answer_cache_kv(
@@ -4590,6 +4597,8 @@ def _answer_cache_kv(
     Keyword extraction is unaffected and keeps using ``hashing_kv`` directly: it
     derives keywords from the query text alone and never receives the history.
     """
+    if query_param.verify_answer:
+        return None
     if query_param.conversation_history:
         logger.debug(
             " == LLM cache == Query answer cache bypassed: conversation_history "
@@ -4652,10 +4661,11 @@ async def kg_query(
     )
     llm_cache_identity = get_llm_cache_identity(global_config, "query")
 
+    search_query = getattr(query_param, "_retrieval_query", query)
     if progress_callback:
         await progress_callback(QueryProgress.EXTRACTING_KEYWORDS)
     hl_keywords, ll_keywords = await get_keywords_from_query(
-        query, query_param, global_config, hashing_kv
+        search_query, query_param, global_config, hashing_kv
     )
 
     logger.debug(f"High-level keywords: {hl_keywords}")
@@ -4670,7 +4680,14 @@ async def kg_query(
         if len(query) < 50:
             logger.warning(f"Forced low_level_keywords to origin query: {query}")
             ll_keywords = [query]
-        else:
+        elif not (
+            query_param.mode == "mix"
+            or query_param.enable_lexical
+            or query_param.enable_visual
+            or query_param.document_version
+            or query_param.as_of
+            or query_param.exclude_superseded
+        ):
             return QueryResult(content=PROMPTS["fail_response"], llm_generated=False)
 
     ll_keywords_str = ", ".join(ll_keywords) if ll_keywords else ""
@@ -4678,7 +4695,7 @@ async def kg_query(
 
     # Build query context (unified interface)
     context_result = await _build_query_context(
-        query,
+        search_query,
         ll_keywords_str,
         hl_keywords_str,
         knowledge_graph_inst,
@@ -4734,6 +4751,21 @@ async def kg_query(
             llm_generated=False,
         )
 
+    verification = {}
+    use_model_func = verified_model(
+        use_model_func,
+        query_param,
+        verification,
+        reference_ids=[
+            ref["reference_id"]
+            for ref in context_result.raw_data.get("data", {}).get("references", [])
+        ],
+    )
+    if query_param.verify_answer:
+        context_result.raw_data.setdefault("metadata", {})["verification"] = (
+            verification
+        )
+
     # Call LLM
     tokenizer: Tokenizer = global_config["tokenizer"]
     # Guarded rather than unconditional: this whole block exists for a debug log,
@@ -4752,6 +4784,7 @@ async def kg_query(
     answer_cache_kv = _answer_cache_kv(query_param, hashing_kv)
     args_hash = compute_args_hash(
         _ANSWER_CACHE_POLICY_VERSION,
+        evidence_fingerprint(sys_prompt, query_param),
         query_param.mode,
         query,
         query_param.response_type,
@@ -4764,9 +4797,8 @@ async def kg_query(
         ll_keywords_str,
         # The COMPOSED instructions, so changing the server-side prefix
         # invalidates entries generated under the old one. With no prefix
-        # configured this is byte-identical to the previous
-        # `query_param.user_prompt or ""`, so existing entries keep hitting --
-        # which is why _ANSWER_CACHE_POLICY_VERSION does not need a bump.
+        # configured this component is unchanged. The evidence fingerprint
+        # and v3 policy intentionally invalidate pre-evidence entries.
         # `disable_user_prompt_prefix` is deliberately NOT a separate key
         # component: it only ever acts through this value, and adding it would
         # split the cache between two requests that build identical prompts.
@@ -4846,7 +4878,13 @@ async def kg_query(
                 .strip()
             )
 
-        return QueryResult(content=response, raw_data=context_result.raw_data)
+        return QueryResult(
+            content=response,
+            raw_data=context_result.raw_data,
+            llm_generated=not (
+                query_param.verify_answer and verification.get("supported") is False
+            ),
+        )
     else:
         # Streaming response (AsyncIterator)
         return QueryResult(
@@ -5109,6 +5147,7 @@ async def _get_vector_context(
     chunks_vdb: BaseVectorStorage,
     query_param: QueryParam,
     query_embedding: list[float] = None,
+    runtime=None,
 ) -> list[dict]:
     """
     Retrieve text chunks from the vector database without reranking or truncation.
@@ -5131,7 +5170,13 @@ async def _get_vector_context(
     # let a transient vector-store error surface as a confident "no results"
     # answer instead of a retrieval failure (and, in mix mode, silently
     # dropped the vector-search branch while KG results kept flowing).
-    search_top_k = query_param.chunk_top_k or query_param.top_k
+    if runtime is not None:
+        return await runtime.candidates(query, chunks_vdb, query_param, query_embedding)
+    if query_param.enable_lexical or query_param.enable_visual:
+        raise ValueError("Retrieval runtime is not initialized")
+    search_top_k = (
+        query_param.retrieval_top_k or query_param.chunk_top_k or query_param.top_k
+    )
     cosine_threshold = chunks_vdb.cosine_better_than_threshold
 
     results = await chunks_vdb.query(
@@ -5201,6 +5246,7 @@ async def _perform_kg_search(
         "kg_chunk_pick_method", DEFAULT_KG_CHUNK_PICK_METHOD
     )
 
+    runtime = text_chunks_db.global_config.get("_retrieval_runtime")
     actual_embedding_func = text_chunks_db.embedding_func
     query_embedding = None
     ll_embedding = None
@@ -5228,8 +5274,14 @@ async def _perform_kg_search(
 
         if texts_to_embed:
             try:
-                all_embeddings = await actual_embedding_func(
-                    texts_to_embed, context="query", _priority=DEFAULT_QUERY_PRIORITY
+                all_embeddings = (
+                    await runtime.embed(texts_to_embed, actual_embedding_func)
+                    if runtime
+                    else await actual_embedding_func(
+                        texts_to_embed,
+                        context="query",
+                        _priority=DEFAULT_QUERY_PRIORITY,
+                    )
                 )
                 for i, purpose in enumerate(text_purposes):
                     if purpose == "query":
@@ -5246,72 +5298,65 @@ async def _perform_kg_search(
             except Exception as e:
                 logger.warning(f"Failed to batch pre-compute embeddings: {e}")
 
-    # Handle local and global modes
-    if query_param.mode == "local" and len(ll_keywords) > 0:
-        if progress_callback:
-            await progress_callback(QueryProgress.RETRIEVING_ENTITIES)
-        local_entities, local_relations = await _get_node_data(
-            ll_keywords,
-            knowledge_graph_inst,
-            entities_vdb,
-            query_param,
-            query_embedding=ll_embedding,
-        )
-
-    elif query_param.mode == "global" and len(hl_keywords) > 0:
-        if progress_callback:
-            await progress_callback(QueryProgress.RETRIEVING_RELATIONS)
-        global_relations, global_entities = await _get_edge_data(
-            hl_keywords,
-            knowledge_graph_inst,
-            relationships_vdb,
-            query_param,
-            query_embedding=hl_embedding,
-        )
-
-    else:  # hybrid or mix mode
-        if len(ll_keywords) > 0:
-            if progress_callback:
-                await progress_callback(QueryProgress.RETRIEVING_ENTITIES)
-            local_entities, local_relations = await _get_node_data(
+    # Independent I/O branches share the batched embeddings. Join/cancel all
+    # siblings on failure so a failed branch is never mistaken for no evidence.
+    branches, names = [], []
+    filtered_request = bool(
+        query_param.document_version
+        or query_param.as_of
+        or query_param.exclude_superseded
+    )
+    if need_ll and not filtered_request:
+        names.append("local")
+        branches.append(
+            _get_node_data(
                 ll_keywords,
                 knowledge_graph_inst,
                 entities_vdb,
                 query_param,
                 query_embedding=ll_embedding,
             )
-        if len(hl_keywords) > 0:
-            if progress_callback:
-                await progress_callback(QueryProgress.RETRIEVING_RELATIONS)
-            global_relations, global_entities = await _get_edge_data(
+        )
+    if need_hl and not filtered_request:
+        names.append("global")
+        branches.append(
+            _get_edge_data(
                 hl_keywords,
                 knowledge_graph_inst,
                 relationships_vdb,
                 query_param,
                 query_embedding=hl_embedding,
             )
-
-        # Get vector chunks for mix mode
-        if query_param.mode == "mix" and chunks_vdb:
-            if progress_callback:
-                await progress_callback(QueryProgress.RETRIEVING_CHUNKS)
-            vector_chunks = await _get_vector_context(
-                query,
-                chunks_vdb,
-                query_param,
-                query_embedding,
+        )
+    if chunks_vdb and (
+        query_param.mode == "mix"
+        or query_param.enable_lexical
+        or query_param.enable_visual
+        or filtered_request
+    ):
+        names.append("chunks")
+        branches.append(
+            _get_vector_context(
+                query, chunks_vdb, query_param, query_embedding, runtime=runtime
             )
-            # Track vector chunks with source metadata
-            for i, chunk in enumerate(vector_chunks):
-                chunk_id = chunk.get("chunk_id") or chunk.get("id")
-                if chunk_id:
-                    chunk_tracking[chunk_id] = {
-                        "source": "C",
-                        "frequency": 1,  # Vector chunks always have frequency 1
-                        "order": i + 1,  # 1-based order in vector search results
-                    }
-                else:
-                    logger.warning(f"Vector chunk missing chunk_id: {chunk}")
+        )
+    if progress_callback:
+        await progress_callback(
+            QueryProgress.RETRIEVING_CHUNKS
+            if "chunks" in names
+            else QueryProgress.RETRIEVING_ENTITIES
+        )
+    for name, result in zip(names, await gather_strict(*branches)):
+        if name == "local":
+            local_entities, local_relations = result
+        elif name == "global":
+            global_relations, global_entities = result
+        else:
+            vector_chunks = result
+    for i, chunk in enumerate(vector_chunks):
+        key = chunk.get("chunk_id") or chunk.get("id")
+        if key:
+            chunk_tracking[key] = {"source": "C", "frequency": 1, "order": i + 1}
 
     # Round-robin merge entities
     final_entities = []
@@ -5658,6 +5703,7 @@ async def _merge_all_chunks(
                 seen_chunk_ids.add(chunk_id)
                 merged_chunks.append(
                     {
+                        **chunk,
                         "content": chunk["content"],
                         "file_path": chunk.get("file_path", "unknown_source"),
                         "chunk_id": chunk_id,
@@ -5672,6 +5718,7 @@ async def _merge_all_chunks(
                 seen_chunk_ids.add(chunk_id)
                 merged_chunks.append(
                     {
+                        **chunk,
                         "content": chunk["content"],
                         "file_path": chunk.get("file_path", "unknown_source"),
                         "chunk_id": chunk_id,
@@ -5686,6 +5733,7 @@ async def _merge_all_chunks(
                 seen_chunk_ids.add(chunk_id)
                 merged_chunks.append(
                     {
+                        **chunk,
                         "content": chunk["content"],
                         "file_path": chunk.get("file_path", "unknown_source"),
                         "chunk_id": chunk_id,
@@ -5695,6 +5743,18 @@ async def _merge_all_chunks(
     logger.info(
         f"Round-robin merged chunks: {origin_len} -> {len(merged_chunks)} (deduplicated {origin_len - len(merged_chunks)})"
     )
+
+    if query_param and (query_param.fuse_retrieval or query_param.enable_lexical):
+        merged_chunks = fuse_rankings(vector_chunks, entity_chunks, relation_chunks)
+    runtime = (
+        text_chunks_db.global_config.get("_retrieval_runtime")
+        if text_chunks_db
+        else None
+    )
+    if runtime:
+        merged_chunks = await runtime.filter_chunks(
+            await runtime.hydrate(merged_chunks), query_param
+        )
 
     # Backfill heading path before token truncation so it counts toward the budget
     if text_chunks_db and text_chunks_db.global_config.get(
@@ -5946,11 +6006,21 @@ async def _build_query_context(
     )
 
     if not search_result["final_entities"] and not search_result["final_relations"]:
-        if query_param.mode != "mix":
+        if query_param.mode != "mix" and not search_result["vector_chunks"]:
             return None
         else:
             if not search_result["chunk_tracking"]:
                 return None
+
+    runtime = text_chunks_db.global_config.get("_retrieval_runtime")
+    if runtime:
+        (
+            search_result["final_entities"],
+            search_result["final_relations"],
+        ) = await gather_strict(
+            runtime.attribution(search_result["final_entities"]),
+            runtime.attribution(search_result["final_relations"], relation=True),
+        )
 
     # Stage 2: Apply token truncation for LLM efficiency
     truncation_result = await _apply_token_truncation(
@@ -6675,7 +6745,11 @@ async def naive_query(
 
     if progress_callback:
         await progress_callback(QueryProgress.RETRIEVING_CHUNKS)
-    chunks = await _get_vector_context(query, chunks_vdb, query_param, None)
+    runtime = global_config.get("_retrieval_runtime")
+    search_query = getattr(query_param, "_retrieval_query", query)
+    chunks = await _get_vector_context(
+        search_query, chunks_vdb, query_param, None, runtime=runtime
+    )
 
     if chunks is None or len(chunks) == 0:
         logger.info(
@@ -6805,10 +6879,24 @@ async def naive_query(
             content=prompt_content, raw_data=raw_data, llm_generated=False
         )
 
+    verification = {}
+    use_model_func = verified_model(
+        use_model_func,
+        query_param,
+        verification,
+        reference_ids=[
+            ref["reference_id"]
+            for ref in raw_data.get("data", {}).get("references", [])
+        ],
+    )
+    if query_param.verify_answer:
+        raw_data["metadata"]["verification"] = verification
+
     # Handle cache
     answer_cache_kv = _answer_cache_kv(query_param, hashing_kv)
     args_hash = compute_args_hash(
         _ANSWER_CACHE_POLICY_VERSION,
+        evidence_fingerprint(sys_prompt, query_param),
         query_param.mode,
         query,
         query_param.response_type,
@@ -6819,9 +6907,8 @@ async def naive_query(
         query_param.max_total_tokens,
         # The COMPOSED instructions, so changing the server-side prefix
         # invalidates entries generated under the old one. With no prefix
-        # configured this is byte-identical to the previous
-        # `query_param.user_prompt or ""`, so existing entries keep hitting --
-        # which is why _ANSWER_CACHE_POLICY_VERSION does not need a bump.
+        # configured this component is unchanged. The evidence fingerprint
+        # and v3 policy intentionally invalidate pre-evidence entries.
         # `disable_user_prompt_prefix` is deliberately NOT a separate key
         # component: it only ever acts through this value, and adding it would
         # split the cache between two requests that build identical prompts.
@@ -6896,7 +6983,13 @@ async def naive_query(
                 .strip()
             )
 
-        return QueryResult(content=response, raw_data=raw_data)
+        return QueryResult(
+            content=response,
+            raw_data=raw_data,
+            llm_generated=not (
+                query_param.verify_answer and verification.get("supported") is False
+            ),
+        )
     else:
         # Streaming response (AsyncIterator)
         return QueryResult(

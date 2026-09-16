@@ -5,11 +5,9 @@ request's ``QueryParam.user_prompt``. It changes the generated text, so it has
 to reach the answer-cache key: otherwise an operator who edits the prefix keeps
 being served answers written under the old one.
 
-The key component was changed in place -- ``query_param.user_prompt or ""``
-became the COMPOSED text -- rather than appended as a new component. That is
-what keeps ``_ANSWER_CACHE_POLICY_VERSION`` at v2: with no prefix configured
-the composed text is byte-identical to the old value, so every entry written
-before this feature existed still hits. These tests pin both halves.
+Evidence-aware cache v3 deliberately invalidates older entries, including
+pre-prefix entries: they cannot prove which source revision supported them.
+The frozen historical key below pins that invalidation.
 
 ``disable_user_prompt_prefix`` is deliberately NOT a key component of its own:
 it acts only through the composed text, so a disabled request with a prefix
@@ -353,13 +351,13 @@ async def test_disabled_prefix_keeps_the_prefix_out_of_the_prompt(
 
 
 # ---------------------------------------------------------------------------
-# The invariant: an unconfigured prefix invalidates nothing.
+# Evidence-aware keys deliberately invalidate historical answers.
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.offline
 @pytest.mark.asyncio
-async def test_naive_entry_written_before_the_prefix_feature_still_hits():
+async def test_naive_pre_evidence_entry_is_invalidated():
     cache = _FakeKVStorage()
     model = _RecordingModel()
     cfg = _query_global_config(model)
@@ -371,13 +369,13 @@ async def test_naive_entry_written_before_the_prefix_feature_still_hits():
     }
 
     result = await _run_naive(param, cfg, cache)
-    assert result.content == "PRE-PREFIX-ANSWER"
-    assert model.calls == 0
+    assert result.content == "answer-1"
+    assert model.calls == 1
 
 
 @pytest.mark.offline
 @pytest.mark.asyncio
-async def test_kg_entry_written_before_the_prefix_feature_still_hits(
+async def test_kg_pre_evidence_entry_is_invalidated(
     stub_query_context,
 ):
     cache = _FakeKVStorage()
@@ -391,8 +389,8 @@ async def test_kg_entry_written_before_the_prefix_feature_still_hits(
     }
 
     result = await _run_kg(param, cfg, cache)
-    assert result.content == "PRE-PREFIX-ANSWER"
-    assert model.calls == 0
+    assert result.content == "answer-1"
+    assert model.calls == 1
 
 
 @pytest.mark.offline

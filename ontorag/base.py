@@ -188,6 +188,32 @@ class QueryParam:
     instructions. Set this to True to take full control of the final text.
     """
 
+    # Appended for positional SDK compatibility. None preserves legacy budgets.
+    retrieval_top_k: int | None = None
+    rerank_top_k: int | None = None
+    enable_lexical: bool = False
+    fuse_retrieval: bool = False
+    rewrite_followups: bool = False
+    context_neighbors: int = 0
+    diversify_context: bool = False
+    document_version: str | None = None
+    as_of: str | None = None
+    exclude_superseded: bool = False
+    verify_answer: bool = False
+    cache_retrieval: bool = False
+    auto_route: bool = False
+    retry_missing_evidence: bool = False
+
+    enable_visual: bool = False
+    visual_references: list[dict] | None = field(default=None, repr=False)
+    visual_top_k: int = 40
+    visual_rerank: bool = True
+
+    def __post_init__(self):
+        from ontorag.retrieval.runtime import validate_options
+
+        validate_options(self)
+
 
 @dataclass
 class StorageNameSpace(ABC):

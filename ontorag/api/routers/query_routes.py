@@ -166,6 +166,53 @@ class QueryRequest(BaseModel):
         description="If True, enables streaming output. Defaults to False for /query, True for /query/stream.",
     )
 
+    retrieval_top_k: Optional[int] = Field(default=None, ge=1, le=1000)
+    rerank_top_k: Optional[int] = Field(default=None, ge=1, le=1000)
+    enable_lexical: bool = False
+    fuse_retrieval: bool = False
+    rewrite_followups: bool = False
+    context_neighbors: int = Field(default=0, ge=0, le=3)
+    diversify_context: bool = False
+    document_version: Optional[str] = Field(default=None, min_length=1, max_length=200)
+    as_of: Optional[str] = Field(default=None, pattern=r"^\d{4}-\d{2}-\d{2}$")
+    exclude_superseded: bool = False
+    verify_answer: bool = False
+    cache_retrieval: bool = False
+    auto_route: bool = False
+    retry_missing_evidence: bool = False
+    enable_visual: bool = False
+    visual_references: Optional[List[Dict[str, Any]]] = Field(
+        default=None, min_length=1, max_length=4, repr=False
+    )
+    visual_top_k: int = Field(default=40, ge=1, le=100)
+    visual_rerank: bool = True
+
+    @model_validator(mode="after")
+    def valid_visual_options(self):
+        if self.visual_references is not None and not self.enable_visual:
+            raise ValueError("visual_references requires enable_visual=true")
+        if self.enable_visual and self.mode == "bypass":
+            raise ValueError("Visual retrieval is unavailable in bypass mode")
+        return self
+
+    @field_validator("visual_references")
+    @classmethod
+    def validate_visual_references(cls, value):
+        if value is not None:
+            from ontorag.visual.protocol import validate_references
+
+            validate_references(value)
+        return value
+
+    @field_validator("as_of")
+    @classmethod
+    def valid_as_of(cls, value):
+        if value:
+            from datetime import date
+
+            date.fromisoformat(value)
+        return value
+
     @field_validator("query", mode="after")
     @classmethod
     def query_strip_after(cls, query: str) -> str:
@@ -283,6 +330,7 @@ class ReferenceItem(BaseModel):
 
 
 class QueryResponse(BaseModel):
+    verification: Optional[Dict[str, Any]] = None
     response: str = Field(
         description="The generated response",
     )
@@ -602,6 +650,10 @@ def create_query_routes(rag, api_key: Optional[str] = None, top_k: int = 60):
             result = await rag.aquery_llm(request.query, param=param)
             response_time = round(time.perf_counter() - start_time, 3)
 
+            if result.get("metadata", {}).get("failure_reason") == "retrieval_error":
+                raise RuntimeError(
+                    "Retrieval failed; the backend did not return a complete result"
+                )
             # Extract LLM response and references from unified result
             llm_response = result.get("llm_response", {})
             data = result.get("data", {})
@@ -647,6 +699,7 @@ def create_query_routes(rag, api_key: Optional[str] = None, top_k: int = 60):
                     references=references,
                     response_time=response_time,
                     llm_generated=llm_generated,
+                    verification=result.get("metadata", {}).get("verification"),
                 )
             else:
                 return QueryResponse(
@@ -654,6 +707,7 @@ def create_query_routes(rag, api_key: Optional[str] = None, top_k: int = 60):
                     references=None,
                     response_time=response_time,
                     llm_generated=llm_generated,
+                    verification=result.get("metadata", {}).get("verification"),
                 )
         except Exception as e:
             logger.error(f"Error processing query: {str(e)}", exc_info=True)
@@ -677,6 +731,9 @@ def create_query_routes(rag, api_key: Optional[str] = None, top_k: int = 60):
 
         async def _generate():
             references = result.get("data", {}).get("references", [])
+            if result.get("metadata", {}).get("failure_reason") == "retrieval_error":
+                yield f"{json.dumps({'error': 'Retrieval failed; please retry.'})}\n"
+                return
             llm_response = result.get("llm_response", {})
 
             # Enrich references with chunk content if requested
@@ -730,6 +787,10 @@ def create_query_routes(rag, api_key: Optional[str] = None, top_k: int = 60):
                     "response": response_content,
                     "llm_generated": llm_generated,
                 }
+                if result.get("metadata", {}).get("verification"):
+                    complete_response["verification"] = result["metadata"][
+                        "verification"
+                    ]
                 if include_references:
                     complete_response["references"] = references
 
