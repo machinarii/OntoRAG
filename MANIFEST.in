@@ -3,3 +3,6 @@ include ontorag/api/requirements.txt
 recursive-include ontorag/api/webui *
 recursive-include ontorag/api/static *
 recursive-include prompts/samples *
+
+# Referenced projects are installed separately, never bundled.
+prune external

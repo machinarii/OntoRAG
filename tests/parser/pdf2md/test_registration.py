@@ -16,7 +16,8 @@ def test_pdf2md_spec_registered():
     from ontorag.parser.pdf2md import probe
 
     assert spec.endpoint_requirement() in (None, probe.INSTALL_HINT)
-    assert probe.INSTALL_HINT == "pip install 'ontorag[pdf2md]'"
+    assert "pip install 'ontorag[pdf2md]'" in probe.INSTALL_HINT
+    assert "PDF2MD_REPO_PATH" in probe.INSTALL_HINT
 
 
 def test_pdf2md_unavailable_falls_through_routing(monkeypatch):

@@ -19,6 +19,8 @@ jobs:
 
     steps:
     - uses: actions/checkout@v7
+      with:
+        submodules: recursive
 
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v7
@@ -40,7 +42,7 @@ jobs:
       # pytest/pytest-asyncio/httpx2. Without them importorskip silently skips.
       run: >-
         uv sync --frozen --python ${{ matrix.python-version }}
-        --extra api --extra offline-storage --extra offline-llm --extra pytest
+        --extra api --extra offline-storage --extra offline-llm --extra pytest --extra pdf2md
 
     - name: Set up Bun
       uses: oven-sh/setup-bun@v2

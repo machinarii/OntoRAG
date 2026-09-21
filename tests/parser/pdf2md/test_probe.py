@@ -6,6 +6,7 @@ pytestmark = pytest.mark.offline
 
 
 def test_pdf2md_available_tracks_pymupdf(monkeypatch):
+    monkeypatch.setattr(probe, "reference_available", lambda: True)
     monkeypatch.setattr(probe.importlib.util, "find_spec", lambda name: None)
     assert probe.check_pdf2md_available() is False
     monkeypatch.setattr(probe.importlib.util, "find_spec", lambda name: object())
@@ -92,3 +93,13 @@ def test_tesseract_language_check(monkeypatch):
 def test_tesseract_language_check_is_silent_without_binary(monkeypatch):
     monkeypatch.setattr(probe.shutil, "which", lambda name: None)
     assert probe.check_tesseract_languages("eng") is None
+
+
+def test_pdf2md_requires_external_checkout(monkeypatch, tmp_path):
+    monkeypatch.setattr(probe.importlib.util, "find_spec", lambda name: object())
+    monkeypatch.setenv("PDF2MD_REPO_PATH", str(tmp_path))
+    assert not probe.check_pdf2md_available()
+    (tmp_path / "pdf2md_all.py").write_text("")
+    assert not probe.check_pdf2md_available()
+    (tmp_path / "structured.py").write_text("")
+    assert probe.check_pdf2md_available()
