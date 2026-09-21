@@ -15,9 +15,7 @@ FIXTURE = ROOT / "tests" / "fixtures" / "yago" / "mini_taxonomy.nt"
 
 
 def _load_script_module():
-    spec = importlib.util.spec_from_file_location(
-        "build_yago_taxonomy", SCRIPT_PATH
-    )
+    spec = importlib.util.spec_from_file_location("build_yago_taxonomy", SCRIPT_PATH)
     module = importlib.util.module_from_spec(spec)
     assert spec.loader is not None
     spec.loader.exec_module(module)

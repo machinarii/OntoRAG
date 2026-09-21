@@ -373,9 +373,7 @@ class BindingOptions:
         )
 
         sample_bottom = (
-            ("#\n# End of .env entries for OntoRAG binding options\n")
-            + "#" * 80
-            + "\n"
+            ("#\n# End of .env entries for OntoRAG binding options\n") + "#" * 80 + "\n"
         )
 
         sample_stream = StringIO()

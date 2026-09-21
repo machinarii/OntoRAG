@@ -85,9 +85,7 @@ def _client(tmp_path, monkeypatch, title):
     from ontorag.api.config import parse_args
     from ontorag.api import ontorag_server
 
-    monkeypatch.setattr(
-        ontorag_server, "__file__", str(tmp_path / "ontorag_server.py")
-    )
+    monkeypatch.setattr(ontorag_server, "__file__", str(tmp_path / "ontorag_server.py"))
     monkeypatch.setattr(ontorag_server, "webui_title", title)
 
     args = parse_args()

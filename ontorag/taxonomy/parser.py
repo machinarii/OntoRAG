@@ -36,9 +36,7 @@ class YagoClass:
 
 
 _IRI_TRIPLE = re.compile(r"^<([^>]+)>\s+<([^>]+)>\s+<([^>]+)>\s*\.\s*$")
-_LIT_TRIPLE = re.compile(
-    r'^<([^>]+)>\s+<([^>]+)>\s+"((?:\\.|[^"\\])*)"@(\w+)\s*\.\s*$'
-)
+_LIT_TRIPLE = re.compile(r'^<([^>]+)>\s+<([^>]+)>\s+"((?:\\.|[^"\\])*)"@(\w+)\s*\.\s*$')
 
 
 def _unescape_literal(raw: str) -> str:
@@ -76,7 +74,10 @@ def parse_ntriples_file(path: str | Path) -> list[YagoClass]:
             m = _LIT_TRIPLE.match(line)
             if m:
                 subj, pred, raw, lang = (
-                    m.group(1), m.group(2), m.group(3), m.group(4),
+                    m.group(1),
+                    m.group(2),
+                    m.group(3),
+                    m.group(4),
                 )
                 if lang != LABEL_LANGUAGE:
                     continue

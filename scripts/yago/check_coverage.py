@@ -82,14 +82,20 @@ async def _check(
                     primary_counts[top["iri"]] += 1
                 logger.info(
                     "[%d/%d] %s -> %s (%.2f)",
-                    i, len(docs), doc.name, top["iri"], top["score"],
+                    i,
+                    len(docs),
+                    doc.name,
+                    top["iri"],
+                    top["score"],
                 )
 
             total = len(docs)
             print()
             print(f"=== Coverage report ({total} docs) ===")
-            print(f"Uncategorized: {uncategorized}/{total} "
-                  f"({100.0 * uncategorized / total:.1f}%)")
+            print(
+                f"Uncategorized: {uncategorized}/{total} "
+                f"({100.0 * uncategorized / total:.1f}%)"
+            )
             print()
             print("Top primary classes:")
             for iri, count in primary_counts.most_common(20):
@@ -118,20 +124,28 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--llm-binding", default="openai")
     args = p.parse_args(argv if argv is not None else sys.argv[1:])
 
-    logging.basicConfig(level=logging.INFO,
-                        format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+    logging.basicConfig(
+        level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s"
+    )
 
     embed = _resolve_callable(args.embedding_binding, ["embed", "openai_embed"])
-    llm = _resolve_callable(args.llm_binding, [
-        "complete", "openai_complete", "gpt_4o_mini_complete",
-    ])
-    asyncio.run(_check(
-        sample_dir=args.sample_dir,
-        working_dir=args.working_dir,
-        workspace=args.workspace,
-        embedding_func=embed,
-        llm_func=llm,
-    ))
+    llm = _resolve_callable(
+        args.llm_binding,
+        [
+            "complete",
+            "openai_complete",
+            "gpt_4o_mini_complete",
+        ],
+    )
+    asyncio.run(
+        _check(
+            sample_dir=args.sample_dir,
+            working_dir=args.working_dir,
+            workspace=args.workspace,
+            embedding_func=embed,
+            llm_func=llm,
+        )
+    )
     return 0
 
 

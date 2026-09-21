@@ -75,9 +75,7 @@ async def test_multi_parent_class_has_both_parent_edges(graph_storage):
         "http://schema.org/Organization",
         "http://schema.org/MedicalEntity",
     ):
-        edge = await graph_storage.get_edge(
-            "http://schema.org/Hospital", parent
-        )
+        edge = await graph_storage.get_edge("http://schema.org/Hospital", parent)
         assert edge is not None, f"missing Hospital -> {parent}"
         assert edge["child_iri"] == "http://schema.org/Hospital"
 

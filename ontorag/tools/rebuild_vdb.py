@@ -776,9 +776,7 @@ class RebuildTool:
 
     def confirm_server_stopped(self) -> bool:
         confirm = (
-            input("\nHas the OntoRAG Server been shut down? (yes/no): ")
-            .strip()
-            .lower()
+            input("\nHas the OntoRAG Server been shut down? (yes/no): ").strip().lower()
         )
         if confirm != "yes":
             print("\n✓ Operation cancelled - please shut down the server first")

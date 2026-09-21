@@ -62,7 +62,7 @@ def test_multi_parent_class_keeps_all_parents():
 def test_ignores_non_english_labels(tmp_path: Path):
     extra = tmp_path / "extra.nt"
     extra.write_text(
-        '<http://schema.org/Thing> '
+        "<http://schema.org/Thing> "
         '<http://www.w3.org/2000/01/rdf-schema#label> "Cosa"@es .\n'
     )
     classes = parse_ntriples_file(extra)
@@ -72,10 +72,10 @@ def test_ignores_non_english_labels(tmp_path: Path):
 def test_parses_escaped_quotes_in_literal(tmp_path: Path):
     extra = tmp_path / "extra.nt"
     extra.write_text(
-        '<http://schema.org/X> '
+        "<http://schema.org/X> "
         '<http://www.w3.org/2000/01/rdf-schema#label> "X"@en .\n'
-        '<http://schema.org/X> '
-        '<http://www.w3.org/2000/01/rdf-schema#comment> '
+        "<http://schema.org/X> "
+        "<http://www.w3.org/2000/01/rdf-schema#comment> "
         '"He said \\"hi\\"."@en .\n'
     )
     classes = parse_ntriples_file(extra)

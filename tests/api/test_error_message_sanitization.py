@@ -35,9 +35,7 @@ from fastapi.testclient import TestClient
 
 # A stand-in exception message stuffed with the kind of internal detail that
 # must never reach a client (mirrors a real asyncpg connection failure).
-_SECRET = (
-    "connect failed host=db.corp port=5432 user=ontorag key=/etc/ontorag/tls.key"
-)
+_SECRET = "connect failed host=db.corp port=5432 user=ontorag key=/etc/ontorag/tls.key"
 _SECRET_NEEDLES = ("db.corp", "5432", "ontorag", "/etc/ontorag/tls.key", _SECRET)
 
 _ENV_VARS_TO_ISOLATE = (

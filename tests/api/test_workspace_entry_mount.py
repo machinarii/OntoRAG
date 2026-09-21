@@ -125,9 +125,7 @@ def _build_app(tmp_path, monkeypatch, *cli_args):
     import ontorag.api.ontorag_server as ontorag_server
 
     # Redirect the build checks and the StaticFiles mounts to the staged dir.
-    monkeypatch.setattr(
-        ontorag_server, "__file__", str(tmp_path / "ontorag_server.py")
-    )
+    monkeypatch.setattr(ontorag_server, "__file__", str(tmp_path / "ontorag_server.py"))
 
     monkeypatch.setattr(ontorag_server, "OntoRAG", _FakeOntoRAG)
     monkeypatch.setattr(

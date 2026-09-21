@@ -450,9 +450,7 @@ def test_smart_audit_json_is_byte_stable_across_reparse(tmp_path, monkeypatch) -
         source_path = input_dir / "doc.docx"
         source_path.write_bytes(b"fake-docx")
         rag = build_debug_rag()
-        with mock.patch(
-            "ontorag.parser.docx.parse_document.extract_docx_blocks", stub
-        ):
+        with mock.patch("ontorag.parser.docx.parse_document.extract_docx_blocks", stub):
             asyncio.run(
                 get_parser("native").parse(
                     ParseContext(

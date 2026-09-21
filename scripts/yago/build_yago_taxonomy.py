@@ -122,10 +122,14 @@ async def build_taxonomy(
         await vdb.initialize()
 
         try:
-            logger.info("Loading %d classes into the YAGO graph namespace…", len(classes))
+            logger.info(
+                "Loading %d classes into the YAGO graph namespace…", len(classes)
+            )
             await load_taxonomy_to_graph(classes, graph)
 
-            logger.info("Selecting working vocabulary (target size %d)…", vocabulary_size)
+            logger.info(
+                "Selecting working vocabulary (target size %d)…", vocabulary_size
+            )
             vocab = await select_working_vocabulary(
                 graph,
                 [c.iri for c in classes],
@@ -172,27 +176,52 @@ def _resolve_embedding(binding: str, model: str | None) -> EmbeddingFunc:
 
 def _parse_args(argv: list[str]) -> argparse.Namespace:
     p = argparse.ArgumentParser(description=__doc__)
-    p.add_argument("--files", nargs="+", type=Path, default=None,
-                   help="YAGO N-Triples files to parse. Defaults to the "
-                        "pinned YAGO 4.0 T-Box at /Users/jin/OntoRAG/yago/. "
-                        "Overriding this disables SHA256 verification.")
-    p.add_argument("--working-dir", required=True, type=Path,
-                   help="OntoRAG working_dir to populate")
-    p.add_argument("--workspace", default="default",
-                   help="Workspace name (default: 'default')")
-    p.add_argument("--vocabulary-size", type=int,
-                   default=DEFAULT_WORKING_VOCABULARY_SIZE,
-                   help=f"Working vocabulary size "
-                        f"(default {DEFAULT_WORKING_VOCABULARY_SIZE})")
-    p.add_argument("--embedding-binding", default="openai",
-                   help="ontorag.llm.<binding> module to import")
-    p.add_argument("--embedding-model", default=None,
-                   help="Embedding model name (binding-specific)")
-    p.add_argument("--exclude", action="append", default=[],
-                   help="IRI to exclude from the vocabulary (repeatable)")
-    p.add_argument("--skip-verify", action="store_true",
-                   help="Skip the YAGO file SHA256 manifest check. Set "
-                        "automatically when --files is overridden.")
+    p.add_argument(
+        "--files",
+        nargs="+",
+        type=Path,
+        default=None,
+        help="YAGO N-Triples files to parse. Defaults to the "
+        "pinned YAGO 4.0 T-Box at /Users/jin/OntoRAG/yago/. "
+        "Overriding this disables SHA256 verification.",
+    )
+    p.add_argument(
+        "--working-dir",
+        required=True,
+        type=Path,
+        help="OntoRAG working_dir to populate",
+    )
+    p.add_argument(
+        "--workspace", default="default", help="Workspace name (default: 'default')"
+    )
+    p.add_argument(
+        "--vocabulary-size",
+        type=int,
+        default=DEFAULT_WORKING_VOCABULARY_SIZE,
+        help=f"Working vocabulary size (default {DEFAULT_WORKING_VOCABULARY_SIZE})",
+    )
+    p.add_argument(
+        "--embedding-binding",
+        default="openai",
+        help="ontorag.llm.<binding> module to import",
+    )
+    p.add_argument(
+        "--embedding-model",
+        default=None,
+        help="Embedding model name (binding-specific)",
+    )
+    p.add_argument(
+        "--exclude",
+        action="append",
+        default=[],
+        help="IRI to exclude from the vocabulary (repeatable)",
+    )
+    p.add_argument(
+        "--skip-verify",
+        action="store_true",
+        help="Skip the YAGO file SHA256 manifest check. Set "
+        "automatically when --files is overridden.",
+    )
     p.add_argument("--verbose", action="store_true")
     return p.parse_args(argv)
 
@@ -211,14 +240,16 @@ def main(argv: list[str] | None = None) -> int:
         verify_yago_files()
 
     embed = _resolve_embedding(args.embedding_binding, args.embedding_model)
-    summary = asyncio.run(build_taxonomy(
-        files=files,
-        working_dir=args.working_dir,
-        workspace=args.workspace,
-        embedding_func=embed,
-        vocabulary_size=args.vocabulary_size,
-        excluded_iris=set(args.exclude) or None,
-    ))
+    summary = asyncio.run(
+        build_taxonomy(
+            files=files,
+            working_dir=args.working_dir,
+            workspace=args.workspace,
+            embedding_func=embed,
+            vocabulary_size=args.vocabulary_size,
+            excluded_iris=set(args.exclude) or None,
+        )
+    )
     print("YAGO bootstrap complete:")
     for k, v in summary.items():
         print(f"  {k}: {v}")
