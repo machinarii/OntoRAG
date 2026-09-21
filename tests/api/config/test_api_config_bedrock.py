@@ -52,9 +52,7 @@ def test_bedrock_env_binding_alias_is_normalized(monkeypatch):
 
 
 def test_bedrock_cli_binding_alias_is_not_supported(monkeypatch):
-    monkeypatch.setattr(
-        sys, "argv", ["ontorag-server", "--llm-binding", "aws_bedrock"]
-    )
+    monkeypatch.setattr(sys, "argv", ["ontorag-server", "--llm-binding", "aws_bedrock"])
 
     with pytest.raises(SystemExit):
         parse_args()
@@ -91,9 +89,7 @@ def test_bedrock_binding_accepts_default_aws_credential_provider_chain(monkeypat
     monkeypatch.setattr(sys, "argv", ["ontorag-server"])
     monkeypatch.setenv("LLM_BINDING", "bedrock")
     monkeypatch.setenv("EMBEDDING_BINDING", "ollama")
-    monkeypatch.setenv(
-        "AWS_ROLE_ARN", "arn:aws:iam::123456789012:role/ontorag-bedrock"
-    )
+    monkeypatch.setenv("AWS_ROLE_ARN", "arn:aws:iam::123456789012:role/ontorag-bedrock")
     monkeypatch.setenv(
         "AWS_WEB_IDENTITY_TOKEN_FILE",
         "/var/run/secrets/eks.amazonaws.com/serviceaccount/token",
@@ -109,9 +105,7 @@ def test_bedrock_role_accepts_default_aws_credential_provider_chain(monkeypatch)
     monkeypatch.setattr(sys, "argv", ["ontorag-server"])
     monkeypatch.setenv("QUERY_LLM_BINDING", "bedrock")
     monkeypatch.setenv("QUERY_LLM_MODEL", "us.amazon.nova-lite-v1:0")
-    monkeypatch.setenv(
-        "AWS_ROLE_ARN", "arn:aws:iam::123456789012:role/ontorag-bedrock"
-    )
+    monkeypatch.setenv("AWS_ROLE_ARN", "arn:aws:iam::123456789012:role/ontorag-bedrock")
     monkeypatch.setenv(
         "AWS_WEB_IDENTITY_TOKEN_FILE",
         "/var/run/secrets/eks.amazonaws.com/serviceaccount/token",

@@ -932,9 +932,7 @@ async def test_equation_omitted_field_falls_back_to_sidecar_latex(
 
 
 @pytest.mark.asyncio
-async def test_equation_equ_alias_accepted(
-    tmp_path, caplog, _propagate_ontorag_logger
-):
+async def test_equation_equ_alias_accepted(tmp_path, caplog, _propagate_ontorag_logger):
     """Regression #3502: when the model returns the equation under a
     semantically equivalent key such as `equ`, it must be accepted (and
     logged — an accepted alias shadows the sidecar's authoritative LaTeX)."""

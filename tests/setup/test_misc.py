@@ -2141,8 +2141,7 @@ fi
 def test_backup_only_backs_up_env_and_generated_compose(tmp_path: Path) -> None:
     """backup_only should back up both .env and the active generated compose file."""
     compose_content = (
-        "\n".join(["services:", "  ontorag:", "    image: example/ontorag:test"])
-        + "\n"
+        "\n".join(["services:", "  ontorag:", "    image: example/ontorag:test"]) + "\n"
     )
     write_text_lines(tmp_path / ".env", ["HOST=0.0.0.0"])
     (tmp_path / "docker-compose.final.yml").write_text(

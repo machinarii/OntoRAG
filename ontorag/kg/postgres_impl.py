@@ -1367,9 +1367,7 @@ class PostgreSQLDB:
                     "Successfully added chunk_id column to ONTORAG_LLM_CACHE table"
                 )
             else:
-                logger.info(
-                    "chunk_id column already exists in ONTORAG_LLM_CACHE table"
-                )
+                logger.info("chunk_id column already exists in ONTORAG_LLM_CACHE table")
 
             # Add missing cache_type column
             if "cache_type" not in existing_column_names:
@@ -6534,9 +6532,7 @@ class PGDocStatusStorage(DocStatusStorage):
             return {}
 
         status_values = [s.value for s in statuses]
-        sql = (
-            "SELECT * FROM ONTORAG_DOC_STATUS WHERE workspace=$1 AND status = ANY($2)"
-        )
+        sql = "SELECT * FROM ONTORAG_DOC_STATUS WHERE workspace=$1 AND status = ANY($2)"
         result = await self.db.query(
             sql, [self.workspace, status_values], multirows=True
         )

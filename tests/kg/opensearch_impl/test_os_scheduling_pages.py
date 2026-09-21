@@ -74,9 +74,7 @@ def _transient_error() -> TransportError:
 
 @pytest.fixture(autouse=True)
 def patch_data_init_lock():
-    with patch(
-        "ontorag.kg.opensearch_impl.get_data_init_lock", side_effect=_mock_lock
-    ):
+    with patch("ontorag.kg.opensearch_impl.get_data_init_lock", side_effect=_mock_lock):
         yield
 
 

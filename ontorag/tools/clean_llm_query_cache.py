@@ -991,14 +991,10 @@ class CleanupTool:
             print("\n" + "=" * 60)
 
             confirm = (
-                input("\nHas OntoRAG Server been shut down? (yes/no): ")
-                .strip()
-                .lower()
+                input("\nHas OntoRAG Server been shut down? (yes/no): ").strip().lower()
             )
             if confirm != "yes":
-                print(
-                    "\n✓ Operation cancelled - Please shut down OntoRAG Server first"
-                )
+                print("\n✓ Operation cancelled - Please shut down OntoRAG Server first")
                 return None, None, None
 
             print("✓ Proceeding with JsonKVStorage cleanup...")

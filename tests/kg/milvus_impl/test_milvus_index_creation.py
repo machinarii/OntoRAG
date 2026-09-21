@@ -793,9 +793,7 @@ class TestMilvusIndexCreation:
         # Mock the init lock as an async context manager
         mock_lock = AsyncMock()
 
-        with patch(
-            "ontorag.kg.milvus_impl.get_data_init_lock", return_value=mock_lock
-        ):
+        with patch("ontorag.kg.milvus_impl.get_data_init_lock", return_value=mock_lock):
             with patch.object(storage, "_create_collection_if_not_exist"):
                 asyncio.run(storage.initialize())
 
@@ -830,9 +828,7 @@ class TestMilvusIndexCreation:
         # Mock the init lock as an async context manager
         mock_lock = AsyncMock()
 
-        with patch(
-            "ontorag.kg.milvus_impl.get_data_init_lock", return_value=mock_lock
-        ):
+        with patch("ontorag.kg.milvus_impl.get_data_init_lock", return_value=mock_lock):
             with patch.object(storage, "_create_collection_if_not_exist"):
                 asyncio.run(storage.initialize())
 

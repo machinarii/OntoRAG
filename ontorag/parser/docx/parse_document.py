@@ -120,8 +120,7 @@ def _diagnose_invalid_docx(file_path: str) -> tuple[str, str]:
     except OSError as exc:
         return (
             f"The file at '{file_path}' could not be read: {exc}",
-            "  1. Verify the file exists and is readable\n"
-            "  2. Re-upload it to OntoRAG",
+            "  1. Verify the file exists and is readable\n  2. Re-upload it to OntoRAG",
         )
 
     if not head:

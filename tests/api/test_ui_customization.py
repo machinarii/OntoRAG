@@ -869,9 +869,7 @@ def _build_app(tmp_path, monkeypatch, *cli_args):
 
     import ontorag.api.ontorag_server as ontorag_server
 
-    monkeypatch.setattr(
-        ontorag_server, "__file__", str(tmp_path / "ontorag_server.py")
-    )
+    monkeypatch.setattr(ontorag_server, "__file__", str(tmp_path / "ontorag_server.py"))
     monkeypatch.setattr(ontorag_server, "OntoRAG", _FakeOntoRAG)
     monkeypatch.setattr(
         ontorag_server, "create_document_routes", lambda *_a, **_k: APIRouter()

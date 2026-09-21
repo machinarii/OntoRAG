@@ -2656,9 +2656,7 @@ generate_docker_compose "$REPO_ROOT/docker-compose.final.yml\"
     )
     assert result.count("UI_TEMPLATES_DIR") == 1
     assert (
-        yaml.safe_load(result)["services"]["ontorag"]["environment"][
-            "UI_TEMPLATES_DIR"
-        ]
+        yaml.safe_load(result)["services"]["ontorag"]["environment"]["UI_TEMPLATES_DIR"]
         == "/custom/ui_templates"
     )
 

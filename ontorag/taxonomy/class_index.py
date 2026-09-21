@@ -76,9 +76,11 @@ async def retrieve_candidate_classes(
     for h in hits:
         distance = float(h.get("distance", 1.0))
         score = max(0.0, min(1.0, 1.0 - distance))
-        out.append({
-            "iri": h.get("iri") or h.get("id"),
-            "label": h.get("label", ""),
-            "score": score,
-        })
+        out.append(
+            {
+                "iri": h.get("iri") or h.get("id"),
+                "label": h.get("label", ""),
+                "score": score,
+            }
+        )
     return out

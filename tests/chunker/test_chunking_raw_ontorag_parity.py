@@ -631,9 +631,7 @@ def test_explicit_V_dispatches_to_semantic_vector(tmp_path, monkeypatch):
 
 
 @pytest.mark.offline
-def test_pending_parse_ontorag_summary_populated_after_processed(
-    tmp_path, monkeypatch
-):
+def test_pending_parse_ontorag_summary_populated_after_processed(tmp_path, monkeypatch):
     """A document enqueued as ``pending_parse`` has empty content at
     enqueue time, so ``content_summary`` starts empty.  After
     ``parse_native`` produces ``.blocks.jsonl`` and the state machine
