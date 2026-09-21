@@ -1,5 +1,7 @@
 # pdf2md Markdown Intake Implementation Plan
 
+> Implementation update (2026-09-21): the vendored converter described below has been replaced by a pinned reference to machinarii/pdf2md. See [current integration](../../Pdf2MdIntegration.md).
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Add a `pdf2md` parser engine that converts PDF/EPUB/DOCX/DOC/ODT/RTF sources into a Markdown-canonical `.textpack` (OCR'ing scanned PDFs in place first), hands it to the native Markdown engine, and makes the `.textpack` the catalogued/archived document while the original stays untouched in its folder.

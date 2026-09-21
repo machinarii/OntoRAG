@@ -140,7 +140,7 @@ api = [
 ]
 
 # Offline deployment dependencies (layered design for flexibility)
-# Markdown-canonical intake via the vendored pdf2md converter + OCRmyPDF.
+# Markdown-canonical intake via the referenced machinarii/pdf2md converter + OCRmyPDF.
 # PyMuPDF is AGPL-3.0: install this extra only where that licence is acceptable.
 # System packages also needed for OCR: tesseract-ocr, ghostscript; for
 # DOC/ODT/RTF input: libreoffice (soffice on PATH).
@@ -244,9 +244,4 @@ markers = [
 
 [tool.ruff]
 target-version = "py310"
-
-[tool.ruff.format]
-# Vendored verbatim from the author's pdf2md build; must stay byte-identical
-# to upstream (plus two documented edits) so re-vendoring is a clean diff.
-# Linting still applies (it caught a py3.12-only f-string on first import).
-exclude = ["ontorag/parser/pdf2md/_pdf2md.py"]
+extend-exclude = ["external"]

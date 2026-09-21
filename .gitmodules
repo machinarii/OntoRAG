@@ -1,0 +1,3 @@
+[submodule "external/pdf2md"]
+	path = external/pdf2md
+	url = https://github.com/machinarii/pdf2md

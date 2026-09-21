@@ -100,7 +100,11 @@ def build_manifest(
         "figures": stats.get("figure_regions", 0),
         "tables": stats.get("tables", 0),
         "ocr": ocr,
-        "converter": {"pdf2md": "pdf2md-files.zip 2026-09-02", "ontorag": __version__},
+        "converter": {
+            "pdf2md": front_matter.get("generator_version", "unknown"),
+            "repository": "https://github.com/machinarii/pdf2md",
+            "ontorag": __version__,
+        },
         "warnings": list(warnings),
     }
 

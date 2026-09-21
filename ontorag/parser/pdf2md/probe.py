@@ -17,11 +17,16 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:  # pragma: no cover - typing only, keeps this module stdlib-cheap
     from ontorag.parser.pdf2md.ocr import OcrSettings
 
-INSTALL_HINT = "pip install 'ontorag[pdf2md]'"
+from .reference import reference_available
+
+INSTALL_HINT = (
+    "pip install 'ontorag[pdf2md]' and git submodule update --init external/pdf2md "
+    "(or set PDF2MD_REPO_PATH to a machinarii/pdf2md checkout)"
+)
 
 
 def check_pdf2md_available() -> bool:
-    return importlib.util.find_spec("pymupdf") is not None
+    return importlib.util.find_spec("pymupdf") is not None and reference_available()
 
 
 def check_ocr_available(settings: "OcrSettings | None" = None) -> str | None:
