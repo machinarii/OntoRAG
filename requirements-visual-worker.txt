@@ -2,7 +2,7 @@ einops>=0.8,<1
 hydra-core==1.3.7
 Pillow>=10.4,<13
 py3-wget>=1.0,<2
-sentencepiece>=0.2,<1
+sentencepiece>=0.2.2,<1
 # Install in a dedicated environment alongside OntoRAG[api], not the API environment.
 # FoundYou source and checkpoints are installed separately: docs/VisualRetrieval.md.
 # This CPU-compatible combination was smoke-tested on Linux aarch64/Python 3.13.
