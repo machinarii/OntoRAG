@@ -1,6 +1,6 @@
 einops>=0.8,<1
 hydra-core==1.3.7
-Pillow>=10.4,<13
+Pillow>=12.3.0,<13
 py3-wget>=1.0,<2
 sentencepiece>=0.2,<1
 # Install in a dedicated environment alongside OntoRAG[api], not the API environment.
