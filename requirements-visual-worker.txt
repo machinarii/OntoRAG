@@ -7,6 +7,6 @@ sentencepiece>=0.2,<1
 # FoundYou source and checkpoints are installed separately: docs/VisualRetrieval.md.
 # This CPU-compatible combination was smoke-tested on Linux aarch64/Python 3.13.
 # For CUDA, install the matching torch/torchvision CUDA wheels for your host.
-torch==2.8.0
-torchvision==0.23.0
+torch==2.14.0
+torchvision==0.29.0
 transformers==4.57.6
